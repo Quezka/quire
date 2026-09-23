@@ -80,3 +80,13 @@ class NoteSummary:
     pinned: bool
     updated: datetime | None
     course: Course | None
+    topic: str = ""
+
+
+@dataclass(frozen=True)
+class NoteGroup:
+    """Notes sharing a course and topic, for the grouped notes list."""
+
+    course: Course | None
+    topic: str  # "" for notes without a topic
+    notes: tuple[NoteSummary, ...]

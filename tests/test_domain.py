@@ -72,3 +72,9 @@ def test_done_task_is_never_overdue():
 ])
 def test_note_title(body, title):
     assert derive_note_title(body) == title
+
+
+def test_topic_normalisation():
+    from quire.domain import normalize_topic
+    assert normalize_topic("  Cell   respiration ") == "Cell respiration"
+    assert normalize_topic("x" * 100) == "x" * 60

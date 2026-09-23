@@ -154,6 +154,14 @@ def derive_note_title(body: str) -> str:
     return "Untitled"
 
 
+TOPIC_LENGTH = 60
+
+
+def normalize_topic(text: str) -> str:
+    """Topics group notes within a course; compare them without stray whitespace."""
+    return " ".join(text.split())[:TOPIC_LENGTH]
+
+
 @dataclass
 class Note:
     body: str = ""
@@ -161,6 +169,7 @@ class Note:
     pinned: bool = False
     updated: datetime | None = None
     id: int | None = None
+    topic: str = ""  # e.g. "Cell respiration" within Biology; "" means ungrouped
 
     @property
     def title(self) -> str:

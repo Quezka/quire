@@ -73,12 +73,17 @@ def seed(services: Services):
         "3. Electron transport chain: inner membrane, ~34 ATP\n\n"
         "- [x] Review diagram on p. 112\n"
         "- [ ] Ask about anaerobic pathways\n",
-        ids["Biology"])
+        ids["Biology"], "Cell biology")
+    notes.create("# Mitochondria\n\nThe powerhouse of the cell: inner membrane folds (cristae) "
+                 "increase surface area for the electron transport chain.\n",
+                 ids["Biology"], "Cell biology")
+    notes.create("# Mendel's laws\n\n1. Segregation\n2. Independent assortment\n",
+                 ids["Biology"], "Genetics")
     notes.create(
         "# Frankenstein: themes\n\n"
         "- Ambition and its costs\n- Isolation\n- *Nature vs. nurture*\n\n"
         "> \"Beware; for I am fearless, and therefore powerful.\"\n",
-        ids["English Literature"])
+        ids["English Literature"], "Frankenstein")
     ideas = notes.create("# Ideas\n\nThings I want to try this term:\n\n"
                          "- Pomodoro for maths homework\n- Join the robotics club\n")
     ideas.pinned = True

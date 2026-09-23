@@ -354,15 +354,61 @@ class TwoLineDelegate(QStyledItemDelegate):
     META = Qt.UserRole + 1
     COLOR = Qt.UserRole + 2
     PINNED = Qt.UserRole + 3
+    HEADER = Qt.UserRole + 4  # 1 = group heading, 2 = sub-heading; rows without it are items
+    COUNT = Qt.UserRole + 5
+    INDENT = Qt.UserRole + 6
+    COLLAPSED = Qt.UserRole + 7
 
     def sizeHint(self, option, index):
+        level = index.data(self.HEADER)
+        if level == 1:
+            return QSize(0, 34)
+        if level == 2:
+            return QSize(0, 28)
         return QSize(0, 54)
+
+    def _paint_header(self, p, option, index, level, t):
+        r = QRectF(option.rect)
+        x = r.left() + 8
+        if option.state & QStyle.State_MouseOver:
+            path = QPainterPath()
+            path.addRoundedRect(r.adjusted(0, 1, 0, -1), 6, 6)
+            p.fillPath(path, QColor(t.hover))
+        if level == 2:
+            x += 8
+        chevron = "chevron-right" if index.data(self.COLLAPSED) else "chevron-down"
+        p.drawPixmap(int(x), int(r.center().y() - 7), icons.pixmap(chevron, t.faint, 14))
+        x += 20
+        color = index.data(self.COLOR)
+        if level == 1 and color:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(color))
+            p.drawEllipse(QPointF(x + 4, r.center().y()), 4, 4)
+            x += 14
+        font = scaled_font(option.widget or self.parent(), 0.95 if level == 1 else 0.88,
+                           bold=level == 1)
+        p.setFont(font)
+        count = str(index.data(self.COUNT) or "")
+        count_w = QFontMetrics(font).horizontalAdvance(count) + 12
+        p.setPen(QColor(t.text if level == 1 else t.muted))
+        title = QFontMetrics(font).elidedText(index.data(Qt.DisplayRole) or "", Qt.ElideRight,
+                                             int(r.right() - x - count_w))
+        p.drawText(QRectF(x, r.top(), r.right() - x - count_w, r.height()),
+                   Qt.AlignLeft | Qt.AlignVCenter, title)
+        p.setPen(QColor(t.faint))
+        p.drawText(QRectF(r.right() - count_w, r.top(), count_w - 8, r.height()),
+                   Qt.AlignRight | Qt.AlignVCenter, count)
 
     def paint(self, p, option, index):
         t = theme.current()
         p.save()
         p.setRenderHint(QPainter.Antialiasing)
-        r = QRectF(option.rect).adjusted(0, 2, 0, -2)
+        level = index.data(self.HEADER)
+        if level:
+            self._paint_header(p, option, index, level, t)
+            p.restore()
+            return
+        r = QRectF(option.rect).adjusted(index.data(self.INDENT) or 0, 2, 0, -2)
         if option.state & QStyle.State_Selected:
             bg = QColor(t.accent_soft)
         elif option.state & QStyle.State_MouseOver:

@@ -23,6 +23,12 @@ your machine in a single SQLite file.
   press Delete to remove one.
 - **Notes**: Markdown notes with live search, course filing, pinning, autosave and a
   preview mode (Ctrl+E). Checklists work: `- [ ]`.
+  - **Topics** split a class's notes into chapters or units (e.g. Biology → *Cell biology*,
+    *Genetics*). Type one in the tag box in the note's toolbar; topics you've already used in
+    that class are suggested, and different capitalisation is merged into one spelling.
+  - The **group** button next to the class filter shows notes under their class and topic.
+    Click a heading to collapse it. Right-click a topic to rename it (a rename into an
+    existing name merges the two) or to start a new note in it.
 - **School (Classeviva)**: connect your Classeviva student account to pull in what teachers
   post:
   - homework and tests from the agenda, which land in Coursework and Today;

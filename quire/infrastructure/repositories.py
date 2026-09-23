@@ -170,14 +170,15 @@ class SqliteNoteRepository(_Repo):
     @staticmethod
     def _note(r) -> Note:
         return Note(r["body"], r["course_id"], bool(r["pinned"]),
-                    datetime.fromisoformat(r["updated"]) if r["updated"] else None, r["id"])
+                    datetime.fromisoformat(r["updated"]) if r["updated"] else None, r["id"],
+                    r["topic"])
 
     def search(self, text="", course_id=None):
         where, args = [], []
         if text:
             escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-            where.append("body LIKE ? ESCAPE '\\'")
-            args.append(f"%{escaped}%")
+            where.append("(body LIKE ? ESCAPE '\\' OR topic LIKE ? ESCAPE '\\')")
+            args += [f"%{escaped}%"] * 2
         if course_id is not None:
             where.append("course_id = ?")
             args.append(course_id)
@@ -194,20 +195,32 @@ class SqliteNoteRepository(_Repo):
         r = self._one("SELECT * FROM notes WHERE id = ?", note_id)
         return self._note(r) if r else None
 
+    def topics(self, course_id):
+        return [r["topic"] for r in self._all(
+            "SELECT DISTINCT topic FROM notes WHERE course_id IS ? AND topic != ''", course_id)]
+
+    def rename_topic(self, course_id, old, new):
+        # Leaves `updated` alone: refiling isn't editing.
+        with self._conn:
+            return self._conn.execute(
+                "UPDATE notes SET topic = ? WHERE course_id IS ? AND topic = ?",
+                (new, course_id, old)).rowcount
+
     @staticmethod
     def _updated(n: Note) -> str:
         return (n.updated or datetime.now()).isoformat(timespec="seconds")
 
     def add(self, n: Note) -> int:
         return self._write(
-            "INSERT INTO notes (title, body, course_id, pinned, updated) VALUES (?, ?, ?, ?, ?)",
-            n.title, n.body, n.course_id, int(n.pinned), self._updated(n))
+            "INSERT INTO notes (title, body, course_id, pinned, updated, topic)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            n.title, n.body, n.course_id, int(n.pinned), self._updated(n), n.topic)
 
     def update(self, n: Note):
         self._write(
-            "UPDATE notes SET title = ?, body = ?, course_id = ?, pinned = ?, updated = ?"
-            " WHERE id = ?",
-            n.title, n.body, n.course_id, int(n.pinned), self._updated(n), n.id)
+            "UPDATE notes SET title = ?, body = ?, course_id = ?, pinned = ?, updated = ?,"
+            " topic = ? WHERE id = ?",
+            n.title, n.body, n.course_id, int(n.pinned), self._updated(n), n.topic, n.id)
 
     def delete(self, note_id):
         self._write("DELETE FROM notes WHERE id = ?", note_id)

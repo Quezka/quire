@@ -3,11 +3,11 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import Qt, QTimer
+from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
-    QComboBox, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit,
-    QStackedWidget, QTextBrowser,
+    QComboBox, QCompleter, QHBoxLayout, QInputDialog, QLineEdit, QListWidget, QListWidgetItem,
+    QMenu, QPlainTextEdit, QStackedWidget, QTextBrowser,
 )
 
 from ...application.bus import Topic
@@ -51,24 +51,47 @@ class NotesView(Page):
         self.search.textChanged.connect(lambda: self.reload_list())
         self.filter = QComboBox()
         self.filter.currentIndexChanged.connect(lambda: self.reload_list())
+        self.group_btn = icon_button("layers", "Group by class and topic", checkable=True)
+        self.group_btn.setChecked(QSettings().value("notes/grouped", False, type=bool))
+        self.group_btn.toggled.connect(self._grouping_toggled)
+        self._collapsed: set[tuple] = set()
         self.list = QListWidget()
         self.list.setItemDelegate(TwoLineDelegate(self.list))
         self.list.setMouseTracking(True)
         self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.list.currentItemChanged.connect(self._selected)
+        self.list.itemClicked.connect(self._header_clicked)
+        self.list.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.list.customContextMenuRequested.connect(self._list_menu)
         QShortcut(QKeySequence.Delete, self.list, activated=self.delete_current,
                   context=Qt.WidgetShortcut)
 
+        filters = QHBoxLayout()
+        filters.setSpacing(6)
+        filters.addWidget(self.filter, 1)
+        filters.addWidget(self.group_btn)
         left = Card(padding=12)
-        left.setFixedWidth(300)
+        left.setFixedWidth(310)
         left.add(self.search)
-        left.add(self.filter)
+        left.body.addLayout(filters)
         left.add(self.list, 1)
 
         # ---- right: editor ----
         self.course = QComboBox()
         self.course.setMinimumWidth(170)
         self.course.currentIndexChanged.connect(self._meta_changed)
+        self.topic = QComboBox(editable=True)
+        self.topic.setMinimumWidth(170)
+        self.topic.setInsertPolicy(QComboBox.NoInsert)
+        self.topic.lineEdit().setPlaceholderText("No topic")
+        self.topic.setToolTip("Topic within the class, e.g. a chapter or unit")
+        self.topic.completer().setCaseSensitivity(Qt.CaseInsensitive)
+        self.topic.completer().setCompletionMode(QCompleter.PopupCompletion)
+        self.topic.activated.connect(lambda _i: self._topic_changed())
+        self.topic.lineEdit().editingFinished.connect(self._topic_changed)
+        self._topic_action = self.topic.lineEdit().addAction(
+            icons.icon("tag", theme.current().faint, size=14), QLineEdit.LeadingPosition)
+        theme.themed(lambda t: self._topic_action.setIcon(icons.icon("tag", t.faint, size=14)))
         self.pin = icon_button("pin", "Pin to top", checkable=True)
         self.pin.toggled.connect(self._meta_changed)
         self.status = label("", "hint")
@@ -82,6 +105,7 @@ class NotesView(Page):
         bar = QHBoxLayout()
         bar.setSpacing(6)
         bar.addWidget(self.course)
+        bar.addWidget(self.topic)
         bar.addWidget(self.pin)
         bar.addStretch()
         bar.addWidget(self.status)
@@ -116,9 +140,7 @@ class NotesView(Page):
 
         self._fill_course_combos()
         self.reload_list()
-        if self.list.count():
-            self.list.setCurrentRow(0)
-        else:
+        if not self._select_first_note():
             self._show(None)
 
     # ---- list -----------------------------------------------------------
@@ -138,30 +160,143 @@ class NotesView(Page):
 
     def reload_list(self, select_id=None):
         select_id = select_id or (self.note.id if self.note else None)
+        text, course_id = self.search.text(), self.filter.currentData()
         today = self.services.planner.today()
         self.list.blockSignals(True)
         self.list.clear()
-        for summary in self.notes.search(self.search.text(), self.filter.currentData()):
-            item = QListWidgetItem(summary.title)
-            item.setData(Qt.UserRole, summary.id)
-            item.setData(TwoLineDelegate.META, self._meta(summary, today))
-            item.setData(TwoLineDelegate.COLOR, summary.course.color if summary.course else None)
-            item.setData(TwoLineDelegate.PINNED, summary.pinned)
-            self.list.addItem(item)
-            if summary.id == select_id:
-                self.list.setCurrentItem(item)
+        count = 0
+        if self.group_btn.isChecked():
+            groups = self.notes.grouped(text, course_id)
+            per_course: dict = {}
+            for g in groups:
+                key = g.course.id if g.course else None
+                per_course.setdefault(key, []).append(g)
+            for key, course_groups in per_course.items():
+                course = course_groups[0].course
+                course_hidden = False
+                if course_id is None:  # a single filtered course needs no heading
+                    course_hidden = ("course", key) in self._collapsed
+                    self._add_header(1, course.name if course else "No class", ("course", key),
+                                     sum(len(g.notes) for g in course_groups),
+                                     course.color if course else None, course_hidden)
+                indent = 12 if course_id is None else 0
+                only_loose = len(course_groups) == 1 and not course_groups[0].topic
+                for g in course_groups:
+                    topic_hidden = course_hidden
+                    if not only_loose:
+                        topic_key = ("topic", key, g.topic)
+                        collapsed = topic_key in self._collapsed
+                        if not course_hidden:
+                            self._add_header(2, g.topic or "No topic", topic_key, len(g.notes),
+                                             None, collapsed, indent)
+                        topic_hidden = course_hidden or collapsed
+                        indent_notes = indent + 16
+                    else:
+                        indent_notes = indent
+                    for summary in g.notes:
+                        count += 1
+                        if not topic_hidden:
+                            self._add_note(summary, today, select_id, indent_notes)
+        else:
+            for summary in self.notes.search(text, course_id):
+                count += 1
+                self._add_note(summary, today, select_id, 0)
         self.list.blockSignals(False)
-        count = self.list.count()
         self.subtitle.setText(f"{count} note{'s' if count != 1 else ''}"
-                              + (" found" if self.search.text().strip() else ""))
+                              + (" found" if text.strip() else ""))
+
+    def _add_note(self, summary: NoteSummary, today: date, select_id, indent: int):
+        item = QListWidgetItem(summary.title)
+        item.setData(Qt.UserRole, summary.id)
+        grouped = self.group_btn.isChecked()
+        item.setData(TwoLineDelegate.META, self._meta(summary, today, with_course=not grouped))
+        item.setData(TwoLineDelegate.COLOR, summary.course.color if summary.course else None)
+        item.setData(TwoLineDelegate.PINNED, summary.pinned)
+        item.setData(TwoLineDelegate.INDENT, indent)
+        self.list.addItem(item)
+        if summary.id == select_id:
+            self.list.setCurrentItem(item)
+
+    def _add_header(self, level: int, text: str, key: tuple, count: int, color, collapsed: bool,
+                    indent: int = 0):
+        item = QListWidgetItem(text)
+        item.setFlags(Qt.ItemIsEnabled)
+        item.setData(TwoLineDelegate.HEADER, level)
+        item.setData(TwoLineDelegate.COUNT, count)
+        item.setData(TwoLineDelegate.COLOR, color)
+        item.setData(TwoLineDelegate.COLLAPSED, collapsed)
+        item.setData(TwoLineDelegate.INDENT, indent)
+        item.setData(Qt.UserRole + 20, key)
+        self.list.addItem(item)
+
+    def _select_first_note(self) -> bool:
+        for row in range(self.list.count()):
+            if self.list.item(row).data(Qt.UserRole) is not None:
+                self.list.setCurrentRow(row)
+                return True
+        return False
+
+    def _grouping_toggled(self, on: bool):
+        QSettings().setValue("notes/grouped", on)
+        self.reload_list()
+
+    def _header_clicked(self, item: QListWidgetItem):
+        key = item.data(Qt.UserRole + 20)
+        if key is None:
+            return
+        self._collapsed ^= {key}
+        self.reload_list()
+
+    def _list_menu(self, pos):
+        item = self.list.itemAt(pos)
+        if item is None:
+            return
+        key = item.data(Qt.UserRole + 20)
+        menu = QMenu(self)
+        if key and key[0] == "topic":
+            _, course_id, topic = key
+            new = menu.addAction("New note in this topic")
+            rename = menu.addAction("Rename topic…") if topic else None
+            chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+            if chosen is new:
+                self._open(self.notes.create("", course_id, topic))
+            elif chosen is not None and chosen is rename:
+                self._rename_topic(course_id, topic)
+        elif key and key[0] == "course":
+            new = menu.addAction("New note in this class")
+            if menu.exec(self.list.viewport().mapToGlobal(pos)) is new:
+                self._open(self.notes.create("", key[1]))
+        elif item.data(Qt.UserRole) is not None:
+            delete = menu.addAction("Delete note")
+            if menu.exec(self.list.viewport().mapToGlobal(pos)) is delete:
+                self.list.setCurrentItem(item)
+                self.delete_current()
+
+    def _rename_topic(self, course_id, topic: str):
+        new, ok = QInputDialog.getText(self, "Rename topic",
+                                       "New name (use an existing name to merge):", text=topic)
+        if not ok:
+            return
+        self.flush()
+        self.notes.rename_topic(course_id, topic, new)
+        if self.note is not None:
+            self.note = self.notes.note(self.note.id)
+            self._fill_topics(self.note)
+        self.reload_list()
 
     @staticmethod
-    def _meta(summary: NoteSummary, today: date) -> str:
+    def _meta(summary: NoteSummary, today: date, with_course: bool = True) -> str:
         meta = relative_timestamp(summary.updated, today)
-        return f"{meta} · {summary.course.name}" if summary.course else meta
+        if with_course and summary.course:
+            meta += f" · {summary.course.name}"
+        if with_course and summary.topic:
+            meta += f" · {summary.topic}"
+        return meta
 
     def _selected(self, item, _previous):
-        if item is not None and (self.note is None or item.data(Qt.UserRole) != self.note.id):
+        if item is None or item.data(Qt.UserRole) is None:  # section headings
+            return
+        if self.note is None or item.data(Qt.UserRole) != self.note.id:
             self.flush()
             self._show(self.notes.note(item.data(Qt.UserRole)))
 
@@ -172,6 +307,7 @@ class NotesView(Page):
         self.note = note
         self.editor.setPlainText(note.body if note else "")
         select_data(self.course, note.course_id if note else None)
+        self._fill_topics(note)
         self.pin.setChecked(note.pinned if note else False)
         self._loading = False
         self._dirty = False
@@ -181,6 +317,24 @@ class NotesView(Page):
             PLACEHOLDER if note else "Select a note, or press Ctrl+N to start one.")
         if self.preview_btn.isChecked():
             self.viewer.setMarkdown(self.editor.toPlainText())
+
+    def _fill_topics(self, note: Note | None, course_id=None):
+        """Offer the topics already used in the note's class."""
+        was_loading, self._loading = self._loading, True
+        course = course_id if course_id is not None or note is None else note.course_id
+        self.topic.clear()
+        self.topic.addItems(self.notes.topics(course))
+        self.topic.setEditText(note.topic if note else "")
+        self._loading = was_loading
+
+    def _topic_changed(self):
+        if self._loading or self.note is None:
+            return
+        if " ".join(self.topic.currentText().split()) != self.note.topic:
+            self._dirty = True
+            self.flush()
+            self.topic.setEditText(self.note.topic)  # show the canonical spelling
+            self.reload_list()
 
     def _edited(self):
         if self._loading or self.note is None:
@@ -193,7 +347,10 @@ class NotesView(Page):
         if self._loading or self.note is None:
             return
         self._dirty = True
+        course_changed = self.course.currentData() != self.note.course_id
         self.flush()
+        if course_changed:
+            self._fill_topics(self.note)
         self.reload_list()
 
     def flush(self):
@@ -203,6 +360,7 @@ class NotesView(Page):
         self.note.body = self.editor.toPlainText()
         self.note.course_id = self.course.currentData()
         self.note.pinned = self.pin.isChecked()
+        self.note.topic = self.topic.currentText()
         self.notes.save(self.note)
         self._dirty = False
         self.status.setText("Saved")
@@ -252,5 +410,7 @@ class NotesView(Page):
         row = self.list.currentRow()
         self._show(None)
         self.reload_list()
-        if self.list.count():
-            self.list.setCurrentRow(min(max(row, 0), self.list.count() - 1))
+        for r in [*range(max(row, 0), self.list.count()), *range(min(row, self.list.count()) - 1, -1, -1)]:
+            if self.list.item(r).data(Qt.UserRole) is not None:
+                self.list.setCurrentRow(r)
+                break

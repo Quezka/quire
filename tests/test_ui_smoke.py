@@ -11,7 +11,7 @@ import pytest  # noqa: E402
 
 pytest.importorskip("PySide6.QtWidgets")
 
-from PySide6.QtCore import QSettings  # noqa: E402
+from PySide6.QtCore import QSettings, Qt  # noqa: E402
 
 from quire.demo import seed  # noqa: E402
 from quire.presentation import theme  # noqa: E402
@@ -94,3 +94,42 @@ def test_school_page_connects_and_shows_synced_data(window, services, register, 
     assert page.grades.topLevelItemCount() == 1
     assert page.lessons.item(0).text() == "Moto rettilineo"
     assert not window.grab().isNull()
+
+
+def test_notes_group_by_topic(window, services, app):
+    from quire.presentation.widgets import TwoLineDelegate
+
+    notes = window.notes
+    window.show_page(window.stack.indexOf(notes))
+    bio = next(c for c in services.timetable.courses() if c.name == "Biology")
+    notes.group_btn.setChecked(True)
+    app.processEvents()
+
+    rows = [notes.list.item(i) for i in range(notes.list.count())]
+    headers = [(r.data(TwoLineDelegate.HEADER), r.text()) for r in rows
+               if r.data(TwoLineDelegate.HEADER)]
+    assert (1, "Biology") in headers and (2, "Cell biology") in headers
+    assert (2, "Genetics") in headers
+
+    # Collapsing a topic hides its notes but keeps the heading.
+    topic_row = next(r for r in rows if r.text() == "Cell biology")
+    before = notes.list.count()
+    notes._header_clicked(topic_row)
+    assert notes.list.count() == before - 2
+    notes._header_clicked(next(notes.list.item(i) for i in range(notes.list.count())
+                               if notes.list.item(i).text() == "Cell biology"))
+    assert notes.list.count() == before
+
+    # Filing the open note under a topic from the editor toolbar.
+    rows = [notes.list.item(i) for i in range(notes.list.count())]  # the list was rebuilt
+    first = next(r for r in rows if r.data(Qt.UserRole) is not None)
+    notes.list.setCurrentItem(first)
+    notes.course.setCurrentIndex(notes.course.findData(bio.id))
+    notes.topic.setEditText("genetics")
+    notes._topic_changed()
+    assert notes.note.topic == "Genetics"  # adopted the existing spelling
+    assert not window.grab().isNull()
+
+    notes.group_btn.setChecked(False)
+    assert not any(notes.list.item(i).data(TwoLineDelegate.HEADER)
+                   for i in range(notes.list.count()))

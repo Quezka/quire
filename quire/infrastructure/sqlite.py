@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 2
+SCHEMA_VERSION = 3
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -48,7 +48,8 @@ CREATE TABLE IF NOT EXISTS notes (
     body      TEXT NOT NULL DEFAULT '',
     course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
     pinned    INTEGER NOT NULL DEFAULT 0,
-    updated   TEXT NOT NULL
+    updated   TEXT NOT NULL,
+    topic     TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS journal (
     day  TEXT PRIMARY KEY,
@@ -99,14 +100,19 @@ class SqliteDatabase:
         """Create missing tables and bring older databases up to SCHEMA_VERSION."""
         self.conn.executescript(SCHEMA)
         # v2: sync ids for records imported from a school register.
-        for table in ("courses", "tasks"):
-            columns = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
-            if "external_id" not in columns:
-                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN external_id TEXT")
+        self._add_column("courses", "external_id", "TEXT")
+        self._add_column("tasks", "external_id", "TEXT")
+        # v3: topics group notes within a course.
+        self._add_column("notes", "topic", "TEXT NOT NULL DEFAULT ''")
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
                           " ON tasks(external_id) WHERE external_id IS NOT NULL")
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
+
+    def _add_column(self, table: str, column: str, definition: str):
+        columns = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
+        if column not in columns:
+            self.conn.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
 
     @property
     def location(self) -> Path:

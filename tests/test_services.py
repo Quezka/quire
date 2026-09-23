@@ -159,3 +159,64 @@ def test_writes_publish_change_topics(services):
 def test_next_meeting(services):
     course_id = add_course(services, slots=((0, 540, 600),))
     assert services.timetable.next_meeting(course_id, TODAY) == date(2026, 9, 28)
+
+
+def test_notes_group_by_course_then_topic(services):
+    bio = add_course(services, "Biology")
+    art = add_course(services, "Art")
+    notes = services.notes
+    notes.create("# Krebs cycle", bio, "Cell respiration")
+    notes.create("# Glycolysis", bio, "  cell   respiration ".title())
+    notes.create("# DNA", bio, "Genetics")
+    notes.create("# Loose biology note", bio)
+    notes.create("# Perspective", art, "Drawing")
+    notes.create("# Shopping list")
+
+    groups = notes.grouped()
+    assert [(g.course.name if g.course else None, g.topic, len(g.notes)) for g in groups] == [
+        ("Art", "Drawing", 1),
+        ("Biology", "Cell respiration", 2),  # the second note adopted the first spelling
+        ("Biology", "Genetics", 1),
+        ("Biology", "", 1),
+        (None, "", 1),
+    ]
+    only_bio = notes.grouped(course_id=bio)
+    assert {g.course.name for g in only_bio} == {"Biology"}
+    assert [g.topic for g in notes.grouped("krebs")] == ["Cell respiration"]
+
+
+def test_topic_suggestions_are_per_course(services):
+    bio = add_course(services, "Biology")
+    services.notes.create("# a", bio, "Genetics")
+    services.notes.create("# b", bio, "ecology")
+    services.notes.create("# c", None, "Personal")
+    assert services.notes.topics(bio) == ["ecology", "Genetics"]
+    assert services.notes.topics(None) == ["Personal"]
+
+
+def test_search_matches_topic(services):
+    services.notes.create("# Unrelated body", None, "Photosynthesis")
+    assert [n.topic for n in services.notes.search("photo")] == ["Photosynthesis"]
+
+
+def test_rename_topic_moves_every_note_in_that_course_only(services):
+    bio = add_course(services, "Biology")
+    chem = add_course(services, "Chemistry")
+    a = services.notes.create("# a", bio, "Cells")
+    b = services.notes.create("# b", bio, "Cells")
+    other = services.notes.create("# c", chem, "Cells")
+    before = services.notes.note(a.id).updated
+
+    assert services.notes.rename_topic(bio, "Cells", " Cell  biology ") == 2
+    assert services.notes.note(a.id).topic == "Cell biology"
+    assert services.notes.note(b.id).topic == "Cell biology"
+    assert services.notes.note(other.id).topic == "Cells"
+    assert services.notes.note(a.id).updated == before
+    assert services.notes.rename_topic(bio, "", "x") == 0
+
+
+def test_saving_a_note_normalises_its_topic(services):
+    note = services.notes.create("# n")
+    note.topic = "  Mixed   spacing "
+    services.notes.save(note)
+    assert services.notes.note(note.id).topic == "Mixed spacing"
