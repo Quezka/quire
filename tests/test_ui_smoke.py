@@ -133,3 +133,27 @@ def test_notes_group_by_topic(window, services, app):
     notes.group_btn.setChecked(False)
     assert not any(notes.list.item(i).data(TwoLineDelegate.HEADER)
                    for i in range(notes.list.count()))
+
+
+def test_course_dialog_links_subject_and_keeps_link_on_save(window, services, register):
+    from quire.application.ports import RemoteSubject
+    from quire.domain import ClassSlot, Course, TimeRange
+
+    register.subjects_ = [RemoteSubject("7", "MATEMATICA", ("ROSSI MARIO",))]
+    services.school.connect("S1", "secret")
+    services.school.sync()
+    mine = services.timetable.save_course(
+        Course("Maths", slots=[ClassSlot(0, TimeRange(480, 540))]))
+
+    dialog = CourseDialog(services, mine, window)
+    dialog.subject.setCurrentIndex(dialog.subject.findData("classeviva:subject:7"))
+    dialog._save()
+    assert services.timetable.course(mine).external_id == "classeviva:subject:7"
+    assert "Matematica" not in [c.name for c in services.timetable.courses()]
+
+    # Re-saving without touching the picker must not drop the link.
+    again = CourseDialog(services, mine, window)
+    again.room.setText("B12")
+    again._save()
+    saved = services.timetable.course(mine)
+    assert saved.external_id == "classeviva:subject:7" and saved.room == "B12"

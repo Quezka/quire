@@ -290,6 +290,11 @@ class SchoolView(Page):
             lines = [f"Imported {plural(len(report.new_tasks), 'assignment')}, "
                      f"{plural(len(report.new_grades), 'grade')} and "
                      f"{plural(report.lessons, 'lesson')}."]
+            if report.courses_created:
+                lines.append(
+                    f"Added {plural(report.courses_created, 'course')} for your subjects. "
+                    "If you already had one under another name, open it in Week → Courses and "
+                    "pick its subject to merge them.")
         for line in lines or ["Nothing new since the last sync."]:
             item = QListWidgetItem(line)
             if not lines:

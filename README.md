@@ -35,7 +35,11 @@ your machine in a single SQLite file.
   - grades, with per-subject and overall averages;
   - lesson topics from the class register.
 
-  Your subjects become courses automatically; courses you already made are matched by name.
+  Your subjects become courses automatically. A course you already made is matched when its
+  name is the same as the subject's (ignoring capitals). If you named it differently (say
+  "Maths" for *MATEMATICA*), open it in **Week → Courses** and pick its **Classeviva subject**.
+  Its timetable stays as it is. Anything the sync had put in a separate "Matematica" course
+  (homework, grades, lesson topics, notes) moves over, and the empty duplicate is removed.
   Quire re-syncs every 30 minutes while it's open, and on demand with Ctrl+R. You get a
   desktop notification when something new appears. Ticking off an imported task sticks
   across syncs. If a teacher deletes an assignment, Quire removes it too, unless you had

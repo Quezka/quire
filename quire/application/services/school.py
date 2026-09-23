@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from ...domain import COURSE_COLORS, Course, Grade, Lesson, Task, average
+from ...domain import COURSE_COLORS, Course, Grade, Lesson, NotFound, Subject, Task, average
 from ..bus import ChangeBus, Topic
 from ..errors import NotConnected
 from ..ports import (
@@ -56,6 +56,14 @@ class SyncReport:
     @property
     def has_news(self) -> bool:
         return bool(self.new_tasks or self.updated_tasks or self.new_grades)
+
+
+@dataclass(frozen=True)
+class SubjectLink:
+    """A register subject and the local course it is linked to, if any."""
+
+    subject: Subject
+    course: Course | None
 
 
 @dataclass(frozen=True)
@@ -192,6 +200,11 @@ class SchoolSyncService:
 
     def _sync_courses(self, snap: RegisterSnapshot):
         """Match register subjects to local courses, creating any that are missing."""
+        if snap.subjects:
+            self._records.replace_subjects([
+                Subject(self._external("subject", s.id), tidy_subject(s.name),
+                        tuple(tidy_person(t) for t in s.teachers if t))
+                for s in snap.subjects])
         courses = self._courses.list()
         by_external = {c.external_id: c for c in courses if c.external_id}
         by_name = {c.name.casefold(): c for c in courses}
@@ -252,6 +265,47 @@ class SchoolSyncService:
                     self._tasks.delete(task.id)
                     removed += 1
         return new, updated, removed
+
+    # ---- linking --------------------------------------------------------------
+
+    def subject_links(self) -> list[SubjectLink]:
+        """Subjects seen in the last sync, each with the course it feeds into."""
+        by_external = {c.external_id: c for c in self._courses.list() if c.external_id}
+        return [SubjectLink(s, by_external.get(s.external_id)) for s in self._records.subjects()]
+
+    def link_course(self, course_id: int, subject_id: str | None):
+        """Make `course_id` the course a register subject syncs into (None unlinks).
+
+        A course the sync created for that subject is folded into this one: its
+        imported homework, grades, lesson topics and notes move over, and the empty
+        duplicate is deleted. A course that has class times of its own is only
+        unlinked, never deleted.
+        """
+        course = self._courses.get(course_id)
+        if course is None:
+            raise NotFound(f"Course {course_id} does not exist.")
+        if course.external_id == subject_id:
+            return
+        if subject_id is not None:
+            subject = next((s for s in self._records.subjects() if s.external_id == subject_id),
+                           None)
+            if subject is None:
+                raise NotFound("That subject isn't in the last sync. Sync again and retry.")
+            previous = next((c for c in self._courses.list()
+                             if c.external_id == subject_id and c.id != course_id), None)
+            if previous is not None:
+                if previous.slots:
+                    previous.external_id = None
+                    self._courses.update(previous)
+                else:
+                    self._courses.merge_into(previous.id, course_id)
+            if not course.teacher and subject.teachers:
+                course.teacher = ", ".join(subject.teachers)
+        course.external_id = subject_id
+        self._courses.update(course)
+        self._bus.publish(Topic.COURSES)
+        self._bus.publish(Topic.TASKS)
+        self._bus.publish(Topic.SCHOOL)
 
     # ---- queries --------------------------------------------------------------
 

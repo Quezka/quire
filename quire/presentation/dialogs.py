@@ -74,7 +74,9 @@ class CourseDialog(QDialog):
     def __init__(self, services: Services, course_id=None, parent=None):
         super().__init__(parent)
         self.timetable = services.timetable
+        self.school = services.school
         self.course_id = course_id
+        self._external_id = None
         self.setWindowTitle("Edit course" if course_id else "New course")
         self.setMinimumWidth(600)
 
@@ -90,6 +92,26 @@ class CourseDialog(QDialog):
         form.addRow("Teacher", self.teacher)
         form.addRow("Room", self.room)
         form.addRow("Colour", self.color)
+
+        # Which register subject feeds homework and grades into this course.
+        self.subject = None
+        links = self.school.subject_links()
+        if links:
+            register = self.school.status().register
+            self.subject = QComboBox()
+            self.subject.addItem("Not linked", None)
+            for link in links:
+                text = link.subject.name
+                if link.course and link.course.id != course_id:
+                    text += f"   (now in {link.course.name})"
+                self.subject.addItem(text, link.subject.external_id)
+            self.subject.currentIndexChanged.connect(self._subject_picked)
+            hint = QLabel(f"Homework, tests and grades for this {register} subject go into this "
+                          "course. Linking merges any course the sync created for it.")
+            hint.setObjectName("hint")
+            hint.setWordWrap(True)
+            form.addRow(f"{register} subject", self.subject)
+            form.addRow("", hint)
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels(["Day", "Start", "End", "Room (if different)"])
@@ -123,8 +145,18 @@ class CourseDialog(QDialog):
             self.teacher.setText(c.teacher)
             self.room.setText(c.room)
             self.color.setColor(c.color)
+            self._external_id = c.external_id
             for s in c.slots:
                 self._add_row(s.weekday, s.time.start, s.time.end, s.room)
+        if self.subject is not None:
+            self.subject.blockSignals(True)
+            select_data(self.subject, self._external_id)
+            self.subject.blockSignals(False)
+
+    def _subject_picked(self):
+        # Naming a new course after its subject saves typing.
+        if not self.name.text().strip() and self.subject.currentData():
+            self.name.setText(self.subject.currentText().split("   (")[0])
 
     def _add_row(self, weekday=None, start=None, end=None, room=""):
         row = self.table.rowCount()
@@ -167,10 +199,17 @@ class CourseDialog(QDialog):
             except DomainError as e:
                 QMessageBox.warning(self, "Check class times", f"Class time {r + 1}: {e}")
                 return
+        # Carry the existing link through the save; relinking is a separate use case.
         course = Course(self.name.text().strip(), self.teacher.text().strip(),
-                        self.room.text().strip(), self.color.color(), slots, self.course_id)
-        if attempt(self, lambda: self.timetable.save_course(course)):
-            self.accept()
+                        self.room.text().strip(), self.color.color(), slots, self.course_id,
+                        self._external_id)
+        if not attempt(self, lambda: self.timetable.save_course(course)):
+            return
+        chosen = self.subject.currentData() if self.subject is not None else self._external_id
+        if chosen != self._external_id and not attempt(
+                self, lambda: self.school.link_course(course.id, chosen)):
+            return
+        self.accept()
 
     def _delete(self):
         if confirm(self, "Delete course", "Delete this course and its timetable?\n"

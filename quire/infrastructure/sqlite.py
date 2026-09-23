@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 3
+SCHEMA_VERSION = 4
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -76,6 +76,11 @@ CREATE TABLE IF NOT EXISTS lessons (
     hour        INTEGER NOT NULL DEFAULT 0,
     course_id   INTEGER REFERENCES courses(id) ON DELETE SET NULL
 );
+CREATE TABLE IF NOT EXISTS register_subjects (
+    external_id TEXT PRIMARY KEY,
+    name        TEXT NOT NULL,
+    teachers    TEXT NOT NULL DEFAULT ''
+);
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -102,6 +107,7 @@ class SqliteDatabase:
         # v2: sync ids for records imported from a school register.
         self._add_column("courses", "external_id", "TEXT")
         self._add_column("tasks", "external_id", "TEXT")
+        # v4 only adds the register_subjects table, created by SCHEMA above.
         # v3: topics group notes within a course.
         self._add_column("notes", "topic", "TEXT NOT NULL DEFAULT ''")
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"

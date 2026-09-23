@@ -213,3 +213,12 @@ class Lesson:
     teacher: str = ""
     hour: int = 0  # position in the school day (1st hour, 2nd hour, ...)
     course_id: int | None = None
+
+
+@dataclass(frozen=True)
+class Subject:
+    """A subject as the school register names it; courses can be linked to one."""
+
+    external_id: str
+    name: str
+    teachers: tuple[str, ...] = ()

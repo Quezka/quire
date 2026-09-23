@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from ..domain import ClassSlot, Course, Event, Grade, Lesson, Note, Task, TaskKind, TimeRange
+from ..domain import ClassSlot, Course, Event, Grade, Lesson, Note, Subject, Task, TaskKind, TimeRange
 from .sqlite import SqliteDatabase
 
 
@@ -74,6 +74,13 @@ class SqliteCourseRepository(_Repo):
 
     def delete(self, course_id):
         self._write("DELETE FROM courses WHERE id = ?", course_id)
+
+    def merge_into(self, source_id, target_id):
+        with self._conn:
+            for table in ("tasks", "notes", "grades", "lessons"):
+                self._conn.execute(f"UPDATE {table} SET course_id = ? WHERE course_id = ?",
+                                   (target_id, source_id))
+            self._conn.execute("DELETE FROM courses WHERE id = ?", (source_id,))
 
 
 class SqliteEventRepository(_Repo):
@@ -279,6 +286,20 @@ class SqliteSchoolRecordRepository(_Repo):
                 " course_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
                 [(l.external_id, l.day.isoformat(), l.subject, l.topic, l.teacher, l.hour,
                   l.course_id) for l in lessons])
+
+
+    def subjects(self):
+        return [Subject(r["external_id"], r["name"],
+                        tuple(t for t in r["teachers"].split("\n") if t))
+                for r in self._all("SELECT * FROM register_subjects ORDER BY name COLLATE NOCASE")]
+
+    def replace_subjects(self, subjects):
+        with self._conn:
+            self._conn.execute("DELETE FROM register_subjects")
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO register_subjects (external_id, name, teachers)"
+                " VALUES (?, ?, ?)",
+                [(s.external_id, s.name, "\n".join(s.teachers)) for s in subjects])
 
 
 class SqliteKeyValueStore(_Repo):

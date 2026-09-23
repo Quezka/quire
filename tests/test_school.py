@@ -165,3 +165,78 @@ def test_sync_publishes_changes(connected, register):
     connected.bus.subscribe(seen.append)
     connected.school.sync()
     assert Topic.TASKS in seen and Topic.SCHOOL in seen
+
+
+def own_course(services, name, slots=((0, 480, 540),)):
+    return services.timetable.save_course(
+        Course(name, color="#123456",
+               slots=[ClassSlot(wd, TimeRange(s, e)) for wd, s, e in slots]))
+
+
+def test_subjects_from_sync_are_offered_for_linking(connected, register):
+    connected.school.sync()
+    links = {l.subject.name: l for l in connected.school.subject_links()}
+    assert set(links) == {"Matematica", "Storia"}
+    assert links["Matematica"].course.name == "Matematica"
+    assert links["Matematica"].subject.teachers == ("Rossi Mario",)
+
+
+def test_linking_folds_the_auto_created_duplicate_into_your_course(connected, register):
+    maths = own_course(connected, "Maths")
+    register.assignments_ = [homework()]
+    register.grades_ = [grade("g1", 8.0)]
+    connected.school.sync()
+    duplicate = next(c for c in connected.timetable.courses() if c.name == "Matematica")
+    note = connected.notes.create("# Limits", duplicate.id, "Calculus")
+
+    connected.school.link_course(maths, "classeviva:subject:1")
+
+    names = [c.name for c in connected.timetable.courses()]
+    assert "Matematica" not in names and "Maths" in names
+    linked = connected.timetable.course(maths)
+    assert linked.external_id == "classeviva:subject:1"
+    assert linked.teacher == "Rossi Mario" and len(linked.slots) == 1  # your timetable stays
+    (task,) = [i.task for g in connected.tasks.groups() for i in g.items]
+    assert task.course_id == maths
+    assert connected.notes.note(note.id).course_id == maths
+    assert connected.school.grades_by_subject()[0].course.id == maths
+
+
+def test_after_linking_sync_uses_your_course_and_creates_no_duplicate(connected, register):
+    maths = own_course(connected, "Maths")
+    connected.school.sync()
+    connected.school.link_course(maths, "classeviva:subject:1")
+
+    register.assignments_ = [homework("99", text="Nuovi esercizi")]
+    report = connected.school.sync()
+    assert report.courses_created == 0
+    assert [c.name for c in connected.timetable.courses()].count("Matematica") == 0
+    assert report.new_tasks[0].course_id == maths
+
+
+def test_linking_never_deletes_a_course_with_class_times(connected, register):
+    connected.school.sync()
+    auto = next(c for c in connected.timetable.courses() if c.name == "Matematica")
+    auto.slots = [ClassSlot(1, TimeRange(600, 660))]
+    connected.timetable.save_course(auto)
+    maths = own_course(connected, "Maths")
+
+    connected.school.link_course(maths, "classeviva:subject:1")
+    kept = connected.timetable.course(auto.id)
+    assert kept.external_id is None and kept.slots
+
+
+def test_unlinking(connected, register):
+    connected.school.sync()
+    auto = next(c for c in connected.timetable.courses() if c.name == "Storia")
+    connected.school.link_course(auto.id, None)
+    assert connected.timetable.course(auto.id).external_id is None
+    links = {l.subject.name: l.course for l in connected.school.subject_links()}
+    assert links["Storia"] is None
+
+
+def test_linking_to_unknown_subject_fails(connected, register):
+    from quire.domain import NotFound
+    maths = own_course(connected, "Maths")
+    with pytest.raises(NotFound):
+        connected.school.link_course(maths, "classeviva:subject:404")
