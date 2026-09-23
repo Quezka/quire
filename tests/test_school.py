@@ -269,7 +269,7 @@ def test_failed_homework_fetch_does_not_delete_imported_tasks(connected, registe
 
 def test_everything_failing_is_an_error_and_not_a_sync(connected, register):
     from quire.application.errors import RegisterError
-    for name in ("subjects", "assignments", "grades", "lessons"):
+    for name in ("subjects", "assignments", "homework", "grades", "lessons"):
         register.failing[name] = RegisterError("down")
     with pytest.raises(RegisterError, match="Couldn't sync anything"):
         connected.school.sync()
@@ -326,3 +326,61 @@ def test_overview_numbers(connected, register):
     assert o.next_test.task.title == "Verifica"
     assert o.homework_due_this_week == 1 and o.next_homework.task.title == "Esercizi"
     assert [s.subject for s in o.below_pass] == ["Matematica"]
+
+
+
+def homework_item(id="n1", day=TODAY, text="Workbook p. 18", done=False):
+    from quire.application.ports import RemoteAssignment
+    return RemoteAssignment(id, day, TaskKind.HOMEWORK, text, MATHS.id, MATHS.name,
+                            "ROSSI MARIO", feed="homework", done=done)
+
+
+def test_homework_feed_is_imported_next_to_the_agenda(connected, register):
+    register.assignments_ = [homework("1", text="Esercizi")]
+    register.homework_ = [homework_item("1", text="Workbook p. 18")]  # same id, other feed
+    report = connected.school.sync()
+    titles = sorted(t.title for t in report.new_tasks)
+    assert titles == ["Esercizi", "Workbook p. 18"]  # no clash between the two feeds
+    hw = next(t for t in report.new_tasks if t.title == "Workbook p. 18")
+    assert hw.external_id == "classeviva:homework:1" and hw.kind is TaskKind.HOMEWORK
+
+
+def test_homework_that_leaves_the_feed_is_kept(connected, register):
+    register.homework_ = [homework_item()]
+    connected.school.sync()
+    register.homework_ = []  # expired from Classeviva's current list
+    report = connected.school.sync()
+    assert report.removed_tasks == 0
+    assert [i.task.title for i in connected.school.agenda()] == ["Workbook p. 18"]
+
+
+def test_done_on_the_register_is_carried_over_but_never_undone(connected, register):
+    register.homework_ = [homework_item(done=True)]
+    connected.school.sync()
+    (task,) = [i.task for g in connected.tasks.groups(include_done=True) for i in g.items]
+    assert task.done
+
+    register.homework_ = [homework_item("n2", text="Other")]
+    connected.school.sync()
+    other = next(i.task for g in connected.tasks.groups() for i in g.items)
+    connected.tasks.set_done(other.id, True)  # ticked in Quire
+    register.homework_ = [homework_item("n2", text="Other", done=False)]
+    connected.school.sync()
+    assert connected.tasks.task(other.id).done
+
+
+def test_agenda_includes_overdue_today_and_ahead(connected, register):
+    register.assignments_ = [
+        homework("late", day=TODAY - timedelta(days=5), text="Vecchi esercizi"),
+        homework("now", day=TODAY, text="Oggi"),
+        homework("soon", day=TODAY + timedelta(days=10), text="Ricerca"),
+        homework("far", day=TODAY + timedelta(days=90), text="Lontano"),
+    ]
+    connected.school.sync()
+    agenda = connected.school.agenda()
+    assert [(i.task.title, i.overdue) for i in agenda] == [
+        ("Vecchi esercizi", True), ("Oggi", False), ("Ricerca", False)]
+
+    connected.tasks.set_done(agenda[1].task.id, True)
+    assert [i.task.title for i in connected.school.agenda()] == ["Vecchi esercizi", "Ricerca"]
+    assert "Oggi" in [i.task.title for i in connected.school.agenda(include_done=True)]

@@ -27,6 +27,10 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 HOMEWORK_CODE = "AGHW"
+# Agenda notes ("AGNT") that are really homework.
+HOMEWORK_WORDS = re.compile(
+    r"\b(compit\w*|eserciz\w*|es\.|pag\.|pagg?\b|pagin\w*|studi\w*|legger\w*|ripass\w*"
+    r"|svolger\w*|homework|exercis\w*)", re.IGNORECASE)
 # Agenda notes announcing a test rather than homework.
 EXAM_WORDS = re.compile(
     r"\b(verific\w*|compit\w* in classe|interrogazion\w*|test|prova|prove|esame|esami"
@@ -177,12 +181,32 @@ class ClassevivaRegister:
                 kind = TaskKind.HOMEWORK
             elif EXAM_WORDS.search(text):
                 kind = TaskKind.EXAM
+            elif HOMEWORK_WORDS.search(text):
+                kind = TaskKind.HOMEWORK
             else:
                 kind = TaskKind.TASK
             result.append(RemoteAssignment(
                 id=str(e["evtId"]), day=_day(e["evtDatetimeBegin"]), kind=kind, text=text,
                 subject_id=_id(e.get("subjectId")), subject_name=e.get("subjectDesc") or "",
                 author=e.get("authorName") or ""))
+        return result
+
+    def homework(self) -> list[RemoteAssignment]:
+        """Homework from Classeviva's homework feature ("Compiti", separate from the agenda).
+
+        The endpoint takes no date range and lists what's currently assigned.
+        """
+        data = self._get("/homeworks")
+        result = []
+        for h in data.get("items", []):
+            due = h.get("expiryDate") or h.get("assignmentDate")
+            if not due:
+                continue
+            result.append(RemoteAssignment(
+                id=str(h["evtId"]), day=_day(due), kind=TaskKind.HOMEWORK,
+                text=(h.get("homeworkDesc") or "").strip(), subject_id=_id(h.get("subjectId")),
+                subject_name=h.get("subjectDesc") or "", author=h.get("teacherName") or "",
+                feed="homework", done=bool(h.get("homeworkDone"))))
         return result
 
     def grades(self) -> list[RemoteGrade]:

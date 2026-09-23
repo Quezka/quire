@@ -51,6 +51,12 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.5.0" date="2026-09-23">
+      <description>
+        <p>Homework from Classeviva's homework feature, and a Homework &amp; tests list on the
+          School page with overdue work and checkboxes.</p>
+      </description>
+    </release>
     <release version="0.4.0" date="2026-09-23">
       <description>
         <p>Zoomable calendars and a redesigned School page.</p>

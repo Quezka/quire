@@ -115,7 +115,8 @@ class DemoRegister:
 
     def subjects(self):
         return [RemoteSubject("1", "MATEMATICA", ("OKAFOR GRACE",)),
-                RemoteSubject("2", "BIOLOGY"), RemoteSubject("3", "STORIA", ("DUARTE LUIS",))]
+                RemoteSubject("2", "BIOLOGY"), RemoteSubject("3", "STORIA", ("DUARTE LUIS",)),
+                RemoteSubject("4", "LINGUA STRANIERA INGLESE", ("VALERI ANNA MARIA",))]
 
     def assignments(self, first, last):
         d = self.today
@@ -125,6 +126,17 @@ class DemoRegister:
                              "OKAFOR GRACE"),
             RemoteAssignment("a2", d + timedelta(days=5), TaskKind.EXAM,
                              "Verifica: Rivoluzione francese", "3", "STORIA", "DUARTE LUIS"),
+        ]
+
+    def homework(self):
+        d = self.today
+        return [
+            RemoteAssignment("h1", d, TaskKind.HOMEWORK, "Workbook p. 18, exercises 1-4",
+                             "4", "LINGUA STRANIERA INGLESE", "VALERI ANNA MARIA",
+                             feed="homework"),
+            RemoteAssignment("h2", d - timedelta(days=3), TaskKind.HOMEWORK,
+                             "Riassunto del capitolo 2", "3", "STORIA", "DUARTE LUIS",
+                             feed="homework"),
         ]
 
     def grades(self):

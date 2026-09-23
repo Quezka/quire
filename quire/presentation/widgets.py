@@ -565,6 +565,9 @@ class TwoLineDelegate(QStyledItemDelegate):
     COUNT = Qt.UserRole + 5
     INDENT = Qt.UserRole + 6
     COLLAPSED = Qt.UserRole + 7
+    ALERT = Qt.UserRole + 8  # e.g. overdue: title in the danger colour
+
+    CHECK = 18  # diameter of the round checkbox on checkable rows
 
     def sizeHint(self, option, index):
         level = index.data(self.HEADER)
@@ -573,6 +576,20 @@ class TwoLineDelegate(QStyledItemDelegate):
         if level == 2:
             return QSize(0, 28)
         return QSize(0, 54)
+
+    def _check_rect(self, option) -> QRectF:
+        r = QRectF(option.rect)
+        return QRectF(r.left() + 10, r.top() + 17 - self.CHECK / 2 + 2, self.CHECK, self.CHECK)
+
+    def editorEvent(self, event, model, option, index):
+        # Clicking the round checkbox toggles the row's check state.
+        if (index.data(Qt.CheckStateRole) is not None and not index.data(self.HEADER)
+                and event.type() == QEvent.MouseButtonRelease
+                and self._check_rect(option).adjusted(-4, -4, 4, 4).contains(event.position())):
+            checked = index.data(Qt.CheckStateRole) == Qt.Checked
+            model.setData(index, Qt.Unchecked if checked else Qt.Checked, Qt.CheckStateRole)
+            return True
+        return super().editorEvent(event, model, option, index)
 
     def _paint_header(self, p, option, index, level, t):
         r = QRectF(option.rect)
@@ -630,6 +647,21 @@ class TwoLineDelegate(QStyledItemDelegate):
             p.fillPath(path, bg)
 
         x = r.left() + 12
+        checkable = index.data(Qt.CheckStateRole) is not None
+        checked = index.data(Qt.CheckStateRole) == Qt.Checked
+        if checkable:
+            box = self._check_rect(option)
+            if checked:
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor(t.accent))
+                p.drawEllipse(box)
+                p.drawPixmap(int(box.left() + 3), int(box.top() + 3),
+                             icons.pixmap("check", t.on_accent, int(self.CHECK - 6)))
+            else:
+                p.setPen(QPen(QColor(t.faint), 1.5))
+                p.setBrush(Qt.NoBrush)
+                p.drawEllipse(box.adjusted(0.75, 0.75, -0.75, -0.75))
+            x = box.right() + 10
         color = index.data(self.COLOR)
         if color:
             p.setPen(Qt.NoPen)
@@ -643,9 +675,11 @@ class TwoLineDelegate(QStyledItemDelegate):
             right -= 20
 
         title_font = scaled_font(option.widget or self.parent(), 1.0, bold=True)
+        title_font.setStrikeOut(checked)
         meta_font = scaled_font(option.widget or self.parent(), 0.85)
         p.setFont(title_font)
-        p.setPen(QColor(t.text))
+        alert = index.data(self.ALERT)
+        p.setPen(QColor(t.faint if checked else t.danger if alert else t.text))
         title = QFontMetrics(title_font).elidedText(index.data(Qt.DisplayRole) or "",
                                                    Qt.ElideRight, int(right - x))
         p.drawText(QRectF(x, r.top() + 6, right - x, 22), Qt.AlignLeft | Qt.AlignVCenter, title)

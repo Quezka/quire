@@ -4,6 +4,23 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.5.0] - 2026-09-23
+
+### Added
+- **Classeviva homework**: Quire now also reads Classeviva's homework feature ("Compiti"),
+  which is separate from the agenda. Before, homework set there never reached Quire.
+  - If you've already marked a homework done on Classeviva, it arrives ticked off.
+  - Homework that drops off Classeviva's current list is kept, not deleted.
+- **Homework & tests** on the School page:
+  - lists overdue work first, then today and the days ahead;
+  - round checkboxes tick things off, in sync with Today and Coursework;
+  - "Show done" brings back what you've finished recently;
+  - double-click an item to edit it.
+
+### Changed
+- Agenda notes that read like homework ("compiti", "esercizi", "pag.", "studiare", …) are
+  filed as homework instead of plain tasks.
+
 ## [0.4.0] - 2026-09-23
 
 ### Added

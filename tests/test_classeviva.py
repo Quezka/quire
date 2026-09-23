@@ -186,3 +186,38 @@ def test_other_moved_endpoints_raise_a_register_error():
     register, _, _ = signed_in({"/students/1234567/subjects": WRONG_URI})
     with pytest.raises(RegisterError, match="subjects"):
         register.subjects()
+
+
+
+HOMEWORKS = {"items": [
+    {"evtId": 141468, "evtCode": "NEWDC", "teacherId": 3446147, "teacherName": "VALERI ANNA",
+     "homeworkDesc": "Workbook p. 18 ex. 1-4", "homeworkDone": False,
+     "assignmentDate": "2026-09-23", "assignmentTime": None, "expiryDate": "2026-09-25",
+     "expiryTime": None, "subjectId": 216342, "subjectDesc": "LINGUA STRANIERA INGLESE",
+     "teacherFiles": [], "teacherLinks": []},
+    {"evtId": 141470, "evtCode": "NEWDC", "homeworkDesc": "Leggere cap. 3",
+     "homeworkDone": True, "assignmentDate": "2026-09-20", "expiryDate": None,
+     "subjectId": 216343, "subjectDesc": "ITALIANO", "teacherName": "ROSSI"},
+]}
+
+
+def test_homework_feed_is_parsed():
+    register, server, _ = signed_in({"/students/1234567/homeworks": (200, HOMEWORKS)})
+    first, second = register.homework()
+    assert (first.id, first.day, first.kind, first.feed, first.done) == (
+        "141468", date(2026, 9, 25), TaskKind.HOMEWORK, "homework", False)
+    assert first.subject_name == "LINGUA STRANIERA INGLESE" and first.author == "VALERI ANNA"
+    assert (second.day, second.done) == (date(2026, 9, 20), True)  # falls back to assigned
+
+
+def test_agenda_notes_that_read_like_homework_are_homework():
+    notes = {"agenda": [
+        {"evtId": 7, "evtCode": "AGNT", "evtDatetimeBegin": "2026-09-24T08:00:00+02:00",
+         "notes": "Per domani svolgere gli esercizi a pag. 45"},
+        {"evtId": 8, "evtCode": "AGNT", "evtDatetimeBegin": "2026-09-24T08:00:00+02:00",
+         "notes": "Uscita didattica al museo"},
+    ]}
+    path = "/students/1234567/agenda/all/20260923/20261231"
+    register, _, _ = signed_in({path: (200, notes)})
+    kinds = [a.kind for a in register.assignments(date(2026, 9, 23), date(2026, 12, 31))]
+    assert kinds == [TaskKind.HOMEWORK, TaskKind.TASK]

@@ -47,7 +47,9 @@ your machine in a single SQLite file.
   - Double-click an empty time in Today or Week to add an event or a shift there.
 - **School (Classeviva)**: connect your Classeviva student account to pull in what teachers
   post:
-  - homework and tests from the agenda, which land in Coursework and Today;
+  - homework and tests from the agenda and from Classeviva's homework feature ("Compiti").
+    They land in Coursework and Today, and in the School page's **Homework & tests** list
+    (overdue first, tick them off right there);
   - grades, with per-subject and overall averages;
   - lesson topics from the class register.
 

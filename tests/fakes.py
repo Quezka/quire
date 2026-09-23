@@ -16,6 +16,7 @@ class FakeRegister:
     student: str = "Ada Lovelace"
     subjects_: list[RemoteSubject] = field(default_factory=list)
     assignments_: list[RemoteAssignment] = field(default_factory=list)
+    homework_: list[RemoteAssignment] = field(default_factory=list)
     grades_: list[RemoteGrade] = field(default_factory=list)
     lessons_: list[RemoteLesson] = field(default_factory=list)
     requested: list = field(default_factory=list)
@@ -38,6 +39,10 @@ class FakeRegister:
         self._maybe_fail("assignments")
         self.requested.append(("assignments", first, last))
         return [a for a in self.assignments_ if first <= a.day <= last]
+
+    def homework(self):
+        self._maybe_fail("homework")
+        return list(self.homework_)
 
     def grades(self):
         self._maybe_fail("grades")

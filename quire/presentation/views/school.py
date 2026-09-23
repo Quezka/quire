@@ -194,11 +194,17 @@ class SchoolView(Page):
         self._expanded: set[str] = set()
 
         # ---- side ----
-        coming = Card("Coming up")
+        coming = Card("Homework & tests")
+        self.show_done = QPushButton("Show done", objectName="segment", checkable=True)
+        self.show_done.setCursor(Qt.PointingHandCursor)
+        self.show_done.toggled.connect(lambda _on: self._fill_agenda())
+        coming.title_row.addWidget(self.show_done)
         self.coming = QListWidget()
         self.coming.setItemDelegate(TwoLineDelegate(self.coming))
+        self.coming.setMouseTracking(True)
         self.coming.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.coming.itemDoubleClicked.connect(self._open_task)
+        self.coming.itemChanged.connect(self._agenda_ticked)
         coming.add(self.coming, 1)
 
         lessons = Card("Lesson topics")
@@ -216,15 +222,19 @@ class SchoolView(Page):
         self.news.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.news_card.add(self.news, 1)
 
+        main = QVBoxLayout()
+        main.setSpacing(16)
+        main.addWidget(subjects, 3)
+        main.addWidget(self.news_card, 1)
+
         side = QVBoxLayout()
         side.setSpacing(16)
         side.addWidget(coming, 3)
-        side.addWidget(lessons, 4)
-        side.addWidget(self.news_card, 2)
+        side.addWidget(lessons, 2)
 
         body = QHBoxLayout()
         body.setSpacing(16)
-        body.addWidget(subjects, 3)
+        body.addLayout(main, 3)
         body.addLayout(side, 2)
 
         holder = QWidget()
@@ -275,7 +285,7 @@ class SchoolView(Page):
             self._fill_periods()
             self._fill_tiles()
             self._fill_subjects()
-            self._fill_coming()
+            self._fill_agenda()
             self._fill_lessons()
             self._fill_news()
         else:
@@ -376,24 +386,47 @@ class SchoolView(Page):
         self._expanded ^= {item.text()}
         self._fill_subjects()
 
-    def _fill_coming(self):
+    def _fill_agenda(self):
+        """Homework and tests from the register: overdue first, then day by day."""
         today = self.services.planner.today()
+        self.coming.blockSignals(True)
         self.coming.clear()
-        for entry in self.school.upcoming():
+        last_heading = None
+        for entry in self.school.agenda(include_done=self.show_done.isChecked()):
             task = entry.task
+            heading = "Overdue" if entry.overdue else relative_date(task.due, today)
+            if heading != last_heading:
+                last_heading = heading
+                header = QListWidgetItem(heading)
+                header.setData(TwoLineDelegate.HEADER, 2)
+                header.setFlags(Qt.ItemIsEnabled)
+                self.coming.addItem(header)
             item = QListWidgetItem(task.title)
             kind = "Test" if task.kind is TaskKind.EXAM else KIND_LABELS[task.kind]
-            item.setData(TwoLineDelegate.META, " · ".join(filter(None, [
-                relative_date(task.due, today), entry.course.name if entry.course else "",
-                kind])))
+            meta = [entry.course.name if entry.course else "", kind]
+            if entry.overdue:
+                when = relative_date(task.due, today)
+                meta.insert(0, "was due " + (when.lower() if when == "Yesterday" else when))
+            item.setData(TwoLineDelegate.META, " · ".join(filter(None, meta)))
             item.setData(TwoLineDelegate.COLOR, entry.course.color if entry.course else None)
+            item.setData(TwoLineDelegate.ALERT, entry.overdue)
+            item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+            item.setCheckState(Qt.Checked if task.done else Qt.Unchecked)
             item.setData(Qt.UserRole, task.id)
             item.setToolTip(task.details)
             self.coming.addItem(item)
         if not self.coming.count():
-            empty = QListWidgetItem("Nothing on the agenda for the next three weeks")
+            empty = QListWidgetItem("No homework or tests on the agenda")
             empty.setFlags(Qt.NoItemFlags)
             self.coming.addItem(empty)
+        self.coming.blockSignals(False)
+
+    def _agenda_ticked(self, item: QListWidgetItem):
+        task_id = item.data(Qt.UserRole)
+        if task_id is not None:
+            done = item.checkState() == Qt.Checked
+            # Deferred: the refresh this triggers rebuilds the list we're inside.
+            QTimer.singleShot(0, lambda: self.services.tasks.set_done(task_id, done))
 
     def _fill_lessons(self):
         today = self.services.planner.today()

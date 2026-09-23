@@ -145,6 +145,11 @@ class RemoteAssignment:
     subject_id: str | None = None
     subject_name: str = ""
     author: str = ""
+    # Where it came from. The "agenda" feed is complete for the dates asked for, so
+    # anything missing from it was deleted; the "homework" feed only lists current
+    # items, so missing ones are kept.
+    feed: str = "agenda"
+    done: bool = False  # already marked done on the register
 
 
 @dataclass(frozen=True)
@@ -188,6 +193,7 @@ class RegisterSnapshot:
     account: RegisterAccount
     subjects: tuple[RemoteSubject, ...] | None = ()
     assignments: tuple[RemoteAssignment, ...] | None = ()
+    homework: tuple[RemoteAssignment, ...] | None = ()
     grades: tuple[RemoteGrade, ...] | None = ()
     lessons: tuple[RemoteLesson, ...] | None = ()
     assignment_window: tuple[date, date] | None = None
@@ -203,5 +209,8 @@ class SchoolRegister(Protocol):
     def login(self, credentials: Credentials) -> RegisterAccount: ...
     def subjects(self) -> list[RemoteSubject]: ...
     def assignments(self, first: date, last: date) -> list[RemoteAssignment]: ...
+    def homework(self) -> list[RemoteAssignment]:
+        """Homework set through the register's homework feature, if it has one."""
+        ...
     def grades(self) -> list[RemoteGrade]: ...
     def lessons(self, first: date, last: date) -> list[RemoteLesson]: ...

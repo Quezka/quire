@@ -480,3 +480,46 @@ def test_school_term_switcher_filters_grades(window, services, register, app):
     page._pick_period("Trimestre")
     assert page.tile_average.value.text() == "4.00"
     assert page.tile_attention.value.text() == "1"
+
+
+def test_school_agenda_lists_homework_and_ticks_it_off(window, services, register, app):
+    from datetime import timedelta
+
+    from PySide6.QtCore import QPoint, QThreadPool
+    from PySide6.QtTest import QTest
+
+    from quire.application.ports import RemoteAssignment, RemoteSubject
+    from quire.domain import TaskKind
+
+    from .conftest import TODAY
+
+    register.subjects_ = [RemoteSubject("4", "LINGUA STRANIERA INGLESE")]
+    register.homework_ = [RemoteAssignment("141468", TODAY, TaskKind.HOMEWORK,
+                                           "Workbook p. 18", "4", "LINGUA STRANIERA INGLESE",
+                                           feed="homework")]
+    register.assignments_ = [RemoteAssignment("9", TODAY - timedelta(days=5), TaskKind.TASK,
+                                              "Portare il libro", "4", "LINGUA STRANIERA INGLESE")]
+    page = window.school
+    window.show_page(window.stack.indexOf(page))
+    page.username.setText("S1")
+    page.password.setText("secret")
+    page._connect()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+
+    rows = [page.coming.item(i).text() for i in range(page.coming.count())]
+    assert rows == ["Overdue", "Portare il libro", "Today", "Workbook p. 18"]
+
+    # Click the round checkbox on the homework row.
+    row = page.coming.item(3)
+    rect = page.coming.visualItemRect(row)
+    QTest.mouseClick(page.coming.viewport(), Qt.LeftButton,
+                     pos=QPoint(rect.left() + 19, rect.top() + 19))
+    app.processEvents()
+    app.processEvents()
+    homework = next(t for t in services.tasks.groups(include_done=True)
+                    for t in t.items if t.task.title == "Workbook p. 18")
+    assert homework.task.done
+    assert "Workbook p. 18" not in [page.coming.item(i).text() for i in range(page.coming.count())]
+    page.show_done.setChecked(True)
+    assert "Workbook p. 18" in [page.coming.item(i).text() for i in range(page.coming.count())]

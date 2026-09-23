@@ -176,15 +176,16 @@ class SchoolSyncService:
         snapshot = RegisterSnapshot(
             account=account,
             subjects=part("Subjects", self._register.subjects),
-            assignments=part("Homework and tests",
+            assignments=part("Agenda (homework and tests)",
                              lambda: self._register.assignments(*assignment_window)),
+            homework=part("Homework", self._register.homework),
             grades=part("Grades", self._register.grades),
             lessons=part("Lesson topics", lambda: self._register.lessons(*lesson_window)),
             assignment_window=assignment_window,
             lesson_window=lesson_window,
             problems=tuple(problems),
         )
-        if len(problems) == 4:
+        if len(problems) == 5:
             raise RegisterError("Couldn't sync anything from "
                                 f"{self._register.name}. " + " ".join(problems))
         return snapshot
@@ -201,8 +202,14 @@ class SchoolSyncService:
                     or subject_names.get(tidy_subject(subject_name).casefold()))
 
         new_tasks, updated_tasks, removed = [], [], 0
-        if snap.assignments is not None:
-            new_tasks, updated_tasks, removed = self._sync_assignments(snap, course_for)
+        for items, feed, window in ((snap.assignments, "agenda", snap.assignment_window),
+                                    (snap.homework, "homework", None)):
+            if items is not None:
+                added, changed, dropped = self._sync_assignments(items, feed, window,
+                                                                 course_for)
+                new_tasks += added
+                updated_tasks += changed
+                removed += dropped
 
         new_grades: tuple[Grade, ...] = ()
         if snap.grades is not None:
@@ -272,11 +279,16 @@ class SchoolSyncService:
             subject_ids[subject.id] = course.id
         return subject_ids, {k: c.id for k, c in by_name.items()}, created
 
-    def _sync_assignments(self, snap: RegisterSnapshot, course_for):
-        prefix = self._external("agenda", "")
+    def _sync_assignments(self, items, feed: str, window, course_for):
+        """Mirror one feed of register work (agenda, homework) into tasks.
+
+        With a `window`, the feed is complete for those dates, so undone tasks that
+        vanished from it were deleted by the teacher and are removed here too.
+        """
+        prefix = self._external(feed, "")
         existing = {t.external_id: t for t in self._tasks.by_external_prefix(prefix)}
         seen, new, updated = set(), [], []
-        for item in snap.assignments:
+        for item in items:
             external = prefix + item.id
             seen.add(external)
             details = item.text.strip()
@@ -287,18 +299,21 @@ class SchoolSyncService:
                           details=details)
             task = existing.get(external)
             if task is None:
-                task = Task(**fields, external_id=external)
+                task = Task(**fields, done=item.done, external_id=external)
                 task.id = self._tasks.add(task)
                 new.append(task)
-            elif any(getattr(task, k) != v for k, v in fields.items()):
-                for k, v in fields.items():  # keeps the user's done/not-done state
+            elif (any(getattr(task, k) != v for k, v in fields.items())
+                  or (item.done and not task.done)):
+                # Keeps the student's own tick; a "done" on the register is carried over.
+                for k, v in fields.items():
                     setattr(task, k, v)
+                task.done = task.done or item.done
                 self._tasks.update(task)
                 updated.append(task)
 
         removed = 0
-        if snap.assignment_window:
-            first, last = snap.assignment_window
+        if window:
+            first, last = window
             for external, task in existing.items():
                 # Teacher deleted it: drop it, unless the student already ticked it off.
                 if (external not in seen and not task.done and task.due
@@ -377,14 +392,39 @@ class SchoolSyncService:
     def overall_average(self, period: str | None = None) -> float | None:
         return average(self._grades(period))
 
+    def _register_tasks(self) -> list[Task]:
+        return self._tasks.by_external_prefix(f"{self._source}:")
+
     def upcoming(self, days: int = 21) -> list[TaskItem]:
         """Homework and tests from the register that are still to do, soonest first."""
         today = self._clock.today()
         courses = {c.id: c for c in self._courses.list()}
-        tasks = [t for t in self._tasks.by_external_prefix(self._external("agenda", ""))
+        tasks = [t for t in self._register_tasks()
                  if not t.done and t.due is not None and 0 <= (t.due - today).days <= days]
         tasks.sort(key=lambda t: (t.due, t.kind is not TaskKind.EXAM, t.title.casefold()))
         return [TaskItem(t, courses.get(t.course_id), False) for t in tasks]
+
+    def agenda(self, include_done: bool = False, days_ahead: int = 60,
+               done_days_back: int = 14) -> list[TaskItem]:
+        """Everything the register assigned: overdue work, today and what's ahead.
+
+        With `include_done`, work ticked off in the last `done_days_back` days too.
+        """
+        today = self._clock.today()
+        courses = {c.id: c for c in self._courses.list()}
+        result = []
+        for t in self._register_tasks():
+            if t.due is None:
+                continue
+            ahead = (t.due - today).days
+            if t.done:
+                keep = include_done and -done_days_back <= ahead <= days_ahead
+            else:
+                keep = ahead <= days_ahead  # includes everything overdue
+            if keep:
+                result.append(t)
+        result.sort(key=lambda t: (t.due, t.kind is not TaskKind.EXAM, t.title.casefold()))
+        return [TaskItem(t, courses.get(t.course_id), t.is_overdue(today)) for t in result]
 
     def overview(self, period: str | None = None) -> SchoolOverview:
         today = self._clock.today()
