@@ -6,7 +6,7 @@ from PySide6.QtCore import QSettings, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QKeySequence
 from PySide6.QtWidgets import QFileDialog, QMainWindow, QMessageBox, QTabWidget
 
-from .. import __version__
+from .. import DEVELOPER, HOMEPAGE, __version__
 from ..application.services import Services
 from .bridge import ChangeRelay
 from .dialogs import CoursesDialog, EventDialog, TaskDialog
@@ -129,6 +129,7 @@ class MainWindow(QMainWindow):
             self, "About Quire",
             f"<h3>Quire {__version__}</h3>"
             "<p>Notes, day planner and school timetable.</p>"
+            f"<p>By {DEVELOPER} · <a href='{HOMEPAGE}'>{HOMEPAGE}</a></p>"
             f"<p>Your data lives in:<br><code>{self.services.storage.location}</code></p>")
 
     def closeEvent(self, event):

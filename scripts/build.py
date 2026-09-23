@@ -12,9 +12,14 @@ from __future__ import annotations
 import argparse
 import os
 import sys
+from datetime import date
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+import quire  # noqa: E402  (release metadata only; no Qt imports)
+
 ASSETS = ROOT / "quire" / "assets"
 BUILD = ROOT / "build"
 
@@ -39,6 +44,36 @@ def render_icons() -> Path:
     return target
 
 
+def write_windows_version_file() -> Path:
+    """File properties shown in Windows Explorer (Details tab) for Quire.exe."""
+    parts = [int(p) for p in quire.__version__.split(".")]
+    nums = tuple(parts + [0] * (4 - len(parts)))
+    strings = {
+        "CompanyName": quire.DEVELOPER,
+        "FileDescription": f"{quire.APP_NAME}: notes, day planner and school timetable",
+        "FileVersion": quire.__version__,
+        "InternalName": quire.APP_NAME,
+        "LegalCopyright": f"Copyright (c) {date.today().year} {quire.DEVELOPER}",
+        "OriginalFilename": f"{quire.APP_NAME}.exe",
+        "ProductName": quire.APP_NAME,
+        "ProductVersion": quire.__version__,
+    }
+    entries = ",\n          ".join(f"StringStruct({k!r}, {v!r})" for k, v in strings.items())
+    BUILD.mkdir(exist_ok=True)
+    target = BUILD / "windows-version.txt"
+    target.write_text(f"""VSVersionInfo(
+  ffi=FixedFileInfo(filevers={nums}, prodvers={nums}, mask=0x3f, flags=0x0,
+                    OS=0x40004, fileType=0x1, subtype=0x0, date=(0, 0)),
+  kids=[
+    StringFileInfo([StringTable('040904B0', [
+          {entries}])]),
+    VarFileInfo([VarStruct('Translation', [1033, 1200])]),
+  ],
+)
+""", encoding="utf-8")
+    return target
+
+
 def main():
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group()
@@ -51,7 +86,10 @@ def main():
     import PyInstaller.__main__
 
     icon = render_icons()
+    windows_only = (["--version-file", str(write_windows_version_file())]
+                    if sys.platform == "win32" else [])
     PyInstaller.__main__.run([
+        *windows_only,
         str(ROOT / "scripts" / "launcher.py"),
         "--name", "Quire",
         "--windowed",

@@ -3,8 +3,9 @@
 Layout inside the package:
     /opt/quire/                         the frozen app (binary + bundled Qt/Python)
     /usr/bin/quire                      symlink to /opt/quire/Quire
-    /usr/share/applications/quire.desktop
-    /usr/share/icons/hicolor/...        scalable SVG + 256px PNG
+    /usr/share/applications/<APP_ID>.desktop
+    /usr/share/metainfo/<APP_ID>.metainfo.xml   developer/publisher info for app stores
+    /usr/share/icons/hicolor/...        scalable SVG + 256px PNG named <APP_ID>
 
 The desktop database and icon cache refresh through dpkg triggers, so no
 maintainer scripts are needed.
@@ -14,9 +15,15 @@ from __future__ import annotations
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
+sys.path.insert(0, str(ROOT))
+
+import quire  # noqa: E402  (release metadata only; no Qt imports)
+
+PACKAGING = ROOT / "packaging"
 
 # Bundled Qt still links against these system libraries.
 DEPENDS = [
@@ -33,12 +40,6 @@ DEPENDS = [
 ]
 
 
-def _version() -> str:
-    namespace: dict = {}
-    exec((ROOT / "quire" / "__init__.py").read_text(), namespace)
-    return namespace["__version__"]
-
-
 def _architecture() -> str:
     return subprocess.run(["dpkg", "--print-architecture"], check=True,
                           capture_output=True, text=True).stdout.strip()
@@ -52,7 +53,7 @@ def _installed_size_kib(root: Path) -> int:
 def build_deb(app_dir: Path, png_icon: Path, out_dir: Path, work_dir: Path) -> Path:
     if shutil.which("dpkg-deb") is None:
         raise SystemExit("dpkg-deb not found; build the .deb on a Debian/Ubuntu system")
-    version, arch = _version(), _architecture()
+    version, arch, app_id = quire.__version__, _architecture(), quire.APP_ID
     stage = work_dir / "deb-root"
     shutil.rmtree(stage, ignore_errors=True)
 
@@ -64,13 +65,15 @@ def build_deb(app_dir: Path, png_icon: Path, out_dir: Path, work_dir: Path) -> P
     os.symlink("/opt/quire/Quire", bin_dir / "quire")
 
     share = stage / "usr" / "share"
-    (share / "applications").mkdir(parents=True)
-    shutil.copy(ROOT / "packaging" / "quire.desktop", share / "applications" / "quire.desktop")
+    for folder, name in [("applications", f"{app_id}.desktop"),
+                         ("metainfo", f"{app_id}.metainfo.xml")]:
+        (share / folder).mkdir(parents=True)
+        shutil.copy(PACKAGING / name, share / folder / name)
     icons = share / "icons" / "hicolor"
     (icons / "scalable" / "apps").mkdir(parents=True)
-    shutil.copy(ROOT / "quire" / "assets" / "icon.svg", icons / "scalable" / "apps" / "quire.svg")
+    shutil.copy(ROOT / "quire" / "assets" / "icon.svg", icons / "scalable" / "apps" / f"{app_id}.svg")
     (icons / "256x256" / "apps").mkdir(parents=True)
-    shutil.copy(png_icon, icons / "256x256" / "apps" / "quire.png")
+    shutil.copy(png_icon, icons / "256x256" / "apps" / f"{app_id}.png")
 
     for path in stage.rglob("*"):
         if path.is_symlink():
@@ -86,12 +89,12 @@ def build_deb(app_dir: Path, png_icon: Path, out_dir: Path, work_dir: Path) -> P
         f"Package: quire\n"
         f"Version: {version}\n"
         f"Architecture: {arch}\n"
-        f"Maintainer: quezka <arsdom15@gmail.com>\n"
+        f"Maintainer: {quire.DEVELOPER} <{quire.MAINTAINER_EMAIL}>\n"
         f"Installed-Size: {_installed_size_kib(stage)}\n"
         f"Depends: {', '.join(DEPENDS)}\n"
         f"Section: utils\n"
         f"Priority: optional\n"
-        f"Homepage: https://github.com/Quezka/quire\n"
+        f"Homepage: {quire.HOMEPAGE}\n"
         f"Description: Notes, day planner and school timetable\n"
         f" Quire keeps your weekly school timetable, a day planner, homework and\n"
         f" exams, and markdown notes in one desktop app. Data is stored locally\n"

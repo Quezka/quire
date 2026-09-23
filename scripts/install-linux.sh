@@ -12,9 +12,14 @@ if [ ! -x "$app/bin/pip" ]; then
 fi
 "$app/bin/pip" install -q --upgrade "$here"
 
-mkdir -p "$HOME/.local/bin" "$prefix/applications" "$prefix/icons/hicolor/scalable/apps"
+app_id="io.github.quezka.Quire"
+mkdir -p "$HOME/.local/bin" "$prefix/applications" "$prefix/metainfo" \
+    "$prefix/icons/hicolor/scalable/apps"
 ln -sf "$app/bin/quire" "$HOME/.local/bin/quire"
-cp "$here/quire/assets/icon.svg" "$prefix/icons/hicolor/scalable/apps/quire.svg"
-cp "$here/packaging/quire.desktop" "$prefix/applications/quire.desktop"
+cp "$here/quire/assets/icon.svg" "$prefix/icons/hicolor/scalable/apps/$app_id.svg"
+cp "$here/packaging/$app_id.desktop" "$prefix/applications/$app_id.desktop"
+cp "$here/packaging/$app_id.metainfo.xml" "$prefix/metainfo/$app_id.metainfo.xml"
+# Entries from installs before the app id was introduced.
+rm -f "$prefix/applications/quire.desktop" "$prefix/icons/hicolor/scalable/apps/quire.svg"
 update-desktop-database "$prefix/applications" 2>/dev/null || true
 echo "Installed. Launch Quire from your app menu or run: quire"

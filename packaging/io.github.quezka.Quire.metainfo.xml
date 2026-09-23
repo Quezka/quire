@@ -1,0 +1,60 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- AppStream metadata: what Ubuntu App Center / GNOME Software show about Quire. -->
+<component type="desktop-application">
+  <id>io.github.quezka.Quire</id>
+  <metadata_license>CC0-1.0</metadata_license>
+
+  <name>Quire</name>
+  <summary>Notes, day planner and school timetable</summary>
+  <developer id="io.github.quezka">
+    <name>Quezka</name>
+  </developer>
+
+  <description>
+    <p>
+      Quire keeps your weekly school timetable, a day planner, homework and exams,
+      and your notes in one place. Everything is stored locally on your computer.
+    </p>
+    <ul>
+      <li>Today: a timeline of classes and events, tasks due, and day notes</li>
+      <li>Week: a colour-coded timetable; open a lesson's notes or add homework from any class</li>
+      <li>Coursework: homework, assignments, readings and exams grouped by when they are due</li>
+      <li>Notes: Markdown notes with search, course filing, pinning and autosave</li>
+    </ul>
+  </description>
+
+  <launchable type="desktop-id">io.github.quezka.Quire.desktop</launchable>
+  <provides>
+    <binary>quire</binary>
+  </provides>
+
+  <url type="homepage">https://github.com/Quezka/quire</url>
+  <url type="bugtracker">https://github.com/Quezka/quire/issues</url>
+
+  <categories>
+    <category>Office</category>
+    <category>Calendar</category>
+  </categories>
+  <keywords>
+    <keyword>notes</keyword>
+    <keyword>planner</keyword>
+    <keyword>timetable</keyword>
+    <keyword>homework</keyword>
+    <keyword>school</keyword>
+  </keywords>
+
+  <content_rating type="oars-1.1"/>
+  <branding>
+    <color type="primary" scheme_preference="light">#dbe4ff</color>
+    <color type="primary" scheme_preference="dark">#1e3a8a</color>
+  </branding>
+
+  <!-- Newest first. Every released version needs an entry; tests enforce it. -->
+  <releases>
+    <release version="0.1.0" date="2026-09-23">
+      <description>
+        <p>First release: day planner, weekly timetable, coursework tracker and Markdown notes.</p>
+      </description>
+    </release>
+  </releases>
+</component>

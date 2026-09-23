@@ -82,6 +82,20 @@ PyInstaller builds for the platform it runs on, so run the build on Windows to g
 `Quire.exe`. The GitHub Actions workflow in `.github/workflows/build.yml` builds both on every
 push and uploads the `.deb` and `Quire.exe` as artifacts.
 
+## Releasing a new version
+
+Developer and publisher details (`DEVELOPER`, `APP_ID`, `HOMEPAGE`) live in
+`quire/__init__.py`. The `.deb`, the AppStream metadata checks, the Windows `.exe` file properties
+and the About dialog all read them from there.
+
+1. Bump `__version__` in `quire/__init__.py`.
+2. Add a `<release version="…" date="…">` entry at the top of
+   `packaging/io.github.quezka.Quire.metainfo.xml`. The tests fail if you forget.
+3. Commit, tag (`git tag v0.2.0`) and push.
+
+`packaging/io.github.quezka.Quire.metainfo.xml` is what Ubuntu App Center and GNOME Software
+read to show the app's developer, description and version history.
+
 ## Architecture
 
 Quire follows **Clean Architecture**: source-code dependencies point only inward.
