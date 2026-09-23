@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "quire"
+version = "0.1.0"
+description = "Notes, day planner and school timetable in one native desktop app"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = ["PySide6>=6.6"]
+
+[project.optional-dependencies]
+build = ["pyinstaller>=6.0"]
+
+[project.gui-scripts]
+quire = "quire.app:main"
+
+[tool.setuptools.packages.find]
+include = ["quire*"]
+
+[tool.setuptools.package-data]
+quire = ["assets/*"]

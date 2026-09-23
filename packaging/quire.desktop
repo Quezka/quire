@@ -1,0 +1,11 @@
+[Desktop Entry]
+Type=Application
+Name=Quire
+GenericName=Planner & Notes
+Comment=Notes, day planner and school timetable
+Exec=quire %U
+Icon=quire
+Terminal=false
+Categories=Office;Calendar;Education;
+Keywords=notes;planner;schedule;timetable;homework;school;
+StartupWMClass=quire
