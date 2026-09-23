@@ -5,18 +5,19 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 
-from ..domain import Course, DueBucket, Task, TimeRange
+from ..domain import Course, DueBucket, Job, Shift, Task, TimeRange
 
 
 class ItemKind(Enum):
     CLASS = "class"
     EVENT = "event"
+    SHIFT = "shift"
 
 
 @dataclass(frozen=True)
 class AgendaItem:
     kind: ItemKind
-    ref_id: int  # course id for classes, event id for events
+    ref_id: int  # course id for classes, event id for events, shift id for shifts
     day: date
     time: TimeRange
     title: str
@@ -49,6 +50,10 @@ class DayAgenda:
     @property
     def event_count(self) -> int:
         return sum(1 for i in self.items if i.kind is ItemKind.EVENT)
+
+    @property
+    def shift_count(self) -> int:
+        return len({i.ref_id for i in self.items if i.kind is ItemKind.SHIFT})
 
     @property
     def open_task_count(self) -> int:
@@ -90,3 +95,30 @@ class NoteGroup:
     course: Course | None
     topic: str  # "" for notes without a topic
     notes: tuple[NoteSummary, ...]
+
+
+@dataclass(frozen=True)
+class ShiftItem:
+    shift: Shift
+    job: Job | None
+
+    @property
+    def pay(self) -> float | None:
+        return self.shift.pay(self.job.hourly_rate if self.job else None)
+
+
+@dataclass(frozen=True)
+class JobTotal:
+    job: Job | None
+    minutes: int
+    pay: float | None
+
+
+@dataclass(frozen=True)
+class WorkSummary:
+    first: date
+    last: date
+    minutes: int  # paid minutes
+    pay: float | None  # None when no job has a rate
+    shifts: int
+    per_job: tuple[JobTotal, ...]

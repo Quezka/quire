@@ -171,6 +171,8 @@ def stylesheet(t: Theme) -> str:
     #cardTitle {{ font-weight: 700; color: {t.text}; font-size: 10.5pt; }}
     #muted {{ color: {t.muted}; }}
     #hint {{ color: {t.faint}; }}
+    QLabel#danger {{ color: {t.danger}; }}
+    #stat {{ font-size: 22pt; font-weight: 700; color: {t.text}; }}
     #badge {{ background: {t.accent_soft}; color: {t.accent}; border-radius: 9px;
               padding: 1px 8px; font-weight: 600; font-size: 9pt; }}
 
@@ -193,12 +195,14 @@ def stylesheet(t: Theme) -> str:
     QToolButton::menu-indicator {{ image: none; width: 0; }}
 
     /* ---- inputs ---- */
-    QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox {{
+    QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox,
+    QDoubleSpinBox {{
         background: {t.surface}; color: {t.text}; border: 1px solid {t.border};
         border-radius: 8px; padding: 6px 10px; selection-background-color: {t.accent};
         selection-color: {t.on_accent}; }}
     QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus,
-    QDateEdit:focus, QTimeEdit:focus {{ border: 1px solid {t.accent}; }}
+    QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
+        border: 1px solid {t.accent}; }}
     QLineEdit#search {{ background: {t.raised}; border-color: transparent; }}
     QLineEdit#search:focus {{ background: {t.surface}; border-color: {t.accent}; }}
     QPlainTextEdit#bare, QTextBrowser#bare {{ border: none; background: transparent;
@@ -206,7 +210,8 @@ def stylesheet(t: Theme) -> str:
     QComboBox::drop-down, QDateEdit::drop-down {{ border: none; width: 26px; }}
     QComboBox::down-arrow, QDateEdit::down-arrow {{ image: url({chevron}); width: 14px;
         height: 14px; }}
-    QTimeEdit::up-button, QTimeEdit::down-button {{ width: 0; border: none; }}
+    QTimeEdit::up-button, QTimeEdit::down-button, QSpinBox::up-button, QSpinBox::down-button,
+    QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0; border: none; }}
     QComboBox QAbstractItemView {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 8px; padding: 4px; selection-background-color: {t.accent_soft};
         selection-color: {t.text}; }}

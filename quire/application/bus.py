@@ -12,6 +12,7 @@ class Topic(Enum):
     NOTES = "notes"
     JOURNAL = "journal"
     SCHOOL = "school"
+    WORK = "work"
 
 
 Listener = Callable[[Topic], None]

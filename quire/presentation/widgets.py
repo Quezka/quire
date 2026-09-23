@@ -130,6 +130,10 @@ class TimeGrid(QWidget):
     def y_for(self, minute: int) -> float:
         return self.PAD + (minute - self.start_min) * self.HOUR / 60
 
+    def first_daytime_start(self, default: int = 8 * 60 + 30) -> int:
+        """Where to scroll: the first block after 06:00 (late shifts spill past midnight)."""
+        return min((b.start for b in self.blocks if b.start >= 6 * 60), default=default)
+
     def column_width(self) -> float:
         return max(1.0, (self.width() - self.GUTTER) / self.column_count)
 

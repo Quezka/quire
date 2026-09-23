@@ -10,7 +10,7 @@ from ...application.bus import Topic
 from ...application.dto import AgendaItem, ItemKind
 from ...application.services import Services
 from ..bridge import ChangeRelay
-from ..dialogs import CoursesDialog, EventDialog, class_menu
+from ..dialogs import CoursesDialog, EventDialog, ShiftDialog, class_menu, new_item_menu
 from ..widgets import GridHeader, TimeGrid
 from .common import Card, Page, agenda_block, button, icon_button, primary_button
 
@@ -66,11 +66,11 @@ class WeekView(Page):
         QTimer.singleShot(0, self._scroll_to_focus)
 
     def _scroll_to_focus(self):
-        target = min((b.start for b in self.grid.blocks), default=8 * 60 + 30) - 30
+        target = self.grid.first_daytime_start() - 30
         self.scroll.verticalScrollBar().setValue(int(self.grid.y_for(target)) - TimeGrid.PAD)
 
     def _changed(self, topic: Topic):
-        if topic in (Topic.COURSES, Topic.EVENTS):
+        if topic in (Topic.COURSES, Topic.EVENTS, Topic.WORK):
             self.refresh()
 
     def refresh(self):
@@ -90,15 +90,17 @@ class WeekView(Page):
 
         if week.has_courses:
             self.subtitle.setText("Double-click a class for notes and homework, "
-                                  "or an empty slot to add an event")
+                                  "or an empty slot to add an event or work shift")
         else:
             self.subtitle.setText("No classes yet. Add your subjects under Courses")
 
     def _block_activated(self, item: AgendaItem, pos):
         if item.kind is ItemKind.EVENT:
             EventDialog(self.services, item.ref_id, parent=self).exec()
+        elif item.kind is ItemKind.SHIFT:
+            ShiftDialog(self.services, item.ref_id, parent=self).exec()
         else:
             class_menu(self, self.services, item.ref_id, item.day, pos, self.openClassNote.emit)
 
     def _empty_activated(self, col, minute):
-        EventDialog(self.services, day=self.days[col], start=minute, parent=self).exec()
+        new_item_menu(self, self.services, self.days[col], minute)

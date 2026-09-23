@@ -1,19 +1,22 @@
 """Edit dialogs for courses, events and tasks."""
 from __future__ import annotations
 
-from datetime import date
+from datetime import date, timedelta
 from typing import Callable
 
 from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
-    QAbstractItemView, QCheckBox, QComboBox, QDateEdit, QDialog, QDialogButtonBox, QFormLayout,
-    QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
-    QMessageBox, QPlainTextEdit, QPushButton, QTableWidget, QTimeEdit, QVBoxLayout,
+    QAbstractItemView, QCheckBox, QComboBox, QDateEdit, QDialog, QDialogButtonBox,
+    QDoubleSpinBox, QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
+    QListWidgetItem, QMenu, QMessageBox, QPlainTextEdit, QPushButton, QSpinBox, QTableWidget,
+    QTimeEdit, QVBoxLayout,
 )
 
 from ..application.services import Services
-from ..domain import ClassSlot, Course, DomainError, Event, Task, TaskKind, TimeRange
-from .formatting import KIND_LABELS, WEEKDAYS, fmt_min
+from ..domain import (
+    ClassSlot, Course, DomainError, Event, Job, Shift, Task, TaskKind, TimeRange,
+)
+from .formatting import KIND_LABELS, WEEKDAYS, fmt_duration, fmt_min, fmt_range, money
 from .widgets import PALETTE, ColorButton, color_icon, min_to_qtime, qtime_to_min
 
 
@@ -411,3 +414,233 @@ def class_menu(parent, services: Services, course_id: int, day: date, pos,
                    parent=parent).exec()
     elif chosen is edit:
         CourseDialog(services, course_id, parent).exec()
+
+
+class JobDialog(QDialog):
+    def __init__(self, services: Services, job_id=None, parent=None):
+        super().__init__(parent)
+        self.work = services.work
+        self.job_id = job_id
+        self.setWindowTitle("Edit job" if job_id else "New job")
+        self.setMinimumWidth(400)
+
+        self.name = QLineEdit(placeholderText="e.g. Pizzeria Da Mario")
+        used = {j.color for j in self.work.jobs()}
+        self.color = ColorButton(next((c for c in reversed(PALETTE) if c not in used), PALETTE[-2]))
+        self.rate = QDoubleSpinBox(decimals=2, maximum=1000, singleStep=0.5)
+        self.rate.setSpecialValueText("Not set")
+        self.rate.setSuffix(" / hour")
+
+        form = QFormLayout()
+        form.addRow("Name", self.name)
+        form.addRow("Colour", self.color)
+        form.addRow("Hourly pay", self.rate)
+        hint = QLabel("Set the hourly pay to see what each shift earns.", objectName="hint")
+        form.addRow("", hint)
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(_buttons(self, self._save, self._delete if job_id else None,
+                                  "Delete job"))
+
+        if job_id:
+            job = self.work.job(job_id)
+            self.name.setText(job.name)
+            self.color.setColor(job.color)
+            self.rate.setValue(job.hourly_rate or 0)
+
+    def _save(self):
+        job = Job(self.name.text(), self.color.color(), self.rate.value() or None, self.job_id)
+        if attempt(self, lambda: self.work.save_job(job)):
+            self.job_id = job.id
+            self.accept()
+
+    def _delete(self):
+        if confirm(self, "Delete job", "Delete this job and all of its shifts?"):
+            self.work.delete_job(self.job_id)
+            self.accept()
+
+
+class JobsDialog(QDialog):
+    def __init__(self, services: Services, parent=None):
+        super().__init__(parent)
+        self.services = services
+        self.setWindowTitle("Jobs")
+        self.setMinimumSize(420, 320)
+        self.list = QListWidget()
+        self.list.itemDoubleClicked.connect(self._edit)
+        add = QPushButton("Add job…")
+        add.clicked.connect(self._add)
+        edit = QPushButton("Edit…")
+        edit.clicked.connect(lambda: self._edit(self.list.currentItem()))
+        close = QDialogButtonBox(QDialogButtonBox.Close)
+        close.rejected.connect(self.accept)
+        side = QVBoxLayout()
+        side.addWidget(add)
+        side.addWidget(edit)
+        side.addStretch()
+        body = QHBoxLayout()
+        body.addWidget(self.list, 1)
+        body.addLayout(side)
+        layout = QVBoxLayout(self)
+        layout.addLayout(body)
+        layout.addWidget(close)
+        self._reload()
+
+    def _reload(self):
+        self.list.clear()
+        for job in self.services.work.jobs():
+            rate = f"{money(job.hourly_rate)} / hour" if job.hourly_rate else "no pay rate"
+            item = QListWidgetItem(color_icon(job.color, 14), f"{job.name}\n{rate}")
+            item.setData(Qt.UserRole, job.id)
+            self.list.addItem(item)
+
+    def _add(self):
+        if JobDialog(self.services, parent=self).exec():
+            self._reload()
+
+    def _edit(self, item):
+        if item and JobDialog(self.services, item.data(Qt.UserRole), self).exec():
+            self._reload()
+
+
+class ShiftDialog(QDialog):
+    def __init__(self, services: Services, shift_id=None, day: date | None = None,
+                 start: int = 17 * 60, parent=None):
+        super().__init__(parent)
+        self.services = services
+        self.work = services.work
+        self.shift_id = shift_id
+        self.setWindowTitle("Edit shift" if shift_id else "New shift")
+        self.setMinimumWidth(460)
+
+        self.job = QComboBox()
+        new_job = QPushButton("New job…")
+        new_job.clicked.connect(self._new_job)
+        job_row = QHBoxLayout()
+        job_row.addWidget(self.job, 1)
+        job_row.addWidget(new_job)
+
+        self.date = QDateEdit(calendarPopup=True)
+        self.date.setDisplayFormat("ddd d MMM yyyy")
+        self.start = _time_edit(start)
+        self.end = _time_edit(min(start + 4 * 60, 24 * 60 - 1))
+        self.next_day = QLabel("", objectName="hint")
+        times = QHBoxLayout()
+        times.addWidget(self.start)
+        times.addWidget(QLabel("to"))
+        times.addWidget(self.end)
+        times.addWidget(self.next_day)
+        times.addStretch()
+
+        self.break_min = QSpinBox(maximum=240, singleStep=5, suffix=" min")
+        self.break_min.setSpecialValueText("No break")
+        self.repeat = QSpinBox(maximum=52, suffix=" more weeks")
+        self.repeat.setSpecialValueText("Just this once")
+        self.notes = QPlainTextEdit(placeholderText="Notes (optional)")
+        self.notes.setFixedHeight(70)
+        self.summary = QLabel("", objectName="muted")
+        self.clash = QLabel("", objectName="danger")
+        self.clash.setWordWrap(True)
+
+        form = QFormLayout()
+        form.addRow("Job", job_row)
+        form.addRow("Date", self.date)
+        form.addRow("Time", times)
+        form.addRow("Unpaid break", self.break_min)
+        if not shift_id:
+            form.addRow("Repeat weekly", self.repeat)
+        form.addRow("Notes", self.notes)
+        form.addRow("", self.summary)
+        form.addRow("", self.clash)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(_buttons(self, self._save, self._delete if shift_id else None))
+
+        self._fill_jobs()
+        if shift_id:
+            shift = self.work.shift(shift_id)
+            select_data(self.job, shift.job_id)
+            self.date.setDate(to_qdate(shift.day))
+            self.start.setTime(min_to_qtime(shift.start))
+            self.end.setTime(min_to_qtime(shift.end % (24 * 60)))
+            self.break_min.setValue(shift.break_minutes)
+            self.notes.setPlainText(shift.notes)
+        else:
+            self.date.setDate(to_qdate(day or services.planner.today()))
+        for signal in (self.job.currentIndexChanged, self.date.dateChanged,
+                       self.start.timeChanged, self.end.timeChanged,
+                       self.break_min.valueChanged, self.repeat.valueChanged):
+            signal.connect(self._update_preview)
+        self._update_preview()
+
+    def _fill_jobs(self, select=None):
+        current = select if select is not None else self.job.currentData()
+        self.job.blockSignals(True)
+        self.job.clear()
+        for job in self.work.jobs():
+            self.job.addItem(color_icon(job.color), job.name, job.id)
+        if current is not None:
+            select_data(self.job, current)
+        self.job.blockSignals(False)
+
+    def _new_job(self):
+        dialog = JobDialog(self.services, parent=self)
+        if dialog.exec():
+            self._fill_jobs(select=dialog.job_id)
+            self._update_preview()
+
+    def _shift(self) -> Shift:
+        return Shift.between(self.job.currentData() or 0, self.date.date().toPython(),
+                             qtime_to_min(self.start.time()), qtime_to_min(self.end.time()),
+                             break_minutes=self.break_min.value(),
+                             notes=self.notes.toPlainText().strip(), id=self.shift_id)
+
+    def _update_preview(self):
+        shift = self._shift()
+        self.next_day.setText("ends next day" if shift.ends_next_day else "")
+        job = next((j for j in self.work.jobs() if j.id == shift.job_id), None)
+        pay = shift.pay(job.hourly_rate if job else None)
+        text = f"{fmt_duration(max(shift.paid_minutes, 0))} paid"
+        if pay is not None and shift.paid_minutes > 0:
+            text += f"  ·  ≈ {money(pay)}"
+        if self.repeat.value():
+            text += f"  ·  {self.repeat.value() + 1} shifts in total"
+        self.summary.setText(text)
+        try:
+            items = self.services.planner.items_between(shift.day, shift.day + timedelta(days=1))
+            clashes = self.work.clashes(shift, items)
+        except DomainError:
+            clashes = []
+        self.clash.setText("Overlaps " + ", ".join(
+            f"{c.title} ({fmt_range(c.time)})" for c in clashes) if clashes else "")
+        self.clash.setVisible(bool(clashes))
+
+    def _save(self):
+        if self.job.currentData() is None:
+            QMessageBox.information(self, "Add a job first",
+                                    "Create the job this shift is for with “New job…”.")
+            return
+        shift = self._shift()
+        repeat = self.repeat.value() if not self.shift_id else 0
+        if attempt(self, lambda: self.work.save_shift(shift, repeat)):
+            self.accept()
+
+    def _delete(self):
+        if confirm(self, "Delete shift", "Delete this shift?"):
+            self.work.delete_shift(self.shift_id)
+            self.accept()
+
+
+def new_item_menu(parent, services: Services, day: date, minute: int, pos=None):
+    """Double-clicking empty time asks what to add there."""
+    from PySide6.QtGui import QCursor
+
+    menu = QMenu(parent)
+    event = menu.addAction("Event…")
+    shift = menu.addAction("Work shift…")
+    chosen = menu.exec(pos or QCursor.pos())
+    if chosen is event:
+        EventDialog(services, day=day, start=minute, parent=parent).exec()
+    elif chosen is shift:
+        ShiftDialog(services, day=day, start=minute, parent=parent).exec()

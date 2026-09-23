@@ -13,13 +13,14 @@ from .. import DEVELOPER, HOMEPAGE, __version__
 from ..application.services import Services
 from . import theme
 from .bridge import ChangeRelay
-from .dialogs import CoursesDialog, EventDialog, TaskDialog
+from .dialogs import CoursesDialog, EventDialog, JobsDialog, ShiftDialog, TaskDialog
 from .icons import APP_ICON
 from .views.coursework import CourseworkView
 from .views.notes import NotesView
 from .views.school import SchoolView
 from .views.today import TodayView
 from .views.week import WeekView
+from .views.work import WorkView
 
 
 class Sidebar(QFrame):
@@ -72,7 +73,7 @@ class Sidebar(QFrame):
 
 class MainWindow(QMainWindow):
     PAGES = [("today", "Today"), ("week", "Week"), ("coursework", "Coursework"),
-             ("notes", "Notes"), ("school", "School")]
+             ("notes", "Notes"), ("school", "School"), ("briefcase", "Work")]
 
     def __init__(self, services: Services):
         super().__init__()
@@ -87,11 +88,13 @@ class MainWindow(QMainWindow):
         self.coursework = CourseworkView(services, relay)
         self.notes = NotesView(services, relay)
         self.school = SchoolView(services, relay)
+        self.work = WorkView(services, relay)
 
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         for i, (page, (icon_name, label)) in enumerate(zip(
-                [self.today, self.week, self.coursework, self.notes, self.school], self.PAGES)):
+                [self.today, self.week, self.coursework, self.notes, self.school, self.work],
+                self.PAGES)):
             self.stack.addWidget(page)
             self.sidebar.add_page(icon_name, label, f"Ctrl+{i + 1}")
         self.sidebar.group.idClicked.connect(self.show_page)
@@ -149,6 +152,7 @@ class MainWindow(QMainWindow):
         self._shortcut("Ctrl+T", self.new_task)
         self._shortcut("Ctrl+Shift+E", self.new_event)
         self._shortcut("Ctrl+Shift+C", self.open_courses)
+        self._shortcut("Ctrl+Shift+W", self.new_shift)
         self._shortcut("Ctrl+D", self._go_today)
         self._shortcut("Ctrl+R", lambda: self.school.sync())
         self._shortcut(QKeySequence.Find, self._search_notes)
@@ -160,8 +164,10 @@ class MainWindow(QMainWindow):
             ("New task", "Ctrl+T", self.new_task),
             ("New event", "Ctrl+Shift+E", self.new_event),
             ("New note", "Ctrl+N", self.new_note),
+            ("New work shift", "Ctrl+Shift+W", self.new_shift),
             None,
             ("Courses && timetable", "Ctrl+Shift+C", self.open_courses),
+            ("Jobs", None, lambda: JobsDialog(self.services, self).exec()),
             ("Sync school register", "Ctrl+R", lambda: self.school.sync()),
             None,
             ("Back up data…", None, self.backup),
@@ -208,6 +214,9 @@ class MainWindow(QMainWindow):
     def new_event(self):
         EventDialog(self.services, day=self.today.day, parent=self).exec()
 
+    def new_shift(self):
+        ShiftDialog(self.services, day=self.today.day, parent=self).exec()
+
     def open_courses(self):
         CoursesDialog(self.services, self).exec()
 
@@ -241,7 +250,8 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.services.storage.location.parent)))
 
     def show_shortcuts(self):
-        rows = [("Ctrl+1 … 5", "Today / Week / Coursework / Notes / School"),
+        rows = [("Ctrl+1 … 6", "Today / Week / Coursework / Notes / School / Work"),
+                ("Ctrl+Shift+W", "New work shift"),
                 ("Ctrl+D", "Jump to today"), ("Ctrl+R", "Sync school register"),
                 ("Ctrl+N", "New note"), ("Ctrl+T", "New task"), ("Ctrl+Shift+E", "New event"),
                 ("Ctrl+Shift+C", "Courses & timetable"), ("Ctrl+F", "Search notes"),

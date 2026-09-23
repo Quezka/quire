@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from ..domain import ClassSlot, Course, Event, Grade, Lesson, Note, Subject, Task, TaskKind, TimeRange
+from ..domain import ClassSlot, Course, Event, Grade, Job, Lesson, Note, Shift, Subject, Task, TaskKind, TimeRange
 from .sqlite import SqliteDatabase
 
 
@@ -313,3 +313,58 @@ class SqliteKeyValueStore(_Repo):
         else:
             self._write("INSERT INTO settings (key, value) VALUES (?, ?)"
                         " ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value)
+
+
+class SqliteJobRepository(_Repo):
+    @staticmethod
+    def _job(r) -> Job:
+        return Job(r["name"], r["color"], r["hourly_rate"], r["id"])
+
+    def list(self):
+        return [self._job(r) for r in self._all("SELECT * FROM jobs ORDER BY name COLLATE NOCASE")]
+
+    def get(self, job_id):
+        r = self._one("SELECT * FROM jobs WHERE id = ?", job_id)
+        return self._job(r) if r else None
+
+    def add(self, job: Job) -> int:
+        return self._write("INSERT INTO jobs (name, color, hourly_rate) VALUES (?, ?, ?)",
+                           job.name, job.color, job.hourly_rate)
+
+    def update(self, job: Job):
+        self._write("UPDATE jobs SET name = ?, color = ?, hourly_rate = ? WHERE id = ?",
+                    job.name, job.color, job.hourly_rate, job.id)
+
+    def delete(self, job_id):
+        self._write("DELETE FROM jobs WHERE id = ?", job_id)
+
+
+class SqliteShiftRepository(_Repo):
+    @staticmethod
+    def _shift(r) -> Shift:
+        return Shift(r["job_id"], date.fromisoformat(r["day"]), r["start_min"], r["duration_min"],
+                     r["break_min"], r["notes"], r["id"])
+
+    def starting_between(self, first, last):
+        return [self._shift(r) for r in self._all(
+            "SELECT * FROM shifts WHERE day BETWEEN ? AND ? ORDER BY day, start_min",
+            first.isoformat(), last.isoformat())]
+
+    def get(self, shift_id):
+        r = self._one("SELECT * FROM shifts WHERE id = ?", shift_id)
+        return self._shift(r) if r else None
+
+    def add(self, s: Shift) -> int:
+        return self._write(
+            "INSERT INTO shifts (job_id, day, start_min, duration_min, break_min, notes)"
+            " VALUES (?, ?, ?, ?, ?, ?)",
+            s.job_id, s.day.isoformat(), s.start, s.duration, s.break_minutes, s.notes)
+
+    def update(self, s: Shift):
+        self._write(
+            "UPDATE shifts SET job_id = ?, day = ?, start_min = ?, duration_min = ?,"
+            " break_min = ?, notes = ? WHERE id = ?",
+            s.job_id, s.day.isoformat(), s.start, s.duration, s.break_minutes, s.notes, s.id)
+
+    def delete(self, shift_id):
+        self._write("DELETE FROM shifts WHERE id = ?", shift_id)

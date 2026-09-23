@@ -8,7 +8,7 @@ from PySide6.QtWidgets import (
 
 from ...application.dto import AgendaItem, ItemKind
 from .. import theme
-from ..formatting import fmt_range
+from ..formatting import fmt_min, fmt_range
 from ..widgets import Block
 
 
@@ -101,7 +101,14 @@ def label(text: str = "", role: str = "muted") -> QLabel:
 def agenda_block(item: AgendaItem, column: int) -> Block:
     if item.kind is ItemKind.CLASS:
         details = [item.room, item.teacher]
+    elif item.kind is ItemKind.SHIFT:
+        details = ["work shift", item.details.splitlines()[0] if item.details else ""]
     else:
         details = [item.details.splitlines()[0] if item.details else ""]
-    subtitle = " · ".join([fmt_range(item.time), *filter(None, details)])
+    when = fmt_range(item.time)
+    if item.kind is ItemKind.SHIFT and item.time.end == 24 * 60:
+        when = f"{fmt_min(item.time.start)} → next day"
+    elif item.kind is ItemKind.SHIFT and item.time.start == 0:
+        when = f"until {fmt_min(item.time.end)}"
+    subtitle = " · ".join([when, *filter(None, details)])
     return Block(column, item.time.start, item.time.end, item.title, subtitle, item.color, item)

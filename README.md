@@ -29,6 +29,15 @@ your machine in a single SQLite file.
   - The **group** button next to the class filter shows notes under their class and topic.
     Click a heading to collapse it. Right-click a topic to rename it (a rename into an
     existing name merges the two) or to start a new note in it.
+- **Work**: add your jobs (with an optional hourly rate) and your shifts.
+  - Shifts show up in Today and Week next to your classes. Late shifts can run past
+    midnight, e.g. 18:00–01:00.
+  - A weekly shift can be repeated for several weeks in one go.
+  - The shift editor shows paid hours (minus your unpaid break) and estimated pay. It warns
+    you if a shift overlaps a class, an event or another shift.
+  - The Work page lists upcoming shifts and totals hours and pay for this week and this
+    month, per job.
+  - Double-click an empty time in Today or Week to add an event or a shift there.
 - **School (Classeviva)**: connect your Classeviva student account to pull in what teachers
   post:
   - homework and tests from the agenda, which land in Coursework and Today;
@@ -65,7 +74,8 @@ If Spaggiari changes that API, the sync may stop working until Quire is updated.
 
 | Keys | Action |
 | --- | --- |
-| Ctrl+1 … Ctrl+5 | Today / Week / Coursework / Notes / School |
+| Ctrl+1 … Ctrl+6 | Today / Week / Coursework / Notes / School / Work |
+| Ctrl+Shift+W | New work shift |
 | Ctrl+R | Sync school register |
 | Ctrl+N | New note |
 | Ctrl+T | New task |
@@ -154,7 +164,7 @@ Quire follows **Clean Architecture**: source-code dependencies point only inward
 | Layer | Contents | May depend on |
 | --- | --- | --- |
 | `quire/domain` | `Course`, `ClassSlot`, `TimeRange`, `Event`, `Task`, `Note`, and rules such as due-date buckets, next class meeting, note titles and validation | nothing |
-| `quire/application` | Use-case services (`TimetableService`, `PlannerService`, `TaskService`, `NoteService`, `SchoolSyncService`), **ports** (`Protocol`s) for repositories, the school register and credential storage, read-model DTOs, and a framework-free `ChangeBus` | domain |
+| `quire/application` | Use-case services (`TimetableService`, `PlannerService`, `TaskService`, `NoteService`, `SchoolSyncService`, `WorkService`), **ports** (`Protocol`s) for repositories, the school register and credential storage, read-model DTOs, and a framework-free `ChangeBus` | domain |
 | `quire/infrastructure` | `SqliteDatabase` (with schema migrations), SQLite repositories, the `ClassevivaRegister` HTTP adapter, the keyring credential store, the system clock and platform data paths | application, domain |
 | `quire/presentation` | PySide6 UI. It talks only to the `Services` facade and adapts `ChangeBus` into a Qt signal (`bridge.py`) | application, domain |
 | `quire/bootstrap.py` | Composition root: builds repositories and injects them into services | everything |

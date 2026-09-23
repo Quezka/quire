@@ -60,5 +60,18 @@ def relative_timestamp(ts: datetime | None, today: date) -> str:
     return relative_date(ts.date(), today)
 
 
+def fmt_duration(minutes: int) -> str:
+    hours, rest = divmod(int(minutes), 60)
+    if not hours:
+        return f"{rest} min"
+    return f"{hours} h {rest:02d}" if rest else f"{hours} h"
+
+
+def money(value: float) -> str:
+    from PySide6.QtCore import QLocale
+
+    return QLocale.system().toCurrencyString(value)
+
+
 def plural(n: int, word: str, suffix: str = "s") -> str:
     return f"{n} {word}{'' if n == 1 else suffix}"

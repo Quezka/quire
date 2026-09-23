@@ -78,3 +78,30 @@ def test_topic_normalisation():
     from quire.domain import normalize_topic
     assert normalize_topic("  Cell   respiration ") == "Cell respiration"
     assert normalize_topic("x" * 100) == "x" * 60
+
+
+def test_shift_rules():
+    from quire.domain import Shift
+
+    evening = Shift.between(1, TODAY, 17 * 60, 22 * 60, break_minutes=30)
+    assert (evening.duration, evening.paid_minutes, evening.ends_next_day) == (300, 270, False)
+    assert evening.pay(9.0) == 40.5 and evening.pay(None) is None
+
+    late = Shift.between(1, TODAY, 18 * 60, 1 * 60)
+    assert late.ends_next_day and late.duration == 7 * 60
+    assert [(d.day, t.start, t.end) for d, t in late.segments()] == [(23, 1080, 1440), (24, 0, 60)]
+    assert late.overlaps(date(2026, 9, 24), TimeRange(30, 90))
+    assert not late.overlaps(TODAY, TimeRange(600, 700))
+
+    for bad in (Shift(1, TODAY, 600, 0), Shift(1, TODAY, 600, 17 * 60),
+                Shift(1, TODAY, 600, 60, break_minutes=60), Shift(1, TODAY, 1440, 60)):
+        with pytest.raises(ValidationError):
+            bad.validate()
+
+
+def test_job_rules():
+    from quire.domain import Job
+    with pytest.raises(ValidationError):
+        Job(" ").validate()
+    with pytest.raises(ValidationError):
+        Job("Café", hourly_rate=-1).validate()

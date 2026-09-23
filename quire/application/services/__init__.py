@@ -9,6 +9,7 @@ from .planner import PlannerService
 from .school import SchoolSyncService
 from .tasks import TaskService
 from .timetable import TimetableService
+from .work import WorkService
 
 
 @dataclass(frozen=True)
@@ -20,9 +21,10 @@ class Services:
     tasks: TaskService
     notes: NoteService
     school: SchoolSyncService
+    work: WorkService
     storage: Storage
     bus: ChangeBus
 
 
 __all__ = ["Services", "NoteService", "PlannerService", "SchoolSyncService", "TaskService",
-           "TimetableService"]
+           "TimetableService", "WorkService"]

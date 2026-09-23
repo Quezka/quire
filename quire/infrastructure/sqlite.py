@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 4
+SCHEMA_VERSION = 5
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -81,6 +81,22 @@ CREATE TABLE IF NOT EXISTS register_subjects (
     name        TEXT NOT NULL,
     teachers    TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS jobs (
+    id          INTEGER PRIMARY KEY,
+    name        TEXT NOT NULL,
+    color       TEXT NOT NULL DEFAULT '#0090ff',
+    hourly_rate REAL
+);
+CREATE TABLE IF NOT EXISTS shifts (
+    id            INTEGER PRIMARY KEY,
+    job_id        INTEGER NOT NULL REFERENCES jobs(id) ON DELETE CASCADE,
+    day           TEXT NOT NULL,
+    start_min     INTEGER NOT NULL,
+    duration_min  INTEGER NOT NULL,
+    break_min     INTEGER NOT NULL DEFAULT 0,
+    notes         TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_shifts_day ON shifts(day);
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -107,7 +123,7 @@ class SqliteDatabase:
         # v2: sync ids for records imported from a school register.
         self._add_column("courses", "external_id", "TEXT")
         self._add_column("tasks", "external_id", "TEXT")
-        # v4 only adds the register_subjects table, created by SCHEMA above.
+        # v4 (register_subjects) and v5 (jobs, shifts) only add tables, created by SCHEMA.
         # v3: topics group notes within a course.
         self._add_column("notes", "topic", "TEXT NOT NULL DEFAULT ''")
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"

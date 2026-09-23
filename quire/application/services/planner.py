@@ -4,8 +4,12 @@ from datetime import date, timedelta
 
 from ...domain import Course, Event, NotFound
 from ..bus import ChangeBus, Topic
-from ..dto import AgendaItem, DayAgenda, ItemKind, TaskItem, WeekAgenda
-from ..ports import Clock, CourseRepository, EventRepository, JournalRepository, TaskRepository
+from ..dto import AgendaItem, DayAgenda, ItemKind, ShiftItem, TaskItem, WeekAgenda
+from ..ports import (
+    Clock, CourseRepository, EventRepository, JobRepository, JournalRepository, ShiftRepository,
+    TaskRepository,
+)
+from .work import shift_agenda_items
 
 
 def monday_of(day: date) -> date:
@@ -30,7 +34,9 @@ class PlannerService:
 
     def __init__(self, courses: CourseRepository, events: EventRepository,
                  tasks: TaskRepository, journal: JournalRepository, clock: Clock,
-                 bus: ChangeBus):
+                 bus: ChangeBus, jobs: JobRepository, shifts: ShiftRepository):
+        self._jobs = jobs
+        self._shifts = shifts
         self._courses = courses
         self._events = events
         self._tasks = tasks
@@ -41,10 +47,27 @@ class PlannerService:
     def today(self) -> date:
         return self._clock.today()
 
+    def _shift_items(self, first: date, last: date) -> list[AgendaItem]:
+        """Shift segments on days first..last (a shift may start the evening before)."""
+        jobs = {j.id: j for j in self._jobs.list()}
+        shifts = self._shifts.starting_between(first - timedelta(days=1), last)
+        items = shift_agenda_items([ShiftItem(s, jobs.get(s.job_id)) for s in shifts])
+        return [i for i in items if first <= i.day <= last]
+
+    def items_between(self, first: date, last: date) -> list[AgendaItem]:
+        """Every class, event and shift segment on days first..last."""
+        courses = self._courses.list()
+        days = [first + timedelta(days=n) for n in range((last - first).days + 1)]
+        return ([i for d in days for i in _class_items(courses, d)]
+                + [_event_item(e) for e in self._events.between(first, last)]
+                + self._shift_items(first, last))
+
     def day_agenda(self, day: date) -> DayAgenda:
         today = self._clock.today()
         courses = self._courses.list()
-        items = _class_items(courses, day) + [_event_item(e) for e in self._events.between(day, day)]
+        items = (_class_items(courses, day)
+                 + [_event_item(e) for e in self._events.between(day, day)]
+                 + self._shift_items(day, day))
         items.sort(key=lambda i: (i.time.start, i.time.end))
 
         tasks = self._tasks.due_on(day)
@@ -63,12 +86,15 @@ class PlannerService:
         sunday = monday + timedelta(days=6)
         courses = self._courses.list()
         events = self._events.between(monday, sunday)
+        shifts = self._shift_items(monday, sunday)
         weekend = (any(s.weekday >= 5 for c in courses for s in c.slots)
-                   or any(e.day.weekday() >= 5 for e in events))
+                   or any(e.day.weekday() >= 5 for e in events)
+                   or any(i.day.weekday() >= 5 for i in shifts))
         days = tuple(monday + timedelta(days=i) for i in range(7 if weekend else 5))
 
         items = [item for d in days for item in _class_items(courses, d)]
         items += [_event_item(e) for e in events if e.day in days]
+        items += [i for i in shifts if i.day in days]
         today = self._clock.today()
         today_index = days.index(today) if today in days else None
         return WeekAgenda(days, tuple(items), today_index, bool(courses))

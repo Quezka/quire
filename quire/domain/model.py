@@ -222,3 +222,78 @@ class Subject:
     external_id: str
     name: str
     teachers: tuple[str, ...] = ()
+
+
+@dataclass
+class Job:
+    """Somewhere the student works shifts."""
+
+    name: str
+    color: str = "#0090ff"
+    hourly_rate: float | None = None  # in the user's currency; None if not tracked
+    id: int | None = None
+
+    def validate(self):
+        if not self.name.strip():
+            raise ValidationError("Give the job a name.")
+        if self.hourly_rate is not None and self.hourly_rate < 0:
+            raise ValidationError("The hourly rate can't be negative.")
+
+
+MAX_SHIFT_MINUTES = 16 * 60
+
+
+@dataclass
+class Shift:
+    """One work shift. It may run past midnight into the next day."""
+
+    job_id: int
+    day: date
+    start: int  # minutes after midnight on `day`
+    duration: int  # minutes, including the break
+    break_minutes: int = 0
+    notes: str = ""
+    id: int | None = None
+
+    def validate(self):
+        if not 0 <= self.start < MINUTES_PER_DAY:
+            raise ValidationError("The shift must start within the day.")
+        if not 0 < self.duration <= MAX_SHIFT_MINUTES:
+            raise ValidationError("A shift must last between a minute and 16 hours.")
+        if not 0 <= self.break_minutes < self.duration:
+            raise ValidationError("The break must be shorter than the shift.")
+
+    @classmethod
+    def between(cls, job_id: int, day: date, start: int, end: int, **fields) -> "Shift":
+        """Build a shift from clock times; an end at or before the start means next day."""
+        duration = end - start if end > start else end + MINUTES_PER_DAY - start
+        return cls(job_id, day, start, duration, **fields)
+
+    @property
+    def end(self) -> int:
+        """Minutes after midnight on `day`; above 1440 when the shift ends the next day."""
+        return self.start + self.duration
+
+    @property
+    def ends_next_day(self) -> bool:
+        return self.end > MINUTES_PER_DAY
+
+    @property
+    def paid_minutes(self) -> int:
+        return self.duration - self.break_minutes
+
+    def pay(self, hourly_rate: float | None) -> float | None:
+        if hourly_rate is None:
+            return None
+        return round(self.paid_minutes / 60 * hourly_rate, 2)
+
+    def segments(self) -> list[tuple[date, TimeRange]]:
+        """The parts of the shift on each calendar day it touches."""
+        if not self.ends_next_day:
+            return [(self.day, TimeRange(self.start, self.end))]
+        return [(self.day, TimeRange(self.start, MINUTES_PER_DAY)),
+                (self.day + timedelta(days=1), TimeRange(0, self.end - MINUTES_PER_DAY))]
+
+    def overlaps(self, day: date, time: TimeRange) -> bool:
+        return any(d == day and seg.start < time.end and time.start < seg.end
+                   for d, seg in self.segments())

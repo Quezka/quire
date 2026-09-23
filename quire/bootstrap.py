@@ -7,14 +7,15 @@ from .application.bus import ChangeBus
 from .application.ports import Clock, CredentialStore, SchoolRegister
 from .application.services import (
     NoteService, PlannerService, SchoolSyncService, Services, TaskService, TimetableService,
+    WorkService,
 )
 from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
 from .infrastructure.credentials import KeyringCredentialStore
 from .infrastructure.repositories import (
-    SqliteCourseRepository, SqliteEventRepository, SqliteJournalRepository,
+    SqliteCourseRepository, SqliteEventRepository, SqliteJobRepository, SqliteJournalRepository,
     SqliteKeyValueStore, SqliteNoteRepository, SqliteSchoolRecordRepository,
-    SqliteTaskRepository,
+    SqliteShiftRepository, SqliteTaskRepository,
 )
 from .infrastructure.sqlite import SqliteDatabase
 
@@ -31,15 +32,18 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     tasks = SqliteTaskRepository(db)
     notes = SqliteNoteRepository(db)
     journal = SqliteJournalRepository(db)
+    jobs = SqliteJobRepository(db)
+    shifts = SqliteShiftRepository(db)
     services = Services(
         timetable=TimetableService(courses, bus),
-        planner=PlannerService(courses, events, tasks, journal, clock, bus),
+        planner=PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts),
         tasks=TaskService(tasks, courses, clock, bus),
         notes=NoteService(notes, courses, clock, bus),
         school=SchoolSyncService(
             register or ClassevivaRegister(), credentials or KeyringCredentialStore(),
             courses, tasks, SqliteSchoolRecordRepository(db), SqliteKeyValueStore(db),
             clock, bus),
+        work=WorkService(jobs, shifts, clock, bus),
         storage=db,
         bus=bus,
     )

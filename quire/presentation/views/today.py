@@ -16,7 +16,7 @@ from ...application.services import Services
 from ...domain import Task, TaskKind
 from .. import icons, theme
 from ..bridge import ChangeRelay
-from ..dialogs import EventDialog, TaskDialog, class_menu, to_qdate
+from ..dialogs import EventDialog, ShiftDialog, TaskDialog, class_menu, new_item_menu, to_qdate
 from ..formatting import KIND_LABELS, long_date, plural, relative_date
 from ..widgets import NO_COLOR, TimeGrid, color_icon
 from .common import Card, Page, agenda_block, badge, button, icon_button, primary_button
@@ -138,10 +138,8 @@ class TodayView(Page):
         if self.day == self.planner.today():
             now = datetime.now()
             target = now.hour * 60 + now.minute - 60
-        elif self.grid.blocks:
-            target = min(b.start for b in self.grid.blocks) - 30
         else:
-            target = 8 * 60
+            target = self.grid.first_daytime_start(8 * 60 + 30) - 30
         self.scroll.verticalScrollBar().setValue(int(self.grid.y_for(target)) - TimeGrid.PAD)
 
     # ---- journal --------------------------------------------------------
@@ -159,7 +157,7 @@ class TodayView(Page):
     # ---- rendering ------------------------------------------------------
 
     def _changed(self, topic: Topic):
-        if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS):
+        if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS, Topic.WORK):
             self.refresh()
 
     def refresh(self) -> DayAgenda:
@@ -180,6 +178,8 @@ class TodayView(Page):
             parts.append(plural(agenda.class_count, "class", "es"))
         if agenda.event_count:
             parts.append(plural(agenda.event_count, "event"))
+        if agenda.shift_count:
+            parts.append(plural(agenda.shift_count, "work shift"))
         if not agenda.has_courses:
             parts.append("add your timetable in Week")
         self.subtitle.setText(" · ".join(parts))
@@ -223,11 +223,13 @@ class TodayView(Page):
     def _block_activated(self, item: AgendaItem, pos):
         if item.kind is ItemKind.EVENT:
             EventDialog(self.services, item.ref_id, parent=self).exec()
+        elif item.kind is ItemKind.SHIFT:
+            ShiftDialog(self.services, item.ref_id, parent=self).exec()
         else:
             class_menu(self, self.services, item.ref_id, item.day, pos, self.openClassNote.emit)
 
     def _empty_activated(self, _col, minute):
-        EventDialog(self.services, day=self.day, start=minute, parent=self).exec()
+        new_item_menu(self, self.services, self.day, minute)
 
     def _task_toggled(self, item: QListWidgetItem):
         task_id = item.data(Qt.UserRole)

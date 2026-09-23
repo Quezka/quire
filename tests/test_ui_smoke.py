@@ -16,7 +16,7 @@ from PySide6.QtCore import QSettings, Qt  # noqa: E402
 from quire.demo import seed  # noqa: E402
 from quire.presentation import theme  # noqa: E402
 from quire.presentation.dialogs import (  # noqa: E402
-    CourseDialog, CoursesDialog, EventDialog, TaskDialog,
+    CourseDialog, CoursesDialog, EventDialog, JobDialog, JobsDialog, ShiftDialog, TaskDialog,
 )
 from quire.presentation.main_window import MainWindow  # noqa: E402
 from quire.presentation.qt_app import create_application  # noqa: E402
@@ -57,7 +57,9 @@ def test_dialogs_open_and_cancel(window, services):
     course_id = services.timetable.courses()[0].id
     for dialog in [CourseDialog(services, course_id, window), CourseDialog(services, None, window),
                    CoursesDialog(services, window), EventDialog(services, parent=window),
-                   TaskDialog(services, task_id, parent=window), TaskDialog(services, parent=window)]:
+                   TaskDialog(services, task_id, parent=window), TaskDialog(services, parent=window),
+                   JobDialog(services, parent=window), JobsDialog(services, window),
+                   ShiftDialog(services, parent=window)]:
         dialog.show()
         dialog.reject()
 
@@ -157,3 +159,55 @@ def test_course_dialog_links_subject_and_keeps_link_on_save(window, services, re
     again._save()
     saved = services.timetable.course(mine)
     assert saved.external_id == "classeviva:subject:7" and saved.room == "B12"
+
+
+def test_work_page_and_shift_dialog(window, services, app):
+    from datetime import timedelta
+
+    from quire.domain import Job
+
+    from .conftest import TODAY
+
+    page = window.work
+    window.show_page(window.stack.indexOf(page))
+    before = page.list.count()  # the demo data already has some shifts
+    assert before and not page.empty.isVisible()
+
+    job_id = services.work.save_job(Job("Café", "#f76b15", 10.0))
+    dialog = ShiftDialog(services, day=TODAY, start=18 * 60, parent=window)
+    dialog.end.setTime(dialog.end.time().fromString("01:00", "HH:mm"))
+    dialog.break_min.setValue(30)
+    dialog.repeat.setValue(1)
+    assert dialog.next_day.text() == "ends next day"
+    assert "6 h 30 paid" in dialog.summary.text() and "2 shifts" in dialog.summary.text()
+    dialog._save()
+    mine = [i for i in services.work.shifts_between(TODAY, TODAY + timedelta(days=8))
+            if i.shift.job_id == job_id]
+    assert len(mine) == 2
+    assert page.list.count() == before + 2
+
+    # The demo's Chemistry class on Wednesdays 10:30-11:20 clashes with a morning shift.
+    clash = ShiftDialog(services, day=TODAY, start=10 * 60, parent=window)
+    assert clash.clash.isVisibleTo(clash) and "Chemistry" in clash.clash.text()
+    clash.reject()
+
+    window.show_page(0)
+    app.processEvents()
+    assert "work shift" in window.today.subtitle.text()
+    assert not window.grab().isNull()
+
+
+def test_week_view_opens_at_the_school_day_not_midnight(window, app):
+    from quire.presentation.widgets import TimeGrid
+
+    window.show_page(1)
+    week = window.week
+    week.set_week(week.anchor)
+    app.processEvents()  # runs the deferred scroll
+    # The demo's late Saturday shift puts a block at 00:00 on Sunday.
+    assert any(b.start == 0 for b in week.grid.blocks)
+    first_class = week.grid.first_daytime_start()
+    assert first_class >= 6 * 60
+    expected = int(week.grid.y_for(first_class - 30)) - TimeGrid.PAD
+    assert week.scroll.verticalScrollBar().value() == min(
+        expected, week.scroll.verticalScrollBar().maximum())

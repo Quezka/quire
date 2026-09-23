@@ -7,7 +7,7 @@ from .application.ports import (
     Credentials, RegisterAccount, RemoteAssignment, RemoteGrade, RemoteLesson, RemoteSubject,
 )
 from .application.services import Services
-from .domain import ClassSlot, Course, Event, Task, TaskKind, TimeRange
+from .domain import ClassSlot, Course, Event, Job, Shift, Task, TaskKind, TimeRange
 
 
 def _t(hhmm: str) -> int:
@@ -89,6 +89,16 @@ def seed(services: Services):
     ideas.pinned = True
     notes.save(ideas)
     planner.save_journal(today, "Remember to bring the permission slip for the museum trip.")
+
+    work = services.work
+    pizzeria = work.save_job(Job("Pizzeria Da Mario", "#f76b15", 8.5))
+    tutoring = work.save_job(Job("Maths tutoring", "#12a594", 15.0))
+    work.save_shift(Shift.between(pizzeria, monday + timedelta(days=1), _t("18:00"), _t("22:30"),
+                                  break_minutes=30), repeat_weeks=3)
+    work.save_shift(Shift.between(pizzeria, monday + timedelta(days=5), _t("19:00"), _t("01:00"),
+                                  break_minutes=30, notes="Saturday rush"), repeat_weeks=3)
+    work.save_shift(Shift.between(tutoring, monday + timedelta(days=3), _t("16:00"),
+                                  _t("17:30")), repeat_weeks=3)
 
 
 class DemoRegister:
