@@ -157,3 +157,32 @@ def test_school_year_boundaries():
     assert school_year(date(2026, 9, 1)) == (date(2026, 9, 1), date(2027, 6, 30))
     assert school_year(date(2027, 3, 15)) == (date(2026, 9, 1), date(2027, 6, 30))
     assert school_year(date(2026, 8, 31)) == (date(2025, 9, 1), date(2026, 6, 30))
+
+
+
+WRONG_URI = (404, {"statusCode": 404, "error": "102:CvvRestApi/wrong uri", "where": "RestUtil #766"})
+
+
+def test_grades_fall_back_to_the_overview_when_the_endpoint_moved():
+    register, server, _ = signed_in({
+        "/students/1234567/grades": WRONG_URI,
+        "/students/1234567/overview/all/20260901/20260923": (200, {"lessons": [], **GRADES}),
+    })
+    first, _second = register.grades()
+    assert first.display == "8"
+    assert server.requests[-1].full_url.endswith("/overview/all/20260901/20260923")
+
+
+def test_grades_error_is_clear_when_no_fallback_works():
+    register, _, _ = signed_in({
+        "/students/1234567/grades": WRONG_URI,
+        "/students/1234567/overview/all/20260901/20260923": WRONG_URI,
+    })
+    with pytest.raises(RegisterError, match="grades endpoint has moved"):
+        register.grades()
+
+
+def test_other_moved_endpoints_raise_a_register_error():
+    register, _, _ = signed_in({"/students/1234567/subjects": WRONG_URI})
+    with pytest.raises(RegisterError, match="subjects"):
+        register.subjects()

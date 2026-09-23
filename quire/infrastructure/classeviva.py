@@ -37,6 +37,10 @@ class _OutsideSchoolYear(Exception):
     """Classeviva error 122: the date range falls outside the school year."""
 
 
+class _WrongUri(Exception):
+    """Classeviva error 102: the endpoint doesn't exist (it may have moved)."""
+
+
 def school_year(today: date) -> tuple[date, date]:
     """The school year Classeviva serves data for: 1 September to 30 June."""
     start_year = today.year if today.month >= 9 else today.year - 1
@@ -101,6 +105,8 @@ class ClassevivaRegister:
                                           "Try connecting your account again.") from e
             if e.code == 404 and code.startswith("122"):
                 raise _OutsideSchoolYear() from e
+            if e.code == 404 and code.startswith("102"):
+                raise _WrongUri(path) from e
             raise RegisterError(f"Classeviva answered with an error ({e.code}"
                                 f"{': ' + info if info else ''}).") from e
         except (urllib.error.URLError, TimeoutError, OSError) as e:
@@ -118,10 +124,16 @@ class ClassevivaRegister:
         if window is None:
             return {}
         try:
-            return self._request(
-                "GET", self._student_path(f"{path}/{_stamp(window[0])}/{_stamp(window[1])}"))
+            return self._get(f"{path}/{_stamp(window[0])}/{_stamp(window[1])}")
         except _OutsideSchoolYear:
             return {}
+
+    def _get(self, path: str) -> dict:
+        try:
+            return self._request("GET", self._student_path(path))
+        except _WrongUri as e:
+            raise RegisterError(f"Classeviva doesn't know {path.split('/')[1]} any more "
+                                "(the endpoint may have moved).") from e
 
     def _student_path(self, path: str) -> str:
         if not self._student:
@@ -149,7 +161,7 @@ class ClassevivaRegister:
         return RegisterAccount(name.title() if name.isupper() else name)
 
     def subjects(self) -> list[RemoteSubject]:
-        data = self._request("GET", self._student_path("/subjects"))
+        data = self._get("/subjects")
         return [
             RemoteSubject(str(s["id"]), s.get("description") or "",
                           tuple(t.get("teacherName") or "" for t in s.get("teachers") or []))
@@ -174,7 +186,18 @@ class ClassevivaRegister:
         return result
 
     def grades(self) -> list[RemoteGrade]:
-        data = self._request("GET", self._student_path("/grades"))
+        try:
+            data = self._request("GET", self._student_path("/grades"))
+        except _WrongUri:
+            # Some accounts have seen /grades answer "wrong uri" (Lioydiano/Classeviva#31);
+            # the overview endpoint carries grades too.
+            start, _ = school_year(self._today())
+            try:
+                data = self._request("GET", self._student_path(
+                    f"/overview/all/{_stamp(start)}/{_stamp(self._today())}"))
+            except _WrongUri as e:
+                raise RegisterError("Classeviva's grades endpoint has moved; Quire needs an "
+                                    "update to read grades.") from e
         result = []
         for g in data.get("grades", []):
             value = g.get("decimalValue")

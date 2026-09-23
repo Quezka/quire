@@ -347,3 +347,22 @@ def test_regular_shift_menu_skip_and_change(window, services, app, monkeypatch):
     days = [i.shift.day for i in services.work.shifts_between(friday, friday + timedelta(weeks=1))
             if i.shift.job_id == job_id]
     assert days == [friday + timedelta(weeks=1)]
+
+
+
+def test_school_page_lists_parts_that_failed(window, services, register, app):
+    from PySide6.QtCore import QThreadPool
+
+    from quire.application.errors import RegisterError
+
+    register.failing["grades"] = RegisterError("Classeviva's grades endpoint has moved")
+    page = window.school
+    window.show_page(window.stack.indexOf(page))
+    page.username.setText("S1")
+    page.password.setText("secret")
+    page._connect()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    texts = [page.news.item(i).text() for i in range(page.news.count())]
+    assert any(t.startswith("Couldn't sync grades") for t in texts)
+    assert "some parts failed" in page.subtitle.text()

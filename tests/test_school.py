@@ -240,3 +240,43 @@ def test_linking_to_unknown_subject_fails(connected, register):
     maths = own_course(connected, "Maths")
     with pytest.raises(NotFound):
         connected.school.link_course(maths, "classeviva:subject:404")
+
+
+
+def test_a_failing_part_does_not_stop_the_rest(connected, register):
+    from quire.application.errors import RegisterError
+    register.grades_ = [grade("g1", 7.0)]
+    connected.school.sync()
+
+    register.failing["grades"] = RegisterError("endpoint moved")
+    register.assignments_ = [homework("5")]
+    report = connected.school.sync()
+    assert [t.title for t in report.new_tasks] == ["Pag. 34 es. 1-5"]
+    assert report.problems == ("Grades: endpoint moved",)
+    # Existing grades are kept, not wiped, when grades couldn't be fetched.
+    assert [g.display for s in connected.school.grades_by_subject() for g in s.grades] == ["7½"]
+
+
+def test_failed_homework_fetch_does_not_delete_imported_tasks(connected, register):
+    from quire.application.errors import RegisterError
+    register.assignments_ = [homework("5")]
+    connected.school.sync()
+    register.failing["assignments"] = RegisterError("timeout")
+    report = connected.school.sync()
+    assert report.removed_tasks == 0
+    assert [i.task.title for g in connected.tasks.groups() for i in g.items] == ["Pag. 34 es. 1-5"]
+
+
+def test_everything_failing_is_an_error_and_not_a_sync(connected, register):
+    from quire.application.errors import RegisterError
+    for name in ("subjects", "assignments", "grades", "lessons"):
+        register.failing[name] = RegisterError("down")
+    with pytest.raises(RegisterError, match="Couldn't sync anything"):
+        connected.school.sync()
+    assert connected.school.status().last_sync is None
+
+
+def test_a_rejected_session_still_stops_the_sync(connected, register):
+    register.failing["grades"] = AuthenticationError("session refused")
+    with pytest.raises(AuthenticationError):
+        connected.school.sync()

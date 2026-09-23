@@ -5,7 +5,7 @@ from datetime import date, datetime, timedelta
 
 from ...domain import COURSE_COLORS, Course, Grade, Lesson, NotFound, Subject, Task, average
 from ..bus import ChangeBus, Topic
-from ..errors import NotConnected
+from ..errors import AuthenticationError, NotConnected, RegisterError
 from ..ports import (
     Clock, CourseRepository, CredentialStore, Credentials, KeyValueStore, RegisterAccount,
     RegisterSnapshot, RemoteAssignment, SchoolRecordRepository, SchoolRegister, TaskRepository,
@@ -52,6 +52,7 @@ class SyncReport:
     new_grades: tuple[Grade, ...] = ()
     lessons: int = 0
     courses_created: int = 0
+    problems: tuple[str, ...] = ()  # parts of the register that couldn't be synced
 
     @property
     def has_news(self) -> bool:
@@ -145,15 +146,33 @@ class SchoolSyncService:
                              today + timedelta(days=ASSIGNMENTS_FUTURE_DAYS))
         lesson_window = (today - timedelta(days=LESSON_DAYS), today)
         account = self._register.login(credentials)
-        return RegisterSnapshot(
+        problems: list[str] = []
+
+        def part(label: str, call):
+            # One broken endpoint shouldn't stop the rest of the sync.
+            try:
+                return tuple(call())
+            except AuthenticationError:
+                raise
+            except RegisterError as e:
+                problems.append(f"{label}: {e}")
+                return None
+
+        snapshot = RegisterSnapshot(
             account=account,
-            subjects=tuple(self._register.subjects()),
-            assignments=tuple(self._register.assignments(*assignment_window)),
-            grades=tuple(self._register.grades()),
-            lessons=tuple(self._register.lessons(*lesson_window)),
+            subjects=part("Subjects", self._register.subjects),
+            assignments=part("Homework and tests",
+                             lambda: self._register.assignments(*assignment_window)),
+            grades=part("Grades", self._register.grades),
+            lessons=part("Lesson topics", lambda: self._register.lessons(*lesson_window)),
             assignment_window=assignment_window,
             lesson_window=lesson_window,
+            problems=tuple(problems),
         )
+        if len(problems) == 4:
+            raise RegisterError("Couldn't sync anything from "
+                                f"{self._register.name}. " + " ".join(problems))
+        return snapshot
 
     def sync(self) -> SyncReport:
         return self.apply(self.fetch())
@@ -166,31 +185,38 @@ class SchoolSyncService:
             return (subject_ids.get(subject_id)
                     or subject_names.get(tidy_subject(subject_name).casefold()))
 
-        new_tasks, updated_tasks, removed = self._sync_assignments(snap, course_for)
+        new_tasks, updated_tasks, removed = [], [], 0
+        if snap.assignments is not None:
+            new_tasks, updated_tasks, removed = self._sync_assignments(snap, course_for)
 
-        known = {g.external_id for g in self._records.grades()}
-        grades = [
-            Grade(self._external("grade", g.id), tidy_subject(g.subject_name), g.day, g.display,
-                  g.value, g.component, g.period, g.notes, g.cancelled,
-                  course_for(g.subject_id, g.subject_name))
-            for g in snap.grades
-        ]
-        self._records.replace_grades(grades)
-        new_grades = tuple(g for g in grades if g.external_id not in known)
+        new_grades: tuple[Grade, ...] = ()
+        if snap.grades is not None:
+            known = {g.external_id for g in self._records.grades()}
+            grades = [
+                Grade(self._external("grade", g.id), tidy_subject(g.subject_name), g.day,
+                      g.display, g.value, g.component, g.period, g.notes, g.cancelled,
+                      course_for(g.subject_id, g.subject_name))
+                for g in snap.grades
+            ]
+            self._records.replace_grades(grades)
+            new_grades = tuple(g for g in grades if g.external_id not in known)
 
-        lessons = [
-            Lesson(self._external("lesson", l.id), l.day, tidy_subject(l.subject_name), l.topic,
-                   tidy_person(l.teacher), l.hour, course_for(l.subject_id, l.subject_name))
-            for l in snap.lessons
-        ]
-        if snap.lesson_window:
-            self._records.replace_lessons(*snap.lesson_window, lessons)
+        lessons = []
+        if snap.lessons is not None:
+            lessons = [
+                Lesson(self._external("lesson", l.id), l.day, tidy_subject(l.subject_name),
+                       l.topic, tidy_person(l.teacher), l.hour,
+                       course_for(l.subject_id, l.subject_name))
+                for l in snap.lessons
+            ]
+            if snap.lesson_window:
+                self._records.replace_lessons(*snap.lesson_window, lessons)
 
         self._settings.set(self._key("student"), snap.account.student_name)
         self._settings.set(self._key("last_sync"), self._clock.now().isoformat(timespec="seconds"))
 
         report = SyncReport(first_sync, tuple(new_tasks), tuple(updated_tasks), removed,
-                            new_grades, len(lessons), created)
+                            new_grades, len(lessons), created, snap.problems)
         self.last_report = report
         if created:
             self._bus.publish(Topic.COURSES)
@@ -211,7 +237,7 @@ class SchoolSyncService:
         used_colors = {c.color for c in courses}
         subject_ids: dict[str, int] = {}
         created = 0
-        for subject in snap.subjects:
+        for subject in snap.subjects or ():
             external = self._external("subject", subject.id)
             name = tidy_subject(subject.name)
             teacher = ", ".join(tidy_person(t) for t in subject.teachers)

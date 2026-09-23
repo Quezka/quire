@@ -204,6 +204,8 @@ class SchoolView(Page):
             when = "syncing…"
         elif self._error:
             when = self._error
+        elif status.last_sync and self.school.last_report and self.school.last_report.problems:
+            when = "synced, but some parts failed (see What's new)"
         elif status.last_sync:
             delta = datetime.now() - status.last_sync
             minutes = int(delta.total_seconds() // 60)
@@ -295,6 +297,10 @@ class SchoolView(Page):
                     f"Added {plural(report.courses_created, 'course')} for your subjects. "
                     "If you already had one under another name, open it in Week → Courses and "
                     "pick its subject to merge them.")
+        for problem in (report.problems if report else ()):
+            item = QListWidgetItem(f"Couldn't sync {problem[0].lower()}{problem[1:]}")
+            item.setForeground(QColor(t.danger))
+            self.news.addItem(item)
         for line in lines or ["Nothing new since the last sync."]:
             item = QListWidgetItem(line)
             if not lines:

@@ -4,6 +4,15 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.3.1] - 2026-09-23
+
+### Fixed
+- Classeviva sync is resilient: homework, grades, lesson topics and subjects sync
+  independently, so one failing part no longer stops the rest. A part that fails never
+  wipes the data you already have, and the School page lists what couldn't be synced.
+- If Classeviva's grades endpoint answers "wrong uri" (reported for some accounts in
+  Lioydiano/Classeviva#31), Quire reads grades from the overview endpoint instead.
+
 ## [0.3.0] - 2026-09-23
 
 ### Added

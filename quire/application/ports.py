@@ -179,15 +179,20 @@ class RegisterAccount:
 
 @dataclass(frozen=True)
 class RegisterSnapshot:
-    """Everything fetched in one sync, before it touches local storage."""
+    """Everything fetched in one sync, before it touches local storage.
+
+    A part that couldn't be fetched is None (not empty), so applying the snapshot
+    leaves the local copy of that part alone; `problems` says what went wrong.
+    """
 
     account: RegisterAccount
-    subjects: tuple[RemoteSubject, ...] = ()
-    assignments: tuple[RemoteAssignment, ...] = ()
-    grades: tuple[RemoteGrade, ...] = ()
-    lessons: tuple[RemoteLesson, ...] = ()
+    subjects: tuple[RemoteSubject, ...] | None = ()
+    assignments: tuple[RemoteAssignment, ...] | None = ()
+    grades: tuple[RemoteGrade, ...] | None = ()
+    lessons: tuple[RemoteLesson, ...] | None = ()
     assignment_window: tuple[date, date] | None = None
     lesson_window: tuple[date, date] | None = None
+    problems: tuple[str, ...] = ()
 
 
 class SchoolRegister(Protocol):

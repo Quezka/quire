@@ -19,6 +19,11 @@ class FakeRegister:
     grades_: list[RemoteGrade] = field(default_factory=list)
     lessons_: list[RemoteLesson] = field(default_factory=list)
     requested: list = field(default_factory=list)
+    failing: dict = field(default_factory=dict)  # method name -> exception to raise
+
+    def _maybe_fail(self, name):
+        if name in self.failing:
+            raise self.failing[name]
 
     def login(self, credentials: Credentials) -> RegisterAccount:
         if credentials.password != self.password:
@@ -26,15 +31,19 @@ class FakeRegister:
         return RegisterAccount(self.student)
 
     def subjects(self):
+        self._maybe_fail("subjects")
         return list(self.subjects_)
 
     def assignments(self, first: date, last: date):
+        self._maybe_fail("assignments")
         self.requested.append(("assignments", first, last))
         return [a for a in self.assignments_ if first <= a.day <= last]
 
     def grades(self):
+        self._maybe_fail("grades")
         return list(self.grades_)
 
     def lessons(self, first: date, last: date):
+        self._maybe_fail("lessons")
         self.requested.append(("lessons", first, last))
         return [l for l in self.lessons_ if first <= l.day <= last]
