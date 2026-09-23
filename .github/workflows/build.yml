@@ -48,3 +48,44 @@ jobs:
         with:
           name: Quire-${{ runner.os }}
           path: ${{ matrix.artifact }}
+
+  release:
+    # Pushing a tag like v1.2.3 publishes that version's .deb and .exe.
+    needs: package
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: Check the tag matches the app version
+        run: |
+          version=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('quire/__init__.py').read()).group(1))")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match quire.__version__ ($version)"
+            exit 1
+          fi
+          echo "VERSION=$version" >> "$GITHUB_ENV"
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Publish the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python3 scripts/release_notes.py "$VERSION" > notes.md
+          cat >> notes.md <<'NOTES'
+
+          ## Install
+
+          **Debian / Ubuntu:** `sudo apt install ./quire_*_amd64.deb`. Quire appears in your app
+          menu, or run `quire`. Your data is kept when you upgrade.
+
+          **Windows:** download the `.exe` and run it. It's a single portable file, so nothing is
+          installed. It isn't code-signed, so SmartScreen may warn you: choose
+          *More info → Run anyway*.
+          NOTES
+          exe="Quire-$VERSION-windows-x64.exe"
+          cp artifacts/Quire-Windows/Quire.exe "$exe"
+          gh release create "$GITHUB_REF_NAME" --verify-tag --title "Quire $VERSION" \
+            --notes-file notes.md artifacts/Quire-Linux/*.deb "$exe"

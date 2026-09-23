@@ -131,14 +131,20 @@ push and uploads the `.deb` and `Quire.exe` as artifacts.
 
 ## Releasing a new version
 
-Developer and publisher details (`DEVELOPER`, `APP_ID`, `HOMEPAGE`) live in
-`quire/__init__.py`. The `.deb`, the AppStream metadata checks, the Windows `.exe` file properties
-and the About dialog all read them from there.
+Every version is published as a GitHub release with the `.deb` and `.exe` attached. Versions
+follow [semver](https://semver.org): patch for fixes, minor for new features, major for
+breaking changes. Developer and publisher details (`DEVELOPER`, `APP_ID`, `HOMEPAGE`) live
+next to `__version__` in `quire/__init__.py`, which is the single source for the package
+version too.
 
 1. Bump `__version__` in `quire/__init__.py`.
-2. Add a `<release version="…" date="…">` entry at the top of
-   `packaging/io.github.quezka.Quire.metainfo.xml`. The tests fail if you forget.
-3. Commit, tag (`git tag v0.2.0`) and push.
+2. Add a `## [x.y.z] - date` section to `CHANGELOG.md`; it becomes the release notes.
+3. Add a `<release version="…" date="…">` entry at the top of
+   `packaging/io.github.quezka.Quire.metainfo.xml`.
+4. Commit, then `git tag vX.Y.Z && git push && git push --tags`.
+
+The tests fail if step 2 or 3 is missing. On the tag, CI checks that the tag matches
+`__version__`, builds both packages and publishes the release.
 
 `packaging/io.github.quezka.Quire.metainfo.xml` is what Ubuntu App Center and GNOME Software
 read to show the app's developer, description and version history.

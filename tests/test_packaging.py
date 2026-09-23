@@ -3,6 +3,8 @@ import ast
 import configparser
 import importlib.util
 import xml.etree.ElementTree as ET
+
+import pytest
 from pathlib import Path
 
 import quire
@@ -52,3 +54,28 @@ def test_windows_version_file_is_valid_python(tmp_path, monkeypatch):
     ast.parse(text)
     assert f"'CompanyName', '{quire.DEVELOPER}'" in text
     assert f"'ProductVersion', '{quire.__version__}'" in text
+
+
+def load_release_notes():
+    spec = importlib.util.spec_from_file_location("release_notes",
+                                                  ROOT / "scripts" / "release_notes.py")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_changelog_has_notes_for_current_version():
+    notes = load_release_notes().notes_for(quire.__version__)
+    assert notes and not notes.startswith("## ")
+
+
+def test_release_notes_stop_at_the_next_version():
+    text = "# Changelog\n\n## [1.1.0] - x\n- new\n\n## [1.0.0] - y\n- old\n"
+    assert load_release_notes().notes_for("1.1.0", text) == "- new"
+    with pytest.raises(SystemExit):
+        load_release_notes().notes_for("9.9.9", text)
+
+
+def test_version_is_semver():
+    import re
+    assert re.fullmatch(r"\d+\.\d+\.\d+", quire.__version__)
