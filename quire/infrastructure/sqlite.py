@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -12,7 +12,8 @@ CREATE TABLE IF NOT EXISTS courses (
     name     TEXT NOT NULL,
     teacher  TEXT NOT NULL DEFAULT '',
     room     TEXT NOT NULL DEFAULT '',
-    color    TEXT NOT NULL DEFAULT '#4f7cff'
+    color    TEXT NOT NULL DEFAULT '#4f7cff',
+    external_id TEXT
 );
 CREATE TABLE IF NOT EXISTS class_slots (
     id        INTEGER PRIMARY KEY,
@@ -38,7 +39,8 @@ CREATE TABLE IF NOT EXISTS tasks (
     course_id INTEGER REFERENCES courses(id) ON DELETE SET NULL,
     due       TEXT,
     done      INTEGER NOT NULL DEFAULT 0,
-    details   TEXT NOT NULL DEFAULT ''
+    details   TEXT NOT NULL DEFAULT '',
+    external_id TEXT
 );
 CREATE TABLE IF NOT EXISTS notes (
     id        INTEGER PRIMARY KEY,
@@ -52,7 +54,33 @@ CREATE TABLE IF NOT EXISTS journal (
     day  TEXT PRIMARY KEY,
     body TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS grades (
+    external_id TEXT PRIMARY KEY,
+    subject     TEXT NOT NULL,
+    day         TEXT NOT NULL,
+    display     TEXT NOT NULL,
+    value       REAL,
+    component   TEXT NOT NULL DEFAULT '',
+    period      TEXT NOT NULL DEFAULT '',
+    notes       TEXT NOT NULL DEFAULT '',
+    cancelled   INTEGER NOT NULL DEFAULT 0,
+    course_id   INTEGER REFERENCES courses(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS lessons (
+    external_id TEXT PRIMARY KEY,
+    day         TEXT NOT NULL,
+    subject     TEXT NOT NULL,
+    topic       TEXT NOT NULL DEFAULT '',
+    teacher     TEXT NOT NULL DEFAULT '',
+    hour        INTEGER NOT NULL DEFAULT 0,
+    course_id   INTEGER REFERENCES courses(id) ON DELETE SET NULL
+);
+CREATE TABLE IF NOT EXISTS settings (
+    key   TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+);
 CREATE INDEX IF NOT EXISTS idx_events_day ON events(day);
+CREATE INDEX IF NOT EXISTS idx_lessons_day ON lessons(day);
 CREATE INDEX IF NOT EXISTS idx_tasks_due ON tasks(due);
 """
 
@@ -65,7 +93,18 @@ class SqliteDatabase:
         self.conn = sqlite3.connect(str(self.path))
         self.conn.row_factory = sqlite3.Row
         self.conn.execute("PRAGMA foreign_keys = ON")
+        self._migrate()
+
+    def _migrate(self):
+        """Create missing tables and bring older databases up to SCHEMA_VERSION."""
         self.conn.executescript(SCHEMA)
+        # v2: sync ids for records imported from a school register.
+        for table in ("courses", "tasks"):
+            columns = {row["name"] for row in self.conn.execute(f"PRAGMA table_info({table})")}
+            if "external_id" not in columns:
+                self.conn.execute(f"ALTER TABLE {table} ADD COLUMN external_id TEXT")
+        self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
+                          " ON tasks(external_id) WHERE external_id IS NOT NULL")
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 

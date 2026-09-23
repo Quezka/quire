@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from ..domain import ClassSlot, Course, Event, Note, Task, TaskKind, TimeRange
+from ..domain import ClassSlot, Course, Event, Grade, Lesson, Note, Task, TaskKind, TimeRange
 from .sqlite import SqliteDatabase
 
 
@@ -28,7 +28,8 @@ class _Repo:
 
 class SqliteCourseRepository(_Repo):
     def _load(self, rows) -> list[Course]:
-        courses = {r["id"]: Course(r["name"], r["teacher"], r["room"], r["color"], [], r["id"])
+        courses = {r["id"]: Course(r["name"], r["teacher"], r["room"], r["color"], [], r["id"],
+                                   r["external_id"])
                    for r in rows}
         if courses:
             marks = ",".join("?" * len(courses))
@@ -55,8 +56,9 @@ class SqliteCourseRepository(_Repo):
     def add(self, course: Course) -> int:
         with self._conn:
             cur = self._conn.execute(
-                "INSERT INTO courses (name, teacher, room, color) VALUES (?, ?, ?, ?)",
-                (course.name, course.teacher, course.room, course.color))
+                "INSERT INTO courses (name, teacher, room, color, external_id)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (course.name, course.teacher, course.room, course.color, course.external_id))
             course.id = cur.lastrowid
             self._write_slots(course)
         return course.id
@@ -64,8 +66,10 @@ class SqliteCourseRepository(_Repo):
     def update(self, course: Course):
         with self._conn:
             self._conn.execute(
-                "UPDATE courses SET name = ?, teacher = ?, room = ?, color = ? WHERE id = ?",
-                (course.name, course.teacher, course.room, course.color, course.id))
+                "UPDATE courses SET name = ?, teacher = ?, room = ?, color = ?, external_id = ?"
+                " WHERE id = ?",
+                (course.name, course.teacher, course.room, course.color, course.external_id,
+                 course.id))
             self._write_slots(course)
 
     def delete(self, course_id):
@@ -113,7 +117,7 @@ class SqliteTaskRepository(_Repo):
         except ValueError:
             kind = TaskKind.TASK
         return Task(r["title"], kind, r["course_id"], _date(r["due"]), bool(r["done"]),
-                    r["details"], r["id"])
+                    r["details"], r["id"], r["external_id"])
 
     def list(self, include_done=True, course_id=None):
         where, args = [], []
@@ -124,6 +128,12 @@ class SqliteTaskRepository(_Repo):
             args.append(course_id)
         sql = "SELECT * FROM tasks" + (" WHERE " + " AND ".join(where) if where else "")
         return [self._task(r) for r in self._all(sql + self._ORDER, *args)]
+
+    def by_external_prefix(self, prefix):
+        escaped = prefix.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        return [self._task(r) for r in
+                self._all("SELECT * FROM tasks WHERE external_id LIKE ? ESCAPE '\\'",
+                          escaped + "%")]
 
     def due_on(self, day):
         return [self._task(r) for r in
@@ -140,17 +150,17 @@ class SqliteTaskRepository(_Repo):
 
     def add(self, t: Task) -> int:
         return self._write(
-            "INSERT INTO tasks (title, kind, course_id, due, done, details)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
+            "INSERT INTO tasks (title, kind, course_id, due, done, details, external_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
             t.title, t.kind.value, t.course_id, t.due.isoformat() if t.due else None,
-            int(t.done), t.details)
+            int(t.done), t.details, t.external_id)
 
     def update(self, t: Task):
         self._write(
-            "UPDATE tasks SET title = ?, kind = ?, course_id = ?, due = ?, done = ?, details = ?"
-            " WHERE id = ?",
+            "UPDATE tasks SET title = ?, kind = ?, course_id = ?, due = ?, done = ?, details = ?,"
+            " external_id = ? WHERE id = ?",
             t.title, t.kind.value, t.course_id, t.due.isoformat() if t.due else None,
-            int(t.done), t.details, t.id)
+            int(t.done), t.details, t.external_id, t.id)
 
     def delete(self, task_id):
         self._write("DELETE FROM tasks WHERE id = ?", task_id)
@@ -215,3 +225,57 @@ class SqliteJournalRepository(_Repo):
                         day.isoformat(), body)
         else:
             self._write("DELETE FROM journal WHERE day = ?", day.isoformat())
+
+
+class SqliteSchoolRecordRepository(_Repo):
+    @staticmethod
+    def _grade(r) -> Grade:
+        return Grade(r["external_id"], r["subject"], date.fromisoformat(r["day"]), r["display"],
+                     r["value"], r["component"], r["period"], r["notes"], bool(r["cancelled"]),
+                     r["course_id"])
+
+    @staticmethod
+    def _lesson(r) -> Lesson:
+        return Lesson(r["external_id"], date.fromisoformat(r["day"]), r["subject"], r["topic"],
+                      r["teacher"], r["hour"], r["course_id"])
+
+    def grades(self):
+        return [self._grade(r) for r in self._all("SELECT * FROM grades ORDER BY day DESC")]
+
+    def replace_grades(self, grades):
+        with self._conn:
+            self._conn.execute("DELETE FROM grades")
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO grades (external_id, subject, day, display, value,"
+                " component, period, notes, cancelled, course_id)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                [(g.external_id, g.subject, g.day.isoformat(), g.display, g.value, g.component,
+                  g.period, g.notes, int(g.cancelled), g.course_id) for g in grades])
+
+    def lessons_between(self, first, last):
+        return [self._lesson(r) for r in self._all(
+            "SELECT * FROM lessons WHERE day BETWEEN ? AND ? ORDER BY day, hour",
+            first.isoformat(), last.isoformat())]
+
+    def replace_lessons(self, first, last, lessons):
+        with self._conn:
+            self._conn.execute("DELETE FROM lessons WHERE day BETWEEN ? AND ?",
+                               (first.isoformat(), last.isoformat()))
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO lessons (external_id, day, subject, topic, teacher, hour,"
+                " course_id) VALUES (?, ?, ?, ?, ?, ?, ?)",
+                [(l.external_id, l.day.isoformat(), l.subject, l.topic, l.teacher, l.hour,
+                  l.course_id) for l in lessons])
+
+
+class SqliteKeyValueStore(_Repo):
+    def get(self, key):
+        r = self._one("SELECT value FROM settings WHERE key = ?", key)
+        return r["value"] if r else None
+
+    def set(self, key, value):
+        if value is None:
+            self._write("DELETE FROM settings WHERE key = ?", key)
+        else:
+            self._write("INSERT INTO settings (key, value) VALUES (?, ?)"
+                        " ON CONFLICT(key) DO UPDATE SET value = excluded.value", key, value)

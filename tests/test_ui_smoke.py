@@ -67,3 +67,30 @@ def test_class_note_flow(window, services):
     window.open_class_note(course.id, services.planner.today())
     assert window.stack.currentWidget() is window.notes
     assert window.notes.note.title.startswith(course.name)
+
+
+def test_school_page_connects_and_shows_synced_data(window, services, register, app):
+    from quire.application.ports import RemoteGrade, RemoteLesson, RemoteSubject
+    from .conftest import TODAY
+
+    register.subjects_ = [RemoteSubject("1", "FISICA")]
+    register.grades_ = [RemoteGrade("g", TODAY, "1", "FISICA", "8", 8.0)]
+    register.lessons_ = [RemoteLesson("l", TODAY, "1", "FISICA", "Moto rettilineo")]
+    page = window.school
+    window.show_page(window.stack.indexOf(page))
+    assert page.pages.currentIndex() == 0  # connect form
+
+    page.username.setText("S1")
+    page.password.setText("wrong")
+    page._connect()
+    assert "wrong" in page.connect_error.text()
+
+    page.password.setText("secret")
+    page._connect()  # starts a background sync
+    from PySide6.QtCore import QThreadPool
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    assert page.pages.currentIndex() == 1
+    assert page.grades.topLevelItemCount() == 1
+    assert page.lessons.item(0).text() == "Moto rettilineo"
+    assert not window.grab().isNull()

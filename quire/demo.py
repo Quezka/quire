@@ -3,6 +3,9 @@ from __future__ import annotations
 
 from datetime import timedelta
 
+from .application.ports import (
+    Credentials, RegisterAccount, RemoteAssignment, RemoteGrade, RemoteLesson, RemoteSubject,
+)
 from .application.services import Services
 from .domain import ClassSlot, Course, Event, Task, TaskKind, TimeRange
 
@@ -81,3 +84,55 @@ def seed(services: Services):
     ideas.pinned = True
     notes.save(ideas)
     planner.save_journal(today, "Remember to bring the permission slip for the museum trip.")
+
+
+class DemoRegister:
+    """A pretend Classeviva account so `--demo` can show the School page offline."""
+
+    name = "Classeviva"
+
+    def __init__(self, today):
+        self.today = today
+
+    def login(self, credentials: Credentials) -> RegisterAccount:
+        return RegisterAccount("Giulia Bianchi")
+
+    def subjects(self):
+        return [RemoteSubject("1", "MATEMATICA", ("OKAFOR GRACE",)),
+                RemoteSubject("2", "BIOLOGY"), RemoteSubject("3", "STORIA", ("DUARTE LUIS",))]
+
+    def assignments(self, first, last):
+        d = self.today
+        return [
+            RemoteAssignment("a1", d + timedelta(days=2), TaskKind.HOMEWORK,
+                             "Pag. 112 es. 4-9\nRipassare le derivate", "1", "MATEMATICA",
+                             "OKAFOR GRACE"),
+            RemoteAssignment("a2", d + timedelta(days=5), TaskKind.EXAM,
+                             "Verifica: Rivoluzione francese", "3", "STORIA", "DUARTE LUIS"),
+        ]
+
+    def grades(self):
+        d = self.today
+        return [
+            RemoteGrade("g1", d - timedelta(days=12), "1", "MATEMATICA", "7½", 7.5, "Scritto"),
+            RemoteGrade("g2", d - timedelta(days=4), "1", "MATEMATICA", "8", 8.0, "Orale"),
+            RemoteGrade("g3", d - timedelta(days=6), "3", "STORIA", "6-", 5.75, "Orale",
+                        notes="Ripassare le date principali"),
+            RemoteGrade("g4", d - timedelta(days=2), "2", "BIOLOGY", "9", 9.0, "Pratico"),
+        ]
+
+    def lessons(self, first, last):
+        d = self.today
+        return [
+            RemoteLesson("l1", d - timedelta(days=1), "1", "MATEMATICA",
+                         "Derivate: regola della catena", "OKAFOR GRACE", 1),
+            RemoteLesson("l2", d - timedelta(days=1), "3", "STORIA",
+                         "La presa della Bastiglia", "DUARTE LUIS", 3),
+            RemoteLesson("l3", d - timedelta(days=2), "2", "BIOLOGY",
+                         "Cellular respiration: the Krebs cycle", "", 2),
+        ]
+
+
+def seed_school(services: Services):
+    services.school.connect("demo", "demo")
+    services.school.sync()

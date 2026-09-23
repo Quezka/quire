@@ -6,6 +6,7 @@ from ..bus import ChangeBus
 from ..ports import Storage
 from .notes import NoteService
 from .planner import PlannerService
+from .school import SchoolSyncService
 from .tasks import TaskService
 from .timetable import TimetableService
 
@@ -18,8 +19,10 @@ class Services:
     planner: PlannerService
     tasks: TaskService
     notes: NoteService
+    school: SchoolSyncService
     storage: Storage
     bus: ChangeBus
 
 
-__all__ = ["Services", "NoteService", "PlannerService", "TaskService", "TimetableService"]
+__all__ = ["Services", "NoteService", "PlannerService", "SchoolSyncService", "TaskService",
+           "TimetableService"]

@@ -23,14 +23,40 @@ your machine in a single SQLite file.
   press Delete to remove one.
 - **Notes**: Markdown notes with live search, course filing, pinning, autosave and a
   preview mode (Ctrl+E). Checklists work: `- [ ]`.
+- **School (Classeviva)**: connect your Classeviva student account to pull in what teachers
+  post:
+  - homework and tests from the agenda, which land in Coursework and Today;
+  - grades, with per-subject and overall averages;
+  - lesson topics from the class register.
+
+  Your subjects become courses automatically; courses you already made are matched by name.
+  Quire re-syncs every 30 minutes while it's open, and on demand with Ctrl+R. You get a
+  desktop notification when something new appears. Ticking off an imported task sticks
+  across syncs. If a teacher deletes an assignment, Quire removes it too, unless you had
+  already finished it.
 - A modern sidebar layout with light and dark themes. It follows your system by default; change
   it under **More → Appearance**. **More → Back up data…** writes a copy of your database.
+
+### About the Classeviva connection
+
+Classeviva has no public API. Quire uses the same REST API as the official Classeviva mobile
+app (endpoints as documented by the community in
+[Classeviva-Official-Endpoints](https://github.com/Lioydiano/Classeviva-Official-Endpoints)).
+If Spaggiari changes that API, the sync may stop working until Quire is updated.
+
+- Your password goes into the operating system's keyring (GNOME Keyring or KWallet on Linux,
+  Credential Manager on Windows). It is never written to Quire's database.
+- Quire only contacts `web.spaggiari.eu`, and only while you're connected.
+- **More → Sync school register** (Ctrl+R) syncs now. The **⋯** menu on the School page
+  disconnects the account. Imported items stay after you disconnect.
+- Accounts linked to several students (for example a parent account) sync the first one.
 
 ### Keyboard shortcuts
 
 | Keys | Action |
 | --- | --- |
-| Ctrl+1 … Ctrl+4 | Today / Week / Coursework / Notes |
+| Ctrl+1 … Ctrl+5 | Today / Week / Coursework / Notes / School |
+| Ctrl+R | Sync school register |
 | Ctrl+N | New note |
 | Ctrl+T | New task |
 | Ctrl+Shift+E | New event |
@@ -118,8 +144,8 @@ Quire follows **Clean Architecture**: source-code dependencies point only inward
 | Layer | Contents | May depend on |
 | --- | --- | --- |
 | `quire/domain` | `Course`, `ClassSlot`, `TimeRange`, `Event`, `Task`, `Note`, and rules such as due-date buckets, next class meeting, note titles and validation | nothing |
-| `quire/application` | Use-case services (`TimetableService`, `PlannerService`, `TaskService`, `NoteService`), repository **ports** (`Protocol`s), read-model DTOs, and a framework-free `ChangeBus` | domain |
-| `quire/infrastructure` | `SqliteDatabase`, SQLite repositories implementing the ports, the system clock and platform data paths | application, domain |
+| `quire/application` | Use-case services (`TimetableService`, `PlannerService`, `TaskService`, `NoteService`, `SchoolSyncService`), **ports** (`Protocol`s) for repositories, the school register and credential storage, read-model DTOs, and a framework-free `ChangeBus` | domain |
+| `quire/infrastructure` | `SqliteDatabase` (with schema migrations), SQLite repositories, the `ClassevivaRegister` HTTP adapter, the keyring credential store, the system clock and platform data paths | application, domain |
 | `quire/presentation` | PySide6 UI. It talks only to the `Services` facade and adapts `ChangeBus` into a Qt signal (`bridge.py`) | application, domain |
 | `quire/bootstrap.py` | Composition root: builds repositories and injects them into services | everything |
 

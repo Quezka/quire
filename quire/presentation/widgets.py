@@ -9,12 +9,10 @@ from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, QSize, Qt, QTime, QT
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import QColorDialog, QPushButton, QStyle, QStyledItemDelegate, QToolTip, QWidget
 
+from ..domain import COURSE_COLORS
 from . import icons, theme
 
-PALETTE = [
-    "#4f7cff", "#e5484d", "#30a46c", "#f5a524", "#8e4ec6",
-    "#12a594", "#e93d82", "#f76b15", "#0090ff", "#978365",
-]
+PALETTE = list(COURSE_COLORS)
 NO_COLOR = "#00000000"
 
 

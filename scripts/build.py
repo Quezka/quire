@@ -102,6 +102,9 @@ def main():
         "--distpath", str(ROOT / "dist"),
         "--workpath", str(BUILD / "pyinstaller"),
         "--specpath", str(BUILD),
+        # keyring finds its OS backends through entry points; bundle them explicitly.
+        "--collect-submodules", "keyring.backends",
+        "--copy-metadata", "keyring",
         # Trim Qt modules Quire never uses.
         "--exclude-module", "PySide6.QtWebEngineCore",
         "--exclude-module", "PySide6.QtQml",

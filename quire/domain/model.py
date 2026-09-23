@@ -14,6 +14,10 @@ from .errors import ValidationError
 
 MINUTES_PER_DAY = 24 * 60
 UPCOMING_DAYS = 7
+COURSE_COLORS = (
+    "#4f7cff", "#e5484d", "#30a46c", "#f5a524", "#8e4ec6",
+    "#12a594", "#e93d82", "#f76b15", "#0090ff", "#978365",
+)
 
 
 @dataclass(frozen=True)
@@ -53,6 +57,7 @@ class Course:
     color: str = "#4f7cff"
     slots: list[ClassSlot] = field(default_factory=list)
     id: int | None = None
+    external_id: str | None = None  # set when the course came from a school register
 
     def validate(self):
         if not self.name.strip():
@@ -117,6 +122,7 @@ class Task:
     done: bool = False
     details: str = ""
     id: int | None = None
+    external_id: str | None = None  # set when the task was imported from a school register
 
     def validate(self):
         if not self.title.strip():
@@ -159,3 +165,42 @@ class Note:
     @property
     def title(self) -> str:
         return derive_note_title(self.body)
+
+
+@dataclass
+class Grade:
+    """A mark published by a teacher on the school register."""
+
+    external_id: str
+    subject: str
+    day: date
+    display: str  # as the school shows it, e.g. "7½", "8-", "ass"
+    value: float | None = None  # numeric value, when the mark has one
+    component: str = ""  # e.g. "Scritto", "Orale"
+    period: str = ""
+    notes: str = ""
+    cancelled: bool = False
+    course_id: int | None = None
+
+    @property
+    def counts(self) -> bool:
+        return self.value is not None and not self.cancelled
+
+
+def average(grades: list[Grade]) -> float | None:
+    """Mean of the marks that count; None when there are none."""
+    values = [g.value for g in grades if g.counts]
+    return round(sum(values) / len(values), 2) if values else None
+
+
+@dataclass
+class Lesson:
+    """One lesson as recorded on the school register, with its topic."""
+
+    external_id: str
+    day: date
+    subject: str
+    topic: str = ""
+    teacher: str = ""
+    hour: int = 0  # position in the school day (1st hour, 2nd hour, ...)
+    course_id: int | None = None

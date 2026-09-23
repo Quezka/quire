@@ -17,6 +17,7 @@ from .dialogs import CoursesDialog, EventDialog, TaskDialog
 from .icons import APP_ICON
 from .views.coursework import CourseworkView
 from .views.notes import NotesView
+from .views.school import SchoolView
 from .views.today import TodayView
 from .views.week import WeekView
 
@@ -71,7 +72,7 @@ class Sidebar(QFrame):
 
 class MainWindow(QMainWindow):
     PAGES = [("today", "Today"), ("week", "Week"), ("coursework", "Coursework"),
-             ("notes", "Notes")]
+             ("notes", "Notes"), ("school", "School")]
 
     def __init__(self, services: Services):
         super().__init__()
@@ -85,14 +86,16 @@ class MainWindow(QMainWindow):
         self.week = WeekView(services, relay)
         self.coursework = CourseworkView(services, relay)
         self.notes = NotesView(services, relay)
+        self.school = SchoolView(services, relay)
 
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         for i, (page, (icon_name, label)) in enumerate(zip(
-                [self.today, self.week, self.coursework, self.notes], self.PAGES)):
+                [self.today, self.week, self.coursework, self.notes, self.school], self.PAGES)):
             self.stack.addWidget(page)
             self.sidebar.add_page(icon_name, label, f"Ctrl+{i + 1}")
         self.sidebar.group.idClicked.connect(self.show_page)
+        self.school.newsChanged.connect(self._school_news)
 
         more = self.sidebar.nav_button("more", "More", checkable=False)
         more.setPopupMode(QToolButton.InstantPopup)
@@ -124,6 +127,13 @@ class MainWindow(QMainWindow):
             self.notes.flush()
         self.stack.setCurrentIndex(index)
         self.sidebar.group.button(index).setChecked(True)
+        if self.stack.currentWidget() is self.school:
+            self._school_news(0)
+
+    def _school_news(self, count: int):
+        button = self.sidebar.group.button(self.stack.indexOf(self.school))
+        seen = self.stack.currentWidget() is self.school
+        button.setText("  School" + (f"   {count} new" if count and not seen else ""))
 
     def _shortcut(self, keys, slot):
         action = QAction(self)
@@ -140,6 +150,7 @@ class MainWindow(QMainWindow):
         self._shortcut("Ctrl+Shift+E", self.new_event)
         self._shortcut("Ctrl+Shift+C", self.open_courses)
         self._shortcut("Ctrl+D", self._go_today)
+        self._shortcut("Ctrl+R", lambda: self.school.sync())
         self._shortcut(QKeySequence.Find, self._search_notes)
         self._shortcut(QKeySequence.Quit, self.close)
 
@@ -151,6 +162,7 @@ class MainWindow(QMainWindow):
             ("New note", "Ctrl+N", self.new_note),
             None,
             ("Courses && timetable", "Ctrl+Shift+C", self.open_courses),
+            ("Sync school register", "Ctrl+R", lambda: self.school.sync()),
             None,
             ("Back up data…", None, self.backup),
             ("Open data folder", None, self.open_data_folder),
@@ -229,7 +241,8 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.services.storage.location.parent)))
 
     def show_shortcuts(self):
-        rows = [("Ctrl+1 … 4", "Today / Week / Coursework / Notes"), ("Ctrl+D", "Jump to today"),
+        rows = [("Ctrl+1 … 5", "Today / Week / Coursework / Notes / School"),
+                ("Ctrl+D", "Jump to today"), ("Ctrl+R", "Sync school register"),
                 ("Ctrl+N", "New note"), ("Ctrl+T", "New task"), ("Ctrl+Shift+E", "New event"),
                 ("Ctrl+Shift+C", "Courses & timetable"), ("Ctrl+F", "Search notes"),
                 ("Ctrl+E", "Toggle note preview")]

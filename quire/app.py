@@ -24,11 +24,18 @@ def main(argv: list[str] | None = None) -> int:
         path.unlink(missing_ok=True)
     else:
         path = args.db or data_dir() / "quire.db"
-    services, db = build_services(path)
     if args.demo:
-        from .demo import seed
+        from datetime import date
 
+        from .demo import DemoRegister, seed, seed_school
+        from .infrastructure.credentials import MemoryCredentialStore
+
+        services, db = build_services(path, register=DemoRegister(date.today()),
+                                      credentials=MemoryCredentialStore())
         seed(services)
+        seed_school(services)
+    else:
+        services, db = build_services(path)
 
     # Imported late so `--help` works without a display.
     from .presentation.qt_app import run
