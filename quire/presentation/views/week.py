@@ -4,15 +4,18 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import QScrollArea
+from PySide6.QtWidgets import QMenu, QScrollArea
 
 from ...application.bus import Topic
 from ...application.dto import AgendaItem, ItemKind
 from ...application.services import Services
 from ..bridge import ChangeRelay
-from ..dialogs import CoursesDialog, EventDialog, ShiftDialog, class_menu, new_item_menu
+from ..dialogs import (
+    CoursesDialog, EventDialog, JobsDialog, ShiftDialog, add_menu, class_menu, new_item_menu,
+    weekly_shift_menu,
+)
 from ..widgets import GridHeader, TimeGrid
-from .common import Card, Page, agenda_block, button, icon_button, primary_button
+from .common import Card, Page, agenda_block, button, icon_button, menu_button
 
 
 class WeekView(Page):
@@ -32,14 +35,15 @@ class WeekView(Page):
         self.leading.addWidget(prev_btn)
         self.leading.addWidget(next_btn)
 
-        courses = button("Courses", "school")
-        courses.clicked.connect(lambda: CoursesDialog(self.services, self).exec())
+        timetable = QMenu(self)
+        timetable.addAction("Courses && class times…",
+                            lambda: CoursesDialog(self.services, self).exec())
+        timetable.addAction("Jobs && work schedule…",
+                            lambda: JobsDialog(self.services, self).exec())
         self.this_week = button("This week")
         self.this_week.clicked.connect(lambda: self.set_week(self.planner.today()))
-        add_event = primary_button("Event")
-        add_event.clicked.connect(lambda: EventDialog(
-            self.services, day=self.anchor, parent=self).exec())
-        self.add_actions(courses, self.this_week, add_event)
+        add = menu_button("Add", add_menu(self, self.services, self._default_day), primary=True)
+        self.add_actions(menu_button("Timetable", timetable, "week"), self.this_week, add)
 
         self.grid = TimeGrid()
         self.grid.blockActivated.connect(self._block_activated)
@@ -59,6 +63,10 @@ class WeekView(Page):
 
         relay.changed.connect(self._changed)
         self.set_week(self.anchor)
+
+    def _default_day(self) -> date:
+        today = self.planner.today()
+        return today if today in self.days else self.days[0] if self.days else today
 
     def set_week(self, any_day: date):
         self.anchor = any_day
@@ -92,13 +100,15 @@ class WeekView(Page):
             self.subtitle.setText("Double-click a class for notes and homework, "
                                   "or an empty slot to add an event or work shift")
         else:
-            self.subtitle.setText("No classes yet. Add your subjects under Courses")
+            self.subtitle.setText("Add your classes and work schedule under Timetable")
 
     def _block_activated(self, item: AgendaItem, pos):
         if item.kind is ItemKind.EVENT:
             EventDialog(self.services, item.ref_id, parent=self).exec()
         elif item.kind is ItemKind.SHIFT:
             ShiftDialog(self.services, item.ref_id, parent=self).exec()
+        elif item.kind is ItemKind.WEEKLY_SHIFT:
+            weekly_shift_menu(self, self.services, item.ref_id, item.origin, pos)
         else:
             class_menu(self, self.services, item.ref_id, item.day, pos, self.openClassNote.emit)
 

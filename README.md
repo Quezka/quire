@@ -29,14 +29,19 @@ your machine in a single SQLite file.
   - The **group** button next to the class filter shows notes under their class and topic.
     Click a heading to collapse it. Right-click a topic to rename it (a rename into an
     existing name merges the two) or to start a new note in it.
-- **Work**: add your jobs (with an optional hourly rate) and your shifts.
-  - Shifts show up in Today and Week next to your classes. Late shifts can run past
-    midnight, e.g. 18:00–01:00.
-  - A weekly shift can be repeated for several weeks in one go.
-  - The shift editor shows paid hours (minus your unpaid break) and estimated pay. It warns
+- **Work**: add your jobs, with an optional gross hourly rate and a tax & deductions
+  percentage (presets for Italian occasional work and employee contributions). Give each
+  job a **weekly schedule** so its regular shifts show up every week in Today and Week,
+  right next to your classes.
+  - Late shifts can run past midnight, e.g. 18:00–01:00.
+  - Any shift can repeat every week, every work day, every day or on chosen days, with an
+    optional end date.
+  - Click a regular shift to skip it this week or change just this week's times.
+  - The shift editor shows paid hours (minus your unpaid break) and gross and take-home pay. It warns
     you if a shift overlaps a class, an event or another shift.
-  - The Work page lists upcoming shifts and totals hours and pay for this week and this
-    month, per job.
+  - The Work page lists upcoming shifts and totals hours, gross and take-home pay for this
+    week and this month, per job. Take-home pay is an estimate: real withholding depends on
+    your contract and yearly income.
   - Double-click an empty time in Today or Week to add an event or a shift there.
 - **School (Classeviva)**: connect your Classeviva student account to pull in what teachers
   post:

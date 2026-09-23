@@ -1,12 +1,13 @@
 """Enterprise business rules: entities and invariants, free of any framework."""
 from .errors import DomainError, NotFound, ValidationError
 from .model import (
-    COURSE_COLORS, UPCOMING_DAYS, ClassSlot, Course, DueBucket, Event, Grade, Job, Lesson, Note,
-    Shift, Subject, Task, TaskKind, TimeRange, average, derive_note_title, normalize_topic,
+    COURSE_COLORS, EVERY_DAY, UPCOMING_DAYS, WORK_DAYS, ClassSlot, Course, DueBucket, Event, Grade, Job, Lesson, Note,
+    Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange, average, derive_note_title,
+    net_pay, normalize_topic, reschedule, work_shifts,
 )
 
 __all__ = [
-    "DomainError", "NotFound", "ValidationError", "COURSE_COLORS", "UPCOMING_DAYS", "ClassSlot", "Course",
-    "DueBucket", "Event", "Grade", "Job", "Lesson", "Note", "Shift", "Subject", "Task", "TaskKind", "TimeRange", "average",
-    "derive_note_title", "normalize_topic",
+    "DomainError", "NotFound", "ValidationError", "COURSE_COLORS", "EVERY_DAY", "UPCOMING_DAYS", "WORK_DAYS", "ClassSlot", "Course",
+    "DueBucket", "Event", "Grade", "Job", "Lesson", "Note", "Shift", "ShiftPattern", "Subject", "Task", "TaskKind", "TimeRange", "average",
+    "derive_note_title", "net_pay", "normalize_topic", "reschedule", "work_shifts",
 ]

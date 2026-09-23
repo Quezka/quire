@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from ..domain import ClassSlot, Course, Event, Grade, Job, Lesson, Note, Shift, Subject, Task, TaskKind, TimeRange
+from ..domain import ClassSlot, Course, Event, Grade, Job, Lesson, Note, Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange
 from .sqlite import SqliteDatabase
 
 
@@ -316,24 +316,48 @@ class SqliteKeyValueStore(_Repo):
 
 
 class SqliteJobRepository(_Repo):
-    @staticmethod
-    def _job(r) -> Job:
-        return Job(r["name"], r["color"], r["hourly_rate"], r["id"])
+    def _load(self, rows) -> list[Job]:
+        jobs = {r["id"]: Job(r["name"], r["color"], r["hourly_rate"], r["id"],
+                             deductions=r["deductions"]) for r in rows}
+        if jobs:
+            marks = ",".join("?" * len(jobs))
+            for p in self._all(f"SELECT * FROM shift_patterns WHERE job_id IN ({marks})"
+                               " ORDER BY weekday, start_min", *jobs):
+                jobs[p["job_id"]].schedule.append(ShiftPattern(
+                    p["weekday"], p["start_min"], p["duration_min"], p["break_min"],
+                    _date(p["since"]), _date(p["until"]), p["id"]))
+        return list(jobs.values())
 
     def list(self):
-        return [self._job(r) for r in self._all("SELECT * FROM jobs ORDER BY name COLLATE NOCASE")]
+        return self._load(self._all("SELECT * FROM jobs ORDER BY name COLLATE NOCASE"))
 
     def get(self, job_id):
-        r = self._one("SELECT * FROM jobs WHERE id = ?", job_id)
-        return self._job(r) if r else None
+        found = self._load(self._all("SELECT * FROM jobs WHERE id = ?", job_id))
+        return found[0] if found else None
+
+    def _write_schedule(self, job: Job):
+        self._conn.execute("DELETE FROM shift_patterns WHERE job_id = ?", (job.id,))
+        self._conn.executemany(
+            "INSERT INTO shift_patterns (job_id, weekday, start_min, duration_min, break_min,"
+            " since, until) VALUES (?, ?, ?, ?, ?, ?, ?)",
+            [(job.id, p.weekday, p.start, p.duration, p.break_minutes,
+              p.since.isoformat() if p.since else None,
+              p.until.isoformat() if p.until else None) for p in job.schedule])
 
     def add(self, job: Job) -> int:
-        return self._write("INSERT INTO jobs (name, color, hourly_rate) VALUES (?, ?, ?)",
-                           job.name, job.color, job.hourly_rate)
+        with self._conn:
+            job.id = self._conn.execute(
+                "INSERT INTO jobs (name, color, hourly_rate, deductions) VALUES (?, ?, ?, ?)",
+                (job.name, job.color, job.hourly_rate, job.deductions)).lastrowid
+            self._write_schedule(job)
+        return job.id
 
     def update(self, job: Job):
-        self._write("UPDATE jobs SET name = ?, color = ?, hourly_rate = ? WHERE id = ?",
-                    job.name, job.color, job.hourly_rate, job.id)
+        with self._conn:
+            self._conn.execute(
+                "UPDATE jobs SET name = ?, color = ?, hourly_rate = ?, deductions = ? WHERE id = ?",
+                (job.name, job.color, job.hourly_rate, job.deductions, job.id))
+            self._write_schedule(job)
 
     def delete(self, job_id):
         self._write("DELETE FROM jobs WHERE id = ?", job_id)
@@ -368,3 +392,12 @@ class SqliteShiftRepository(_Repo):
 
     def delete(self, shift_id):
         self._write("DELETE FROM shifts WHERE id = ?", shift_id)
+
+    def skipped(self, first, last):
+        return {(r["job_id"], date.fromisoformat(r["day"]), r["start_min"]) for r in self._all(
+            "SELECT * FROM shift_skips WHERE day BETWEEN ? AND ?",
+            first.isoformat(), last.isoformat())}
+
+    def skip(self, job_id, day, start):
+        self._write("INSERT OR IGNORE INTO shift_skips (job_id, day, start_min) VALUES (?, ?, ?)",
+                    job_id, day.isoformat(), start)

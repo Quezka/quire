@@ -144,6 +144,7 @@ def palette(t: Theme) -> QPalette:
 def stylesheet(t: Theme) -> str:
     check = icons.icon_file("check", t.on_accent, 3)
     chevron = icons.icon_file("chevron-down", t.muted)
+    chevron_up = icons.icon_file("chevron-up", t.muted)
     r = RADIUS
     return f"""
     * {{ outline: none; }}
@@ -192,16 +193,21 @@ def stylesheet(t: Theme) -> str:
         border-radius: 8px; padding: 6px; }}
     QToolButton#icon:hover, QPushButton#icon:hover {{ background: {t.hover}; }}
     QToolButton#icon:checked, QPushButton#icon:checked {{ background: {t.accent_soft}; }}
-    QToolButton::menu-indicator {{ image: none; width: 0; }}
+    QToolButton::menu-indicator, QPushButton::menu-indicator {{ image: none; width: 0; }}
+    QToolButton#day {{ min-width: 26px; max-width: 26px; min-height: 26px; max-height: 26px;
+        padding: 0; border-radius: 13px; border: 1px solid {t.border}; background: {t.surface};
+        color: {t.muted}; font-weight: 600; font-size: 9pt; }}
+    QToolButton#day:hover {{ border-color: {t.accent}; }}
+    QToolButton#day:checked {{ background: {t.accent}; border-color: {t.accent};
+        color: {t.on_accent}; }}
 
     /* ---- inputs ---- */
-    QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox,
-    QDoubleSpinBox {{
+    QLineEdit, QPlainTextEdit, QTextEdit, QComboBox, QDateEdit, QTimeEdit, QSpinBox {{
         background: {t.surface}; color: {t.text}; border: 1px solid {t.border};
         border-radius: 8px; padding: 6px 10px; selection-background-color: {t.accent};
         selection-color: {t.on_accent}; }}
     QLineEdit:focus, QPlainTextEdit:focus, QTextEdit:focus, QComboBox:focus,
-    QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus, QDoubleSpinBox:focus {{
+    QDateEdit:focus, QTimeEdit:focus, QSpinBox:focus {{
         border: 1px solid {t.accent}; }}
     QLineEdit#search {{ background: {t.raised}; border-color: transparent; }}
     QLineEdit#search:focus {{ background: {t.surface}; border-color: {t.accent}; }}
@@ -210,8 +216,16 @@ def stylesheet(t: Theme) -> str:
     QComboBox::drop-down, QDateEdit::drop-down {{ border: none; width: 26px; }}
     QComboBox::down-arrow, QDateEdit::down-arrow {{ image: url({chevron}); width: 14px;
         height: 14px; }}
-    QTimeEdit::up-button, QTimeEdit::down-button, QSpinBox::up-button, QSpinBox::down-button,
-    QDoubleSpinBox::up-button, QDoubleSpinBox::down-button {{ width: 0; border: none; }}
+    QTimeEdit::up-button, QTimeEdit::down-button {{ width: 0; border: none; }}
+    QSpinBox {{ padding-right: 24px; }}
+    QSpinBox::up-button, QSpinBox::down-button {{ subcontrol-origin: border; width: 22px;
+        border: none; background: transparent; }}
+    QSpinBox::up-button {{ subcontrol-position: top right; margin-top: 3px; }}
+    QSpinBox::down-button {{ subcontrol-position: bottom right; margin-bottom: 3px; }}
+    QSpinBox::up-button:hover, QSpinBox::down-button:hover {{ background: {t.hover};
+        border-radius: 4px; }}
+    QSpinBox::up-arrow {{ image: url({chevron_up}); width: 11px; height: 11px; }}
+    QSpinBox::down-arrow {{ image: url({chevron}); width: 11px; height: 11px; }}
     QComboBox QAbstractItemView {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 8px; padding: 4px; selection-background-color: {t.accent_soft};
         selection-color: {t.text}; }}

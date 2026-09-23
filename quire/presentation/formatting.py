@@ -73,5 +73,27 @@ def money(value: float) -> str:
     return QLocale.system().toCurrencyString(value)
 
 
+def fmt_days(weekdays) -> str:
+    """Compact weekday list: "Mon–Fri", "Every day", "Tue, Thu, Sat"."""
+    days = sorted(set(weekdays))
+    if days == list(range(7)):
+        return "Every day"
+    if days == [5, 6]:
+        return "Weekends"
+    short = [WEEKDAYS[d][:3] for d in days]
+    if len(days) >= 3 and days == list(range(days[0], days[-1] + 1)):
+        return f"{short[0]}–{short[-1]}"
+    return ", ".join(short)
+
+
+def pay_text(gross: float | None, net: float | None) -> str:
+    """"€40.00" or "€40.00 gross · €32.00 net" when something is withheld."""
+    if gross is None:
+        return ""
+    if net is None or abs(net - gross) < 0.005:
+        return money(gross)
+    return f"{money(gross)} gross · {money(net)} net"
+
+
 def plural(n: int, word: str, suffix: str = "s") -> str:
     return f"{n} {word}{'' if n == 1 else suffix}"

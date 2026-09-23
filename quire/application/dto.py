@@ -5,13 +5,14 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 
-from ..domain import Course, DueBucket, Job, Shift, Task, TimeRange
+from ..domain import Course, DueBucket, Job, Shift, Task, TimeRange, net_pay
 
 
 class ItemKind(Enum):
     CLASS = "class"
     EVENT = "event"
-    SHIFT = "shift"
+    SHIFT = "shift"  # a one-off shift; ref_id is the shift id
+    WEEKLY_SHIFT = "weekly_shift"  # from a job's weekly schedule; ref_id is the job id
 
 
 @dataclass(frozen=True)
@@ -25,6 +26,9 @@ class AgendaItem:
     room: str = ""
     teacher: str = ""
     details: str = ""
+    # For items that aren't stored on their own (weekly shifts) or span midnight:
+    # the day and minute the whole item starts.
+    origin: tuple[date, int] | None = None
 
 
 @dataclass(frozen=True)
@@ -53,7 +57,8 @@ class DayAgenda:
 
     @property
     def shift_count(self) -> int:
-        return len({i.ref_id for i in self.items if i.kind is ItemKind.SHIFT})
+        return len({(i.kind, i.ref_id, i.origin) for i in self.items
+                    if i.kind in (ItemKind.SHIFT, ItemKind.WEEKLY_SHIFT)})
 
     @property
     def open_task_count(self) -> int:
@@ -104,14 +109,20 @@ class ShiftItem:
 
     @property
     def pay(self) -> float | None:
+        """Gross pay."""
         return self.shift.pay(self.job.hourly_rate if self.job else None)
+
+    @property
+    def net(self) -> float | None:
+        return net_pay(self.pay, self.job.deductions if self.job else 0.0)
 
 
 @dataclass(frozen=True)
 class JobTotal:
     job: Job | None
     minutes: int
-    pay: float | None
+    pay: float | None  # gross
+    net: float | None = None
 
 
 @dataclass(frozen=True)
@@ -119,6 +130,7 @@ class WorkSummary:
     first: date
     last: date
     minutes: int  # paid minutes
-    pay: float | None  # None when no job has a rate
+    pay: float | None  # gross; None when no job has a rate
     shifts: int
     per_job: tuple[JobTotal, ...]
+    net: float | None = None  # after each job's tax and deductions

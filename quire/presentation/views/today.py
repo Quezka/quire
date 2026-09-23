@@ -16,10 +16,13 @@ from ...application.services import Services
 from ...domain import Task, TaskKind
 from .. import icons, theme
 from ..bridge import ChangeRelay
-from ..dialogs import EventDialog, ShiftDialog, TaskDialog, class_menu, new_item_menu, to_qdate
+from ..dialogs import (
+    EventDialog, ShiftDialog, TaskDialog, add_menu, class_menu, new_item_menu, to_qdate,
+    weekly_shift_menu,
+)
 from ..formatting import KIND_LABELS, long_date, plural, relative_date
 from ..widgets import NO_COLOR, TimeGrid, color_icon
-from .common import Card, Page, agenda_block, badge, button, icon_button, primary_button
+from .common import Card, Page, agenda_block, badge, button, icon_button, menu_button
 
 
 class TodayView(Page):
@@ -52,10 +55,8 @@ class TodayView(Page):
 
         self.today_btn = button("Today")
         self.today_btn.clicked.connect(lambda: self.set_day(self.planner.today()))
-        add_event = primary_button("Event")
-        add_event.clicked.connect(
-            lambda: EventDialog(self.services, day=self.day, parent=self).exec())
-        self.add_actions(pick, self.today_btn, add_event)
+        add = menu_button("Add", add_menu(self, self.services, lambda: self.day), primary=True)
+        self.add_actions(pick, self.today_btn, add)
 
         # ---- timeline ----
         self.grid = TimeGrid()
@@ -225,6 +226,8 @@ class TodayView(Page):
             EventDialog(self.services, item.ref_id, parent=self).exec()
         elif item.kind is ItemKind.SHIFT:
             ShiftDialog(self.services, item.ref_id, parent=self).exec()
+        elif item.kind is ItemKind.WEEKLY_SHIFT:
+            weekly_shift_menu(self, self.services, item.ref_id, item.origin, pos)
         else:
             class_menu(self, self.services, item.ref_id, item.day, pos, self.openClassNote.emit)
 

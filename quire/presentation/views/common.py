@@ -78,6 +78,14 @@ def icon_button(name: str, tooltip: str, checkable: bool = False,
     return button
 
 
+def menu_button(text: str, menu, icon_name: str | None = None,
+                primary: bool = False) -> QPushButton:
+    """A header button that opens a menu (e.g. "+ Add" → Event / Work shift)."""
+    result = primary_button(text, icon_name or "plus") if primary else button(text, icon_name)
+    result.setMenu(menu)
+    return result
+
+
 def primary_button(text: str, icon_name: str | None = "plus") -> QPushButton:
     button = QPushButton(text, objectName="primary")
     button.setCursor(Qt.PointingHandCursor)
@@ -101,14 +109,16 @@ def label(text: str = "", role: str = "muted") -> QLabel:
 def agenda_block(item: AgendaItem, column: int) -> Block:
     if item.kind is ItemKind.CLASS:
         details = [item.room, item.teacher]
-    elif item.kind is ItemKind.SHIFT:
-        details = ["work shift", item.details.splitlines()[0] if item.details else ""]
+    elif item.kind in (ItemKind.SHIFT, ItemKind.WEEKLY_SHIFT):
+        label_ = "regular shift" if item.kind is ItemKind.WEEKLY_SHIFT else "work shift"
+        details = [label_, item.details.splitlines()[0] if item.details else ""]
     else:
         details = [item.details.splitlines()[0] if item.details else ""]
     when = fmt_range(item.time)
-    if item.kind is ItemKind.SHIFT and item.time.end == 24 * 60:
+    is_shift = item.kind in (ItemKind.SHIFT, ItemKind.WEEKLY_SHIFT)
+    if is_shift and item.time.end == 24 * 60:
         when = f"{fmt_min(item.time.start)} → next day"
-    elif item.kind is ItemKind.SHIFT and item.time.start == 0:
+    elif is_shift and item.time.start == 0 and item.origin and item.origin[0] != item.day:
         when = f"until {fmt_min(item.time.end)}"
     subtitle = " · ".join([when, *filter(None, details)])
     return Block(column, item.time.start, item.time.end, item.title, subtitle, item.color, item)

@@ -2,7 +2,8 @@
 
 Uses the REST API behind the Classeviva mobile app. It is not officially
 documented; endpoints and headers follow the community reference at
-https://github.com/Lioydiano/Classeviva-Official-Endpoints.
+https://github.com/Lioydiano/Classeviva-Official-Endpoints and the
+maintained client https://github.com/Lioydiano/Classeviva.
 """
 from __future__ import annotations
 
@@ -21,7 +22,7 @@ from ..domain import TaskKind
 
 BASE_URL = "https://web.spaggiari.eu/rest/v1"
 HEADERS = {
-    "User-Agent": "CVVS/std/4.1.7 Android/10",
+    "User-Agent": "CVVS/std/4.2.3 Android/12",
     "Z-Dev-Apikey": "Tg1NWEwNGIgIC0K",
     "Content-Type": "application/json",
 }
@@ -30,6 +31,23 @@ HOMEWORK_CODE = "AGHW"
 EXAM_WORDS = re.compile(
     r"\b(verific\w*|compit\w* in classe|interrogazion\w*|test|prova|prove|esame|esami"
     r"|simulazione)\b", re.IGNORECASE)
+
+
+class _OutsideSchoolYear(Exception):
+    """Classeviva error 122: the date range falls outside the school year."""
+
+
+def school_year(today: date) -> tuple[date, date]:
+    """The school year Classeviva serves data for: 1 September to 30 June."""
+    start_year = today.year if today.month >= 9 else today.year - 1
+    return date(start_year, 9, 1), date(start_year + 1, 6, 30)
+
+
+def clamp_to_school_year(first: date, last: date, today: date) -> tuple[date, date] | None:
+    """Trim a range to the current school year; None if nothing is left (e.g. summer)."""
+    start, end = school_year(today)
+    first, last = max(first, start), min(last, end)
+    return (first, last) if first <= last else None
 
 
 def _day(value: str) -> date:
@@ -47,9 +65,11 @@ def _id(value) -> str | None:
 class ClassevivaRegister:
     name = "Classeviva"
 
-    def __init__(self, opener: Callable = urllib.request.urlopen, timeout: float = 20):
+    def __init__(self, opener: Callable = urllib.request.urlopen, timeout: float = 20,
+                 today: Callable[[], date] = date.today):
         self._open = opener
         self._timeout = timeout
+        self._today = today
         self._token: str | None = None
         self._student: str | None = None
 
@@ -66,10 +86,11 @@ class ClassevivaRegister:
             with self._open(request, timeout=self._timeout) as response:
                 payload = response.read()
         except urllib.error.HTTPError as e:
-            info = ""
+            info, code = "", ""
             try:
                 detail = json.loads(e.read() or b"{}")
-                info = detail.get("info") or detail.get("error") or ""
+                code = str(detail.get("error") or "")  # e.g. "122:CvvRestApi/invalid date range"
+                info = detail.get("info") or code
             except ValueError:
                 pass
             if path == "/auth/login" and e.code in (401, 403, 422):
@@ -78,6 +99,8 @@ class ClassevivaRegister:
             if e.code in (401, 403):
                 raise AuthenticationError("Your Classeviva session was refused. "
                                           "Try connecting your account again.") from e
+            if e.code == 404 and code.startswith("122"):
+                raise _OutsideSchoolYear() from e
             raise RegisterError(f"Classeviva answered with an error ({e.code}"
                                 f"{': ' + info if info else ''}).") from e
         except (urllib.error.URLError, TimeoutError, OSError) as e:
@@ -88,6 +111,17 @@ class ClassevivaRegister:
             return json.loads(payload or b"{}")
         except ValueError as e:
             raise RegisterError("Classeviva sent a response Quire couldn't read.") from e
+
+    def _ranged(self, path: str, first: date, last: date) -> dict:
+        """GET a dated endpoint, keeping the range inside the school year."""
+        window = clamp_to_school_year(first, last, self._today())
+        if window is None:
+            return {}
+        try:
+            return self._request(
+                "GET", self._student_path(f"{path}/{_stamp(window[0])}/{_stamp(window[1])}"))
+        except _OutsideSchoolYear:
+            return {}
 
     def _student_path(self, path: str) -> str:
         if not self._student:
@@ -123,8 +157,7 @@ class ClassevivaRegister:
         ]
 
     def assignments(self, first: date, last: date) -> list[RemoteAssignment]:
-        data = self._request(
-            "GET", self._student_path(f"/agenda/all/{_stamp(first)}/{_stamp(last)}"))
+        data = self._ranged("/agenda/all", first, last)
         result = []
         for e in data.get("agenda", []):
             text = (e.get("notes") or "").strip()
@@ -156,8 +189,7 @@ class ClassevivaRegister:
         return result
 
     def lessons(self, first: date, last: date) -> list[RemoteLesson]:
-        data = self._request(
-            "GET", self._student_path(f"/lessons/{_stamp(first)}/{_stamp(last)}"))
+        data = self._ranged("/lessons", first, last)
         seen, result = set(), []
         for l in data.get("lessons", []):
             lesson_id = str(l["evtId"])

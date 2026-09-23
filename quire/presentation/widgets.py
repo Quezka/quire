@@ -7,7 +7,9 @@ from datetime import datetime
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, QSize, Qt, QTime, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
-from PySide6.QtWidgets import QColorDialog, QPushButton, QStyle, QStyledItemDelegate, QToolTip, QWidget
+from PySide6.QtWidgets import (
+    QColorDialog, QLineEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate, QToolTip, QWidget,
+)
 
 from ..domain import COURSE_COLORS
 from . import icons, theme
@@ -42,6 +44,85 @@ def scaled_font(widget: QWidget, factor: float, bold: bool = False) -> QFont:
     font.setPointSizeF(font.pointSizeF() * factor)
     font.setBold(bold)
     return font
+
+
+def parse_amount(text: str) -> float | None:
+    """Read a money amount typed with either decimal separator; blank means none.
+
+    Raises ValueError for anything that isn't a non-negative number.
+    """
+    text = text.strip().replace(" ", "")
+    if not text:
+        return None
+    if "," in text and "." in text:  # 1.234,50 or 1,234.50: the last one is the decimal mark
+        decimal = "," if text.rfind(",") > text.rfind(".") else "."
+        text = text.replace("." if decimal == "," else ",", "")
+    value = float(text.replace(",", "."))
+    if value < 0 or value != value:
+        raise ValueError(text)
+    return round(value, 2)
+
+
+class AmountEdit(QLineEdit):
+    """A line edit for an optional money amount, e.g. an hourly rate."""
+
+    def amount(self) -> float | None:
+        return parse_amount(self.text())
+
+    def setAmount(self, value: float | None):
+        self.setText("" if value is None else f"{value:.2f}")
+
+
+class SpinBox(QSpinBox):
+    """A spin box whose contents get selected on focus, so typing replaces them.
+
+    Without this, clicking into special text such as "No break" and typing does nothing.
+    """
+
+    def focusInEvent(self, event):
+        super().focusInEvent(event)
+        QTimer.singleShot(0, self.selectAll)
+
+    def mousePressEvent(self, event):
+        first_click = not self.hasFocus()
+        super().mousePressEvent(event)
+        if first_click:
+            QTimer.singleShot(0, self.selectAll)
+
+
+class DaysPicker(QWidget):
+    """Seven round toggles (M T W T F S S) for picking weekdays."""
+
+    changed = Signal()
+    NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
+
+    def __init__(self, days=(), parent=None):
+        super().__init__(parent)
+        from PySide6.QtWidgets import QHBoxLayout, QToolButton
+
+        layout = QHBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(3)
+        self.buttons = []
+        for i, name in enumerate(self.NAMES):
+            button = QToolButton(objectName="day", text=name[0], checkable=True, toolTip=name)
+            button.setCursor(Qt.PointingHandCursor)
+            button.toggled.connect(lambda _on: self.changed.emit())
+            layout.addWidget(button)
+            self.buttons.append(button)
+        layout.addStretch()
+        self.setDays(days)
+
+    def days(self) -> list[int]:
+        return [i for i, b in enumerate(self.buttons) if b.isChecked()]
+
+    def setDays(self, days):
+        wanted = set(days)
+        for i, button in enumerate(self.buttons):
+            button.blockSignals(True)
+            button.setChecked(i in wanted)
+            button.blockSignals(False)
+        self.changed.emit()
 
 
 class ColorButton(QPushButton):

@@ -173,18 +173,24 @@ def test_work_page_and_shift_dialog(window, services, app):
     before = page.list.count()  # the demo data already has some shifts
     assert before and not page.empty.isVisible()
 
-    job_id = services.work.save_job(Job("Café", "#f76b15", 10.0))
+    job_id = services.work.save_job(Job("Café", "#f76b15", 10.0, deductions=20.0))
     dialog = ShiftDialog(services, day=TODAY, start=18 * 60, parent=window)
+    select = dialog.job.findData(job_id)
+    dialog.job.setCurrentIndex(select)
     dialog.end.setTime(dialog.end.time().fromString("01:00", "HH:mm"))
     dialog.break_min.setValue(30)
-    dialog.repeat.setValue(1)
+    dialog.repeat.setCurrentIndex(ShiftDialog.REPEAT_WEEKLY)
     assert dialog.next_day.text() == "ends next day"
-    assert "6 h 30 paid" in dialog.summary.text() and "2 shifts" in dialog.summary.text()
+    assert "6 h 30 paid" in dialog.summary.text()
+    assert "gross" in dialog.summary.text() and "net" in dialog.summary.text()
+    assert "each Wed" in dialog.summary.text()
     dialog._save()
     mine = [i for i in services.work.shifts_between(TODAY, TODAY + timedelta(days=8))
             if i.shift.job_id == job_id]
-    assert len(mine) == 2
-    assert page.list.count() == before + 2
+    assert len(mine) == 2 and all(i.shift.recurring for i in mine)
+    upcoming_cafe = [i for i in services.work.upcoming() if i.shift.job_id == job_id]
+    assert len(upcoming_cafe) >= 4  # it keeps repeating every week
+    assert page.list.count() == before + len(upcoming_cafe)
 
     # The demo's Chemistry class on Wednesdays 10:30-11:20 clashes with a morning shift.
     clash = ShiftDialog(services, day=TODAY, start=10 * 60, parent=window)
@@ -211,3 +217,133 @@ def test_week_view_opens_at_the_school_day_not_midnight(window, app):
     expected = int(week.grid.y_for(first_class - 30)) - TimeGrid.PAD
     assert week.scroll.verticalScrollBar().value() == min(
         expected, week.scroll.verticalScrollBar().maximum())
+
+
+@pytest.mark.parametrize("typed, expected", [
+    ("8.50", 8.5), ("8,50", 8.5), ("12", 12.0), (" 1.234,50 ", 1234.5), ("1,234.50", 1234.5),
+    ("", None),
+])
+def test_amount_parsing_accepts_both_decimal_marks(typed, expected):
+    from quire.presentation.widgets import parse_amount
+    assert parse_amount(typed) == expected
+
+
+@pytest.mark.parametrize("typed", ["abc", "-3", "8.5.0x"])
+def test_amount_parsing_rejects_junk(typed):
+    from quire.presentation.widgets import parse_amount
+    with pytest.raises(ValueError):
+        parse_amount(typed)
+
+
+def click_and_type(widget, text, app):
+    from PySide6.QtCore import QPoint
+    from PySide6.QtTest import QTest
+
+    target = widget.lineEdit() if hasattr(widget, "lineEdit") and widget.lineEdit() else widget
+    QTest.mouseClick(target, Qt.LeftButton, pos=QPoint(target.width() // 3, target.height() // 2))
+    app.processEvents()  # the spin box selects its text on the next event loop turn
+    QTest.keyClicks(target, text)
+
+
+def test_typing_an_hourly_rate_into_the_job_dialog_saves_it(window, services, app):
+    dialog = JobDialog(services, parent=window)
+    dialog.show()
+    dialog.name.setText("Bar Centrale")
+    click_and_type(dialog.rate, "8,50", app)
+    dialog._save()
+    job = next(j for j in services.work.jobs() if j.name == "Bar Centrale")
+    assert job.hourly_rate == 8.5
+
+    again = JobDialog(services, job.id, window)
+    assert again.rate.text() == "8.50"
+    again.rate.setText("")
+    again._save()
+    assert services.work.job(job.id).hourly_rate is None
+
+
+def test_typing_into_the_shift_break_box_works(window, services, app):
+    dialog = ShiftDialog(services, parent=window)
+    dialog.show()
+    app.processEvents()
+    assert dialog.break_min.text() == "No break"
+    click_and_type(dialog.break_min, "30", app)
+    dialog.break_min.interpretText()
+    assert dialog.break_min.value() == 30
+
+
+def test_repeat_every_work_day_from_the_shift_dialog(window, services, app):
+    from datetime import timedelta
+
+    from quire.domain import Job
+
+    from .conftest import TODAY
+
+    job_id = services.work.save_job(Job("Library", "#12a594", 9.0))
+    dialog = ShiftDialog(services, day=TODAY, start=8 * 60, parent=window, job_id=job_id,
+                         end=10 * 60)
+    dialog.show()
+    dialog.repeat.setCurrentIndex(ShiftDialog.REPEAT_WORKDAYS)
+    dialog.has_until.setChecked(True)
+    dialog.until.setDate(dialog.until.date().fromString("2026-10-02", "yyyy-MM-dd"))
+    dialog._save()
+    days = [i.shift.day.weekday() for i in services.work.shifts_between(
+        TODAY, TODAY + timedelta(weeks=4)) if i.shift.job_id == job_id]
+    assert days == [2, 3, 4, 0, 1, 2, 3, 4]  # Wed 23 Sep to Fri 2 Oct, weekdays only
+
+    custom = ShiftDialog(services, day=TODAY, parent=window, job_id=job_id)
+    custom.show()
+    custom.repeat.setCurrentIndex(ShiftDialog.REPEAT_CUSTOM)
+    assert custom.days.isVisibleTo(custom) and custom.days.days() == [2]
+
+
+def test_job_dialog_weekly_schedule_and_tax_preset(window, services, app):
+    from quire.presentation.dialogs import DEDUCTION_PRESETS
+
+    dialog = JobDialog(services, parent=window)
+    dialog.show()
+    dialog.name.setText("Gelateria")
+    dialog.rate.setText("9,50")
+    dialog.preset.setCurrentIndex(1)  # occasional work, 20%
+    assert dialog.deductions.text() == "20"
+    dialog._add_row()  # defaults to Mon-Fri
+    dialog._add_row([5], 15 * 60, 1 * 60, 30)  # Saturday late
+    dialog._save()
+
+    job = next(j for j in services.work.jobs() if j.name == "Gelateria")
+    assert (job.hourly_rate, job.deductions) == (9.5, 20.0)
+    schedule = job.active_schedule(services.planner.today())
+    assert sorted(p.weekday for p in schedule) == [0, 1, 2, 3, 4, 5]
+
+    again = JobDialog(services, job.id, window)
+    assert again.table.rowCount() == 2
+    assert again.table.cellWidget(0, 0).days() == [0, 1, 2, 3, 4]
+    assert again.preset.currentText() == DEDUCTION_PRESETS[1][0]
+    again.deductions.setText("12.5")
+    again._deductions_typed()
+    assert again.preset.currentText() == "Custom…"
+
+
+def test_regular_shift_menu_skip_and_change(window, services, app, monkeypatch):
+    from datetime import timedelta
+
+    from PySide6.QtWidgets import QMenu
+
+    from quire.domain import Job, ShiftPattern
+    from quire.presentation import dialogs
+
+    from .conftest import TODAY
+
+    job_id = services.work.save_job(Job("Cinema"),
+                                    weekly=[ShiftPattern.between(4, 18 * 60, 22 * 60)])
+    friday = TODAY + timedelta(days=2)
+    class ScriptedMenu(QMenu):
+        choice = "Skip this week"
+
+        def exec(self, *_args):
+            return next(a for a in self.actions() if a.text() == self.choice)
+
+    monkeypatch.setattr(dialogs, "QMenu", ScriptedMenu)
+    dialogs.weekly_shift_menu(window, services, job_id, (friday, 18 * 60), None)
+    days = [i.shift.day for i in services.work.shifts_between(friday, friday + timedelta(weeks=1))
+            if i.shift.job_id == job_id]
+    assert days == [friday + timedelta(weeks=1)]

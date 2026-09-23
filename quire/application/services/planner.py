@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from ...domain import Course, Event, NotFound
+from ...domain import Course, Event, NotFound, work_shifts
 from ..bus import ChangeBus, Topic
 from ..dto import AgendaItem, DayAgenda, ItemKind, ShiftItem, TaskItem, WeekAgenda
 from ..ports import (
@@ -49,9 +49,12 @@ class PlannerService:
 
     def _shift_items(self, first: date, last: date) -> list[AgendaItem]:
         """Shift segments on days first..last (a shift may start the evening before)."""
-        jobs = {j.id: j for j in self._jobs.list()}
-        shifts = self._shifts.starting_between(first - timedelta(days=1), last)
-        items = shift_agenda_items([ShiftItem(s, jobs.get(s.job_id)) for s in shifts])
+        jobs = self._jobs.list()
+        by_id = {j.id: j for j in jobs}
+        start = first - timedelta(days=1)
+        shifts = work_shifts(jobs, self._shifts.starting_between(start, last),
+                             self._shifts.skipped(start, last), start, last)
+        items = shift_agenda_items([ShiftItem(s, by_id.get(s.job_id)) for s in shifts])
         return [i for i in items if first <= i.day <= last]
 
     def items_between(self, first: date, last: date) -> list[AgendaItem]:

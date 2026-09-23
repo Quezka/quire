@@ -51,6 +51,18 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.3.0" date="2026-09-23">
+      <description>
+        <p>Weekly work schedules, repeating shifts and take-home pay.</p>
+        <ul>
+          <li>Regular weekly shifts shown next to your school timetable</li>
+          <li>Repeat shifts every week, every work day or on chosen days</li>
+          <li>Skip or change a single week's shift</li>
+          <li>Gross and net pay with per-job tax and deductions</li>
+          <li>Fixes for entering hourly pay and for Classeviva sync early in the school year</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.2.0" date="2026-09-23">
       <description>
         <p>Classeviva sync, note topics, work shifts and a new look.</p>

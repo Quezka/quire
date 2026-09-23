@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt
+from PySide6.QtGui import QCursor
 from PySide6.QtWidgets import QHBoxLayout, QLabel, QListWidget, QListWidgetItem, QVBoxLayout
 
 from ...application.bus import Topic
@@ -9,8 +10,8 @@ from ...application.dto import WorkSummary
 from ...application.services import Services
 from .. import theme
 from ..bridge import ChangeRelay
-from ..dialogs import JobsDialog, ShiftDialog
-from ..formatting import fmt_duration, fmt_min, money, plural, relative_date
+from ..dialogs import JobsDialog, ShiftDialog, weekly_shift_menu
+from ..formatting import fmt_duration, fmt_min, money, pay_text, plural, relative_date
 from ..widgets import TwoLineDelegate
 from .common import Card, Page, button, label, primary_button
 
@@ -31,14 +32,14 @@ class SummaryCard(Card):
         self.hours.setText(fmt_duration(summary.minutes) if summary.minutes else "0 h")
         parts = [plural(summary.shifts, "shift")]
         if summary.pay is not None:
-            parts.append(f"≈ {money(summary.pay)}")
+            parts.append("≈ " + pay_text(summary.pay, summary.net))
         self.detail.setText(" · ".join(parts))
         lines = []
         for total in summary.per_job:
             name = total.job.name if total.job else "Unknown job"
             line = f"{name}: {fmt_duration(total.minutes)}"
             if total.pay is not None:
-                line += f" · {money(total.pay)}"
+                line += " · " + pay_text(total.pay, total.net)
             lines.append(line)
         self.jobs.setText("\n".join(lines))
         self.jobs.setVisible(len(lines) > 1)
@@ -91,17 +92,20 @@ class WorkView(Page):
         ShiftDialog(self.services, parent=self).exec()
 
     def _open(self, item: QListWidgetItem):
-        shift_id = item.data(Qt.UserRole)
-        if shift_id is not None:
-            ShiftDialog(self.services, shift_id, parent=self).exec()
+        weekly = item.data(Qt.UserRole + 20)
+        if weekly is not None:
+            job_id, day, start = weekly
+            weekly_shift_menu(self, self.services, job_id, (day, start), QCursor.pos())
+        elif item.data(Qt.UserRole) is not None:
+            ShiftDialog(self.services, item.data(Qt.UserRole), parent=self).exec()
 
     def refresh(self):
         week, month = self.work.week_summary(), self.work.month_summary()
         self.week.show_summary(week)
         self.month.show_summary(month)
         summary = f"This week: {fmt_duration(week.minutes)}" if week.minutes else "No shifts this week"
-        if week.pay is not None:
-            summary += f" · ≈ {money(week.pay)}"
+        if week.net is not None:
+            summary += f" · ≈ {money(week.net)} take-home"
         self.subtitle.setText(summary)
 
         today = self.services.planner.today()
@@ -113,17 +117,22 @@ class WorkView(Page):
                                   f"{fmt_min(shift.start)}–{end}")
             meta = [job.name if job else "Shift", f"{fmt_duration(shift.paid_minutes)} paid"]
             if item.pay is not None:
-                meta.append(money(item.pay))
+                meta.append(pay_text(item.pay, item.net))
+            if shift.recurring:
+                meta.append("regular")
             if shift.notes:
                 meta.append(shift.notes.splitlines()[0])
             row.setData(Qt.UserRole, shift.id)
+            row.setData(Qt.UserRole + 20, (shift.job_id, shift.day, shift.start)
+                        if shift.recurring else None)
             row.setData(TwoLineDelegate.META, " · ".join(meta))
             row.setData(TwoLineDelegate.COLOR, job.color if job else None)
             self.list.addItem(row)
         has_jobs = bool(self.work.jobs())
-        self.empty.setText("No upcoming shifts. Add one with the Shift button."
+        self.empty.setText("No upcoming shifts. Add one with the Shift button, or give the job a "
+                           "weekly schedule under Jobs."
                            if has_jobs else
-                           "Add your job under Jobs, then add your shifts. They'll show up in "
-                           "Today and Week next to your classes.")
+                           "Add your job under Jobs, with its weekly schedule if you have "
+                           "one. Shifts show up in Today and Week next to your classes.")
         self.list.setVisible(self.list.count() > 0)
         self.empty.setVisible(self.list.count() == 0)

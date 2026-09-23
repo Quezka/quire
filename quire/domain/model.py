@@ -230,17 +230,37 @@ class Job:
 
     name: str
     color: str = "#0090ff"
-    hourly_rate: float | None = None  # in the user's currency; None if not tracked
+    hourly_rate: float | None = None  # gross, in the user's currency; None if not tracked
     id: int | None = None
+    # Every weekly pattern the job has had, including ended ones (kept for history).
+    schedule: list["ShiftPattern"] = field(default_factory=list)
+    # Share of gross pay withheld for tax and contributions, in percent (0-99.99).
+    deductions: float = 0.0
 
     def validate(self):
         if not self.name.strip():
             raise ValidationError("Give the job a name.")
         if self.hourly_rate is not None and self.hourly_rate < 0:
             raise ValidationError("The hourly rate can't be negative.")
+        if not 0 <= self.deductions < 100:
+            raise ValidationError("Tax and deductions must be between 0% and 100%.")
+        for pattern in self.schedule:
+            pattern.validate()
+
+    def active_schedule(self, today: date) -> list["ShiftPattern"]:
+        """Patterns that still apply from `today` on (the ones you'd edit)."""
+        return sorted((p for p in self.schedule if p.until is None or p.until >= today),
+                      key=lambda p: (p.weekday, p.start))
 
 
 MAX_SHIFT_MINUTES = 16 * 60
+
+
+def net_pay(gross: float | None, deductions: float) -> float | None:
+    """Take-home pay once `deductions` percent is withheld."""
+    if gross is None:
+        return None
+    return round(gross * (1 - deductions / 100), 2)
 
 
 @dataclass
@@ -254,14 +274,10 @@ class Shift:
     break_minutes: int = 0
     notes: str = ""
     id: int | None = None
+    recurring: bool = False  # an occurrence of the job's weekly schedule, not stored
 
     def validate(self):
-        if not 0 <= self.start < MINUTES_PER_DAY:
-            raise ValidationError("The shift must start within the day.")
-        if not 0 < self.duration <= MAX_SHIFT_MINUTES:
-            raise ValidationError("A shift must last between a minute and 16 hours.")
-        if not 0 <= self.break_minutes < self.duration:
-            raise ValidationError("The break must be shorter than the shift.")
+        _check_shift_times(self.start, self.duration, self.break_minutes)
 
     @classmethod
     def between(cls, job_id: int, day: date, start: int, end: int, **fields) -> "Shift":
@@ -297,3 +313,102 @@ class Shift:
     def overlaps(self, day: date, time: TimeRange) -> bool:
         return any(d == day and seg.start < time.end and time.start < seg.end
                    for d, seg in self.segments())
+
+
+def _check_shift_times(start: int, duration: int, break_minutes: int):
+    if not 0 <= start < MINUTES_PER_DAY:
+        raise ValidationError("The shift must start within the day.")
+    if not 0 < duration <= MAX_SHIFT_MINUTES:
+        raise ValidationError("A shift must last between a minute and 16 hours.")
+    if not 0 <= break_minutes < duration:
+        raise ValidationError("The break must be shorter than the shift.")
+
+
+@dataclass
+class ShiftPattern:
+    """A shift that repeats every week, like a class in the school timetable.
+
+    `since`/`until` bound the weeks it applies to, so changing a schedule
+    doesn't rewrite the hours already worked.
+    """
+
+    weekday: int
+    start: int
+    duration: int
+    break_minutes: int = 0
+    since: date | None = None
+    until: date | None = None
+    id: int | None = None
+
+    @classmethod
+    def between(cls, weekday: int, start: int, end: int, break_minutes: int = 0,
+                **fields) -> "ShiftPattern":
+        duration = end - start if end > start else end + MINUTES_PER_DAY - start
+        return cls(weekday, start, duration, break_minutes, **fields)
+
+    def validate(self):
+        if not 0 <= self.weekday <= 6:
+            raise ValidationError("Weekday must be between Monday and Sunday.")
+        _check_shift_times(self.start, self.duration, self.break_minutes)
+        if self.since and self.until and self.until < self.since:
+            raise ValidationError("A repeating shift can't end before it starts.")
+
+    @property
+    def key(self) -> tuple[int, int, int, int]:
+        """What makes two patterns the same shift."""
+        return self.weekday, self.start, self.duration, self.break_minutes
+
+    def occurs_on(self, day: date) -> bool:
+        return (day.weekday() == self.weekday
+                and (self.since is None or day >= self.since)
+                and (self.until is None or day <= self.until))
+
+    def shift_on(self, job_id: int, day: date) -> Shift:
+        return Shift(job_id, day, self.start, self.duration, self.break_minutes,
+                     recurring=True)
+
+
+WORK_DAYS = (0, 1, 2, 3, 4)
+EVERY_DAY = (0, 1, 2, 3, 4, 5, 6)
+
+
+def work_shifts(jobs: list[Job], one_off: list[Shift], skipped: set[tuple[int, date, int]],
+                first: date, last: date) -> list[Shift]:
+    """All shifts starting on days first..last: one-off shifts plus weekly-schedule
+    occurrences, minus the occurrences the user skipped (job id, day, start)."""
+    result = [s for s in one_off if first <= s.day <= last]
+    for offset in range((last - first).days + 1):
+        day = first + timedelta(days=offset)
+        for job in jobs:
+            for pattern in job.schedule:
+                if pattern.occurs_on(day) and (job.id, day, pattern.start) not in skipped:
+                    result.append(pattern.shift_on(job.id, day))
+    return sorted(result, key=lambda s: (s.day, s.start))
+
+
+def reschedule(current: list[ShiftPattern], wanted: list[ShiftPattern],
+               this_week: date) -> list[ShiftPattern]:
+    """Apply a new weekly schedule from `this_week` (a Monday) on.
+
+    Unchanged patterns are kept as they are. Patterns that are no longer wanted end
+    the Sunday before `this_week`, or disappear entirely if they started this week.
+    New ones start `this_week`. Patterns that ended earlier stay for history.
+    """
+    active = [p for p in current if p.until is None or p.until >= this_week]
+    wanted_keys = {p.key for p in wanted}
+    active_keys = {p.key for p in active}
+    result = [p for p in current if p not in active]
+    for pattern in active:
+        if pattern.key in wanted_keys:
+            result.append(pattern)
+        elif pattern.since is None or pattern.since < this_week:
+            result.append(ShiftPattern(pattern.weekday, pattern.start, pattern.duration,
+                                       pattern.break_minutes, pattern.since,
+                                       this_week - timedelta(days=1), pattern.id))
+        # else: it only ever applied from this week on, so it simply goes away
+    for pattern in wanted:
+        if pattern.key not in active_keys:
+            active_keys.add(pattern.key)
+            result.append(ShiftPattern(pattern.weekday, pattern.start, pattern.duration,
+                                       pattern.break_minutes, since=this_week))
+    return result

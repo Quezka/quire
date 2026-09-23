@@ -56,9 +56,9 @@ class FakeServer:
         return io.BytesIO(json.dumps(body).encode())
 
 
-def signed_in(routes):
+def signed_in(routes, today=date(2026, 9, 23)):
     server = FakeServer({"/auth/login": (200, LOGIN), **routes})
-    register = ClassevivaRegister(opener=server)
+    register = ClassevivaRegister(opener=server, today=lambda: today)
     account = register.login(Credentials("S1234567X", "pw"))
     return register, server, account
 
@@ -120,3 +120,40 @@ def test_subjects_are_parsed():
 def test_calls_before_login_fail_clearly():
     with pytest.raises(RegisterError, match="Not signed in"):
         ClassevivaRegister(opener=FakeServer({})).grades()
+
+
+
+def test_ranges_are_clamped_to_the_school_year():
+    # Asking from late August must not reach before 1 September (error 122 otherwise).
+    path = "/students/1234567/agenda/all/20260901/20261231"
+    register, server, _ = signed_in({path: (200, AGENDA)})
+    register.assignments(date(2026, 8, 24), date(2026, 12, 31))
+    assert server.requests[-1].full_url.endswith("/agenda/all/20260901/20261231")
+
+
+def test_ranges_end_on_30_june():
+    path = "/students/1234567/lessons/20270610/20270630"
+    register, server, _ = signed_in({path: (200, LESSONS)}, today=date(2027, 6, 20))
+    register.lessons(date(2027, 6, 10), date(2027, 9, 30))
+    assert server.requests[-1].full_url.endswith("/lessons/20270610/20270630")
+
+
+def test_summer_holidays_ask_for_nothing():
+    register, server, _ = signed_in({}, today=date(2027, 7, 20))
+    before = len(server.requests)
+    assert register.assignments(date(2027, 7, 1), date(2027, 8, 31)) == []
+    assert len(server.requests) == before
+
+
+def test_invalid_date_range_error_means_no_data():
+    path = "/students/1234567/agenda/all/20260923/20261231"
+    register, _, _ = signed_in({path: (404, {"statusCode": 404, "info": "Not Found",
+                                             "error": "122:CvvRestApi/invalid date range"})})
+    assert register.assignments(date(2026, 9, 23), date(2026, 12, 31)) == []
+
+
+def test_school_year_boundaries():
+    from quire.infrastructure.classeviva import school_year
+    assert school_year(date(2026, 9, 1)) == (date(2026, 9, 1), date(2027, 6, 30))
+    assert school_year(date(2027, 3, 15)) == (date(2026, 9, 1), date(2027, 6, 30))
+    assert school_year(date(2026, 8, 31)) == (date(2025, 9, 1), date(2026, 6, 30))
