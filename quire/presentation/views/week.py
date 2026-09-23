@@ -14,8 +14,8 @@ from ..dialogs import (
     CoursesDialog, EventDialog, JobsDialog, ShiftDialog, add_menu, class_menu, new_item_menu,
     weekly_shift_menu,
 )
-from ..widgets import GridHeader, TimeGrid
-from .common import Card, Page, agenda_block, button, icon_button, menu_button
+from ..widgets import GridHeader, TimeGrid, TimelineZoom
+from .common import Card, Page, agenda_block, button, icon_button, menu_button, zoom_controls
 
 
 class WeekView(Page):
@@ -51,6 +51,8 @@ class WeekView(Page):
         self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scroll.setWidget(self.grid)
+        self.zoom = TimelineZoom(self.grid, self.scroll, "week", self)
+        self.header.insertWidget(self.header.count() - 3, zoom_controls(self, self.zoom))
         self.day_header = GridHeader(self.grid)
         self.day_header.setContentsMargins(
             0, 0, self.scroll.verticalScrollBar().sizeHint().width(), 0)
@@ -75,7 +77,8 @@ class WeekView(Page):
 
     def _scroll_to_focus(self):
         target = self.grid.first_daytime_start() - 30
-        self.scroll.verticalScrollBar().setValue(int(self.grid.y_for(target)) - TimeGrid.PAD)
+        if not self.zoom.fit:  # when fitted, the whole day is already in view
+            self.scroll.verticalScrollBar().setValue(int(self.grid.y_for(target)) - TimeGrid.PAD)
 
     def _changed(self, topic: Topic):
         if topic in (Topic.COURSES, Topic.EVENTS, Topic.WORK):
@@ -94,6 +97,7 @@ class WeekView(Page):
         now_col = -1 if week.today_index is None else week.today_index
         blocks = [agenda_block(i, week.days.index(i.day)) for i in week.items]
         self.grid.set_data(len(week.days), blocks, now_col)
+        self.zoom.apply()
         self.day_header.set_days([(f"{d:%a}", d.day) for d in week.days], now_col)
 
         if week.has_courses:

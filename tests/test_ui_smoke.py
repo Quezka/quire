@@ -93,9 +93,23 @@ def test_school_page_connects_and_shows_synced_data(window, services, register, 
     QThreadPool.globalInstance().waitForDone(5000)
     app.processEvents()
     assert page.pages.currentIndex() == 1
-    assert page.grades.topLevelItemCount() == 1
-    assert page.lessons.item(0).text() == "Moto rettilineo"
+    assert [page.subjects.item(i).text() for i in range(page.subjects.count())] == ["Fisica"]
+    assert page.tile_average.value.text() == "8.00"
+    topics = [page.lessons.item(i).text() for i in range(page.lessons.count())]
+    assert topics == ["Today", "Moto rettilineo"]  # grouped under a day heading
     assert not window.grab().isNull()
+
+    # Clicking a subject shows its grades underneath.
+    page._subject_clicked(page.subjects.item(0))
+    assert page.subjects.count() == 2
+    page._subject_clicked(page.subjects.item(0))
+    assert page.subjects.count() == 1
+
+    # Double-clicking a lesson topic opens that lesson's class notes.
+    lesson = page.lessons.item(1)
+    page._open_lesson_note(lesson)
+    assert window.stack.currentWidget() is window.notes
+    assert window.notes.note.title.startswith("Fisica")
 
 
 def test_notes_group_by_topic(window, services, app):
@@ -208,10 +222,15 @@ def test_week_view_opens_at_the_school_day_not_midnight(window, app):
 
     window.show_page(1)
     week = window.week
+    week.zoom.set_fit(False)  # scrolling only matters when the day doesn't fit
+    week.zoom.level = 64.0
+    week.zoom.apply()
     week.set_week(week.anchor)
     app.processEvents()  # runs the deferred scroll
-    # The demo's late Saturday shift puts a block at 00:00 on Sunday.
-    assert any(b.start == 0 for b in week.grid.blocks)
+    # The demo's late Saturday shift carries over to 00:00 on Sunday...
+    assert any(b.start == 0 and b.carry_over for b in week.grid.blocks)
+    # ...without stretching the shown hours back to midnight.
+    assert week.grid.start_min >= 7 * 60
     first_class = week.grid.first_daytime_start()
     assert first_class >= 6 * 60
     expected = int(week.grid.y_for(first_class - 30)) - TimeGrid.PAD
@@ -366,3 +385,98 @@ def test_school_page_lists_parts_that_failed(window, services, register, app):
     texts = [page.news.item(i).text() for i in range(page.news.count())]
     assert any(t.startswith("Couldn't sync grades") for t in texts)
     assert "some parts failed" in page.subtitle.text()
+
+
+
+def test_fit_day_shows_the_whole_day_without_scrolling(window, app):
+    window.resize(1200, 780)
+    for index, page in ((0, window.today), (1, window.week)):
+        window.show_page(index)
+        page.zoom.set_fit(True)
+        app.processEvents()
+        page.zoom.apply()
+        app.processEvents()
+        viewport = page.scroll.viewport().height()
+        assert page.grid.minimumHeight() <= viewport + 1
+        assert page.scroll.verticalScrollBar().maximum() == 0
+
+
+def test_zoom_in_and_out_and_remembered(window, app):
+    from PySide6.QtCore import QSettings
+
+    window.show_page(0)
+    zoom = window.today.zoom
+    zoom.set_fit(True)
+    app.processEvents()
+    fitted = window.today.grid.hour_height
+    zoom.zoom_in()
+    assert not zoom.fit and window.today.grid.hour_height > fitted
+    zoomed = window.today.grid.hour_height
+    zoom.zoom_out()
+    assert window.today.grid.hour_height < zoomed
+    assert QSettings().value("zoom/today/fit", type=bool) is False
+    assert abs(float(QSettings().value("zoom/today/hour")) - window.today.grid.hour_height) < 0.01
+
+
+def test_ctrl_wheel_zooms_and_plain_wheel_scrolls(window, app):
+    from PySide6.QtCore import QPoint, QPointF
+    from PySide6.QtGui import QWheelEvent
+
+    window.show_page(0)
+    grid, zoom = window.today.grid, window.today.zoom
+    zoom.set_fit(False)
+    before = grid.hour_height
+
+    def wheel(modifiers):
+        event = QWheelEvent(QPointF(100, 200), QPointF(grid.mapToGlobal(QPoint(100, 200))),
+                            QPoint(0, 0), QPoint(0, 120), Qt.NoButton, modifiers,
+                            Qt.NoScrollPhase, False)
+        app.sendEvent(grid, event)
+
+    wheel(Qt.ControlModifier)
+    assert grid.hour_height > before
+    after_zoom = grid.hour_height
+    wheel(Qt.NoModifier)
+    assert grid.hour_height == after_zoom
+
+
+def test_zoom_level_is_clamped(window):
+    from quire.presentation.widgets import TimeGrid
+
+    zoom = window.today.zoom
+    for _ in range(30):
+        zoom.zoom_in()
+    assert window.today.grid.hour_height == TimeGrid.MAX_HOUR
+    for _ in range(40):
+        zoom.zoom_out()
+    assert window.today.grid.hour_height == TimeGrid.MIN_HOUR
+
+
+
+def test_school_term_switcher_filters_grades(window, services, register, app):
+    from datetime import date
+
+    from PySide6.QtCore import QThreadPool
+
+    from quire.application.ports import RemoteGrade, RemoteSubject
+
+    register.subjects_ = [RemoteSubject("1", "FISICA")]
+    register.grades_ = [
+        RemoteGrade("a", date(2026, 9, 10), "1", "FISICA", "4", 4.0, period="Trimestre"),
+        RemoteGrade("b", date(2026, 9, 20), "1", "FISICA", "8", 8.0, period="Pentamestre"),
+    ]
+    page = window.school
+    window.show_page(window.stack.indexOf(page))
+    page.username.setText("S1")
+    page.password.setText("secret")
+    page._connect()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    assert page.periods.isVisibleTo(page)
+    assert [b.text() for b in page._period_buttons.buttons()] == [
+        "All year", "Trimestre", "Pentamestre"]
+    assert page.tile_average.value.text() == "6.00"
+    assert page.tile_attention.value.text() == "0"
+    page._pick_period("Trimestre")
+    assert page.tile_average.value.text() == "4.00"
+    assert page.tile_attention.value.text() == "1"

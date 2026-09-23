@@ -11,6 +11,8 @@ your machine in a single SQLite file.
 - **Today**: a timeline of today's classes and events with a live "now" line. Beside it are
   tasks due today, overdue work carried over from earlier days, a quick-add box and a
   free-form **day notes** journal.
+- **Zoom**: Today and Week fit the whole day on screen by default. Zoom in or out with the
+  − / + buttons, Ctrl+scroll or a touchpad pinch, and press Ctrl+0 to fit again.
 - **Week**: your weekly school timetable in colour, with one-off events layered on top.
   Saturday and Sunday appear only when something is scheduled on them.
   - Double-click an empty slot to add an event.
@@ -90,6 +92,7 @@ If Spaggiari changes that API, the sync may stop working until Quire is updated.
 | Ctrl+D | Jump to today |
 | Ctrl+F | Search notes |
 | Ctrl+E | Toggle note preview |
+| Ctrl+= / Ctrl+- / Ctrl+0 | Zoom in / out / fit the day (Today, Week) |
 
 ## Running from source
 

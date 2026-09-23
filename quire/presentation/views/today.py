@@ -21,8 +21,10 @@ from ..dialogs import (
     weekly_shift_menu,
 )
 from ..formatting import KIND_LABELS, long_date, plural, relative_date
-from ..widgets import NO_COLOR, TimeGrid, color_icon
-from .common import Card, Page, agenda_block, badge, button, icon_button, menu_button
+from ..widgets import NO_COLOR, TimeGrid, TimelineZoom, color_icon
+from .common import (
+    Card, Page, agenda_block, badge, button, icon_button, menu_button, zoom_controls,
+)
 
 
 class TodayView(Page):
@@ -64,6 +66,8 @@ class TodayView(Page):
         self.grid.emptyActivated.connect(self._empty_activated)
         self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setWidget(self.grid)
+        self.zoom = TimelineZoom(self.grid, self.scroll, "today", self)
+        self.header.insertWidget(self.header.count() - 3, zoom_controls(self, self.zoom))
         timeline = Card(padding=6)
         timeline.add(self.scroll, 1)
 
@@ -141,7 +145,8 @@ class TodayView(Page):
             target = now.hour * 60 + now.minute - 60
         else:
             target = self.grid.first_daytime_start(8 * 60 + 30) - 30
-        self.scroll.verticalScrollBar().setValue(int(self.grid.y_for(target)) - TimeGrid.PAD)
+        if not self.zoom.fit:  # when fitted, the whole day is already in view
+            self.scroll.verticalScrollBar().setValue(int(self.grid.y_for(target)) - TimeGrid.PAD)
 
     # ---- journal --------------------------------------------------------
 
@@ -172,6 +177,7 @@ class TodayView(Page):
 
         self.grid.set_data(1, [agenda_block(i, 0) for i in agenda.items],
                            now_col=0 if agenda.is_today else -1)
+        self.zoom.apply()
         self._fill_tasks(agenda, today)
 
         parts = [relative_date(agenda.day, today)]

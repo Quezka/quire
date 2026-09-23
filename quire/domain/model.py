@@ -196,6 +196,9 @@ class Grade:
         return self.value is not None and not self.cancelled
 
 
+PASS_MARK = 6.0  # on the Italian 1-10 scale Classeviva uses, below 6 is a fail
+
+
 def average(grades: list[Grade]) -> float | None:
     """Mean of the marks that count; None when there are none."""
     values = [g.value for g in grades if g.counts]

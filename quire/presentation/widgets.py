@@ -5,7 +5,9 @@ import html
 from dataclasses import dataclass
 from datetime import datetime
 
-from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, QSize, Qt, QTime, QTimer, Signal
+from PySide6.QtCore import (
+    QEvent, QObject, QPoint, QPointF, QRectF, QSettings, QSize, Qt, QTime, QTimer, Signal,
+)
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
 from PySide6.QtWidgets import (
     QColorDialog, QLineEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate, QToolTip, QWidget,
@@ -163,6 +165,10 @@ class Block:
     subtitle: str
     color: str
     payload: object
+    # The early-morning tail of something that started the evening before (a late
+    # shift). It doesn't stretch the shown hours; if it ends before them, it's drawn
+    # as a thin strip at the top of its day.
+    carry_over: bool = False
 
 
 class TimeGrid(QWidget):
@@ -173,13 +179,17 @@ class TimeGrid(QWidget):
 
     blockActivated = Signal(object, QPoint)  # payload, global position
     emptyActivated = Signal(int, int)  # column, minute (snapped to 15)
+    zoomRequested = Signal(float, float)  # factor, y in grid coordinates to keep in place
 
     GUTTER = 58
-    HOUR = 64
     PAD = 10
+    DEFAULT_HOUR = 64.0
+    MIN_HOUR = 18.0
+    MAX_HOUR = 200.0
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self.hour_height = self.DEFAULT_HOUR
         self.column_count = 1
         self.blocks: list[Block] = []
         self.now_col = -1
@@ -199,17 +209,35 @@ class TimeGrid(QWidget):
         self._recalc()
         self.update()
 
+    CARRY_OVER_MINUTES = 30  # height of a carried-over strip, in minutes
+
     def _recalc(self):
         start, end = 7 * 60, 21 * 60
         for b in self.blocks:
+            if b.carry_over:
+                continue
             start = min(start, b.start // 60 * 60)
             end = max(end, -(-b.end // 60) * 60)
         self.start_min = max(0, start)
         self.end_min = min(24 * 60, end)
         self.setMinimumHeight(int(self.y_for(self.end_min) + self.PAD))
 
-    def y_for(self, minute: int) -> float:
-        return self.PAD + (minute - self.start_min) * self.HOUR / 60
+    def set_hour_height(self, height: float):
+        height = max(self.MIN_HOUR, min(self.MAX_HOUR, height))
+        if abs(height - self.hour_height) > 0.01:
+            self.hour_height = height
+            self._recalc()
+            self.update()
+
+    @property
+    def span_hours(self) -> float:
+        return (self.end_min - self.start_min) / 60
+
+    def y_for(self, minute: float) -> float:
+        return self.PAD + (minute - self.start_min) * self.hour_height / 60
+
+    def minute_at(self, y: float) -> float:
+        return self.start_min + (y - self.PAD) * 60 / self.hour_height
 
     def first_daytime_start(self, default: int = 8 * 60 + 30) -> int:
         """Where to scroll: the first block after 06:00 (late shifts spill past midnight)."""
@@ -230,31 +258,40 @@ class TimeGrid(QWidget):
             n = max(1, len(lanes))
             for b, lane in cluster:
                 x = self.GUTTER + col * colw + lane * colw / n
-                y0, y1 = self.y_for(b.start), self.y_for(b.end)
+                start, end = self._shown_span(b)
+                y0, y1 = self.y_for(start), self.y_for(end)
                 out.append((b, QRectF(x, y0, colw / n, max(20.0, y1 - y0))))
 
         for col in range(self.column_count):
             items = sorted((b for b in self.blocks if b.column == col),
-                           key=lambda b: (b.start, -b.end))
+                           key=lambda b: (self._shown_span(b)[0], -self._shown_span(b)[1]))
             cluster, lanes, cluster_end = [], [], -1
             for b in items:
-                if cluster and b.start >= cluster_end:
+                b_start, b_end = self._shown_span(b)
+                if cluster and b_start >= cluster_end:
                     place(cluster, lanes, col)
                     cluster, lanes = [], []
                 if not cluster:
-                    cluster_end = b.end
+                    cluster_end = b_end
                 for i, lane_end in enumerate(lanes):
-                    if lane_end <= b.start:
-                        lanes[i] = b.end
+                    if lane_end <= b_start:
+                        lanes[i] = b_end
                         lane = i
                         break
                 else:
-                    lanes.append(b.end)
+                    lanes.append(b_end)
                     lane = len(lanes) - 1
                 cluster.append((b, lane))
-                cluster_end = max(cluster_end, b.end)
+                cluster_end = max(cluster_end, b_end)
             place(cluster, lanes, col)
         return out
+
+    def _shown_span(self, b: Block) -> tuple[int, int]:
+        """Where a block is drawn: carried-over tails before the shown hours become a
+        short strip at the top instead of disappearing off-screen."""
+        if b.carry_over and b.end <= self.start_min:
+            return self.start_min, self.start_min + self.CARRY_OVER_MINUTES
+        return b.start, b.end
 
     def _block_at(self, pos: QPointF):
         for b, rect in reversed(self._layout()):
@@ -353,6 +390,10 @@ class TimeGrid(QWidget):
     # ---- interaction --------------------------------------------------------
 
     def event(self, e):
+        if (e.type() == QEvent.NativeGesture
+                and e.gestureType() == Qt.NativeGestureType.ZoomNativeGesture):
+            self.zoomRequested.emit(1 + e.value(), e.position().y())  # touchpad pinch
+            return True
         if e.type() == QEvent.ToolTip:
             b = self._block_at(QPointF(e.pos()))
             if b:
@@ -370,6 +411,14 @@ class TimeGrid(QWidget):
         self.setCursor(Qt.PointingHandCursor if over else Qt.ArrowCursor)
         super().mouseMoveEvent(e)
 
+    def wheelEvent(self, e):
+        # Ctrl+scroll zooms; plain scrolling goes to the scroll area.
+        if e.modifiers() & Qt.ControlModifier and e.angleDelta().y():
+            self.zoomRequested.emit(1.0015 ** e.angleDelta().y(), e.position().y())
+            e.accept()
+        else:
+            super().wheelEvent(e)
+
     def mouseDoubleClickEvent(self, e):
         pos = e.position()
         b = self._block_at(pos)
@@ -377,7 +426,7 @@ class TimeGrid(QWidget):
             self.blockActivated.emit(b.payload, e.globalPosition().toPoint())
         elif pos.x() > self.GUTTER:
             col = min(self.column_count - 1, int((pos.x() - self.GUTTER) // self.column_width()))
-            minute = self.start_min + (pos.y() - self.PAD) * 60 / self.HOUR
+            minute = self.minute_at(pos.y())
             minute = int(minute // 15 * 15)
             self.emptyActivated.emit(col, max(0, min(minute, 24 * 60 - 15)))
 
@@ -385,6 +434,79 @@ class TimeGrid(QWidget):
         b = self._block_at(QPointF(e.pos()))
         if b:
             self.blockActivated.emit(b.payload, e.globalPos())
+
+
+class TimelineZoom(QObject):
+    """Vertical zoom for a TimeGrid in a scroll area.
+
+    "Fit" squeezes the whole shown day into the visible height (and keeps doing so
+    as the window resizes). Zooming by hand keeps the time under the pointer in
+    place. Each view remembers its own setting.
+    """
+
+    changed = Signal()
+
+    def __init__(self, grid: TimeGrid, scroll, key: str, parent=None):
+        super().__init__(parent or grid)
+        self.grid = grid
+        self.scroll = scroll
+        self._key = f"zoom/{key}"
+        settings = QSettings()
+        self.fit = settings.value(f"{self._key}/fit", True, type=bool)
+        self.level = float(settings.value(f"{self._key}/hour", TimeGrid.DEFAULT_HOUR))
+        scroll.viewport().installEventFilter(self)
+        grid.zoomRequested.connect(self._zoom_at)
+        self.apply()
+
+    def eventFilter(self, watched, event):
+        if event.type() == QEvent.Resize and self.fit:
+            QTimer.singleShot(0, self.apply)
+        return False
+
+    def _fit_height(self) -> float | None:
+        viewport = self.scroll.viewport().height()
+        if viewport < 80 or self.grid.span_hours <= 0:
+            return None
+        return (viewport - 2 * TimeGrid.PAD - 1) / self.grid.span_hours
+
+    def apply(self):
+        """Re-apply after the grid's data (and so its hour range) changed."""
+        height = self._fit_height() if self.fit else self.level
+        if height is not None:
+            self.grid.set_hour_height(height)
+
+    def _save(self):
+        settings = QSettings()
+        settings.setValue(f"{self._key}/fit", self.fit)
+        settings.setValue(f"{self._key}/hour", self.level)
+        self.changed.emit()
+
+    def set_fit(self, on: bool):
+        self.fit = on
+        if not on:
+            self.level = self.grid.hour_height
+        self.apply()
+        self._save()
+
+    def _zoom_at(self, factor: float, grid_y: float):
+        bar = self.scroll.verticalScrollBar()
+        minute = self.grid.minute_at(grid_y)
+        offset = grid_y - bar.value()  # where that time sits in the viewport
+        self.fit = False
+        self.level = max(TimeGrid.MIN_HOUR, min(TimeGrid.MAX_HOUR,
+                                                self.grid.hour_height * factor))
+        self.grid.set_hour_height(self.level)
+        QTimer.singleShot(0, lambda: bar.setValue(int(self.grid.y_for(minute) - offset)))
+        self._save()
+
+    def zoom_in(self):
+        self._zoom_at(1.25, self._viewport_centre())
+
+    def zoom_out(self):
+        self._zoom_at(0.8, self._viewport_centre())
+
+    def _viewport_centre(self) -> float:
+        return self.scroll.verticalScrollBar().value() + self.scroll.viewport().height() / 2
 
 
 class GridHeader(QWidget):
@@ -461,9 +583,11 @@ class TwoLineDelegate(QStyledItemDelegate):
             p.fillPath(path, QColor(t.hover))
         if level == 2:
             x += 8
-        chevron = "chevron-right" if index.data(self.COLLAPSED) else "chevron-down"
-        p.drawPixmap(int(x), int(r.center().y() - 7), icons.pixmap(chevron, t.faint, 14))
-        x += 20
+        collapsed = index.data(self.COLLAPSED)
+        if collapsed is not None:  # only collapsible headings get an arrow
+            chevron = "chevron-right" if collapsed else "chevron-down"
+            p.drawPixmap(int(x), int(r.center().y() - 7), icons.pixmap(chevron, t.faint, 14))
+            x += 20
         color = index.data(self.COLOR)
         if level == 1 and color:
             p.setPen(Qt.NoPen)
@@ -532,3 +656,142 @@ class TwoLineDelegate(QStyledItemDelegate):
         p.drawText(QRectF(x, r.top() + 27, r.right() - 10 - x, 18),
                    Qt.AlignLeft | Qt.AlignVCenter, meta)
         p.restore()
+
+
+def mark_color(value: float | None, t) -> str:
+    """Italian 1-10 marks: red below 6, amber below 7, green from 7."""
+    if value is None:
+        return t.muted
+    if value < 6:
+        return t.danger
+    if value < 7:
+        return "#f5a524"
+    return t.success
+
+
+class SubjectDelegate(QStyledItemDelegate):
+    """Rows of the School page's subject list.
+
+    Subject rows: dot, name, latest marks as chips, a trend sparkline and the
+    average in a pill. Grade rows (shown when a subject is expanded): what the
+    mark was for, its date and the mark.
+    """
+
+    KIND = Qt.UserRole + 30  # "subject" or "grade"
+    COLOR = Qt.UserRole + 31
+    AVERAGE = Qt.UserRole + 32
+    CHIPS = Qt.UserRole + 33  # [(display, value, cancelled)], newest first
+    TREND = Qt.UserRole + 34  # [values], oldest first
+    EXPANDED = Qt.UserRole + 35
+    META = Qt.UserRole + 36
+
+    PILL_W = 58
+    SPARK_W = 84
+
+    def sizeHint(self, option, index):
+        return QSize(0, 58 if index.data(self.KIND) == "subject" else 34)
+
+    def _chip(self, p, rect: QRectF, text: str, value, cancelled, t, font):
+        color = QColor(t.faint if cancelled else mark_color(value, t))
+        fill = QColor(color)
+        fill.setAlpha(40 if t.dark else 28)
+        path = QPainterPath()
+        path.addRoundedRect(rect, rect.height() / 2, rect.height() / 2)
+        p.fillPath(path, fill)
+        p.setPen(color)
+        p.setFont(font)
+        p.drawText(rect, Qt.AlignCenter, text)
+
+    def paint(self, p, option, index):
+        t = theme.current()
+        p.save()
+        p.setRenderHint(QPainter.Antialiasing)
+        r = QRectF(option.rect).adjusted(0, 2, 0, -2)
+        if option.state & QStyle.State_MouseOver:
+            path = QPainterPath()
+            path.addRoundedRect(r, 8, 8)
+            p.fillPath(path, QColor(t.hover))
+        widget = option.widget or self.parent()
+        if index.data(self.KIND) == "subject":
+            self._paint_subject(p, r, index, t, widget)
+        else:
+            self._paint_grade(p, r, index, t, widget)
+        p.restore()
+
+    def _paint_subject(self, p, r, index, t, widget):
+        cy = r.center().y()
+        chevron = "chevron-down" if index.data(self.EXPANDED) else "chevron-right"
+        p.drawPixmap(int(r.left() + 6), int(cy - 7), icons.pixmap(chevron, t.faint, 14))
+        x = r.left() + 28
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(index.data(self.COLOR) or t.faint))
+        p.drawEllipse(QPointF(x + 5, cy - 7), 5, 5)
+        x += 18
+
+        # Average pill on the right.
+        avg = index.data(self.AVERAGE)
+        pill = QRectF(r.right() - self.PILL_W - 8, cy - 14, self.PILL_W, 28)
+        bold = scaled_font(widget, 1.0, bold=True)
+        self._chip(p, pill, f"{avg:.2f}" if avg is not None else "–", avg, False, t, bold)
+        right = pill.left() - 12
+
+        # Trend sparkline, with the pass line at 6.
+        values = [v for v in (index.data(self.TREND) or []) if v is not None]
+        if len(values) >= 2 and right - self.SPARK_W > x + 120:
+            box = QRectF(right - self.SPARK_W, cy - 14, self.SPARK_W, 28)
+            lo, hi = min(min(values), 5.0), max(max(values), 8.0)
+            to_y = lambda v: box.bottom() - (v - lo) / (hi - lo) * box.height()  # noqa: E731
+            pass_pen = QPen(QColor(t.border), 1, Qt.DashLine)
+            p.setPen(pass_pen)
+            p.drawLine(QPointF(box.left(), to_y(6.0)), QPointF(box.right(), to_y(6.0)))
+            step = box.width() / (len(values) - 1)
+            points = [QPointF(box.left() + i * step, to_y(v)) for i, v in enumerate(values)]
+            p.setPen(QPen(QColor(mark_color(avg, t)), 1.8))
+            for a, b in zip(points, points[1:]):
+                p.drawLine(a, b)
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(mark_color(values[-1], t)))
+            p.drawEllipse(points[-1], 3, 3)
+            right = box.left() - 12
+
+        # Latest marks as chips, as many as fit.
+        small = scaled_font(widget, 0.85, bold=True)
+        fm = QFontMetrics(small)
+        for display, value, cancelled in index.data(self.CHIPS) or []:
+            w = max(30, fm.horizontalAdvance(display) + 16)
+            if right - w < x + 140:
+                break
+            self._chip(p, QRectF(right - w, cy - 11, w, 22), display, value, cancelled, t, small)
+            right -= w + 5
+
+        name_font = scaled_font(widget, 1.02, bold=True)
+        p.setFont(name_font)
+        p.setPen(QColor(t.text))
+        name = QFontMetrics(name_font).elidedText(index.data(Qt.DisplayRole) or "",
+                                                 Qt.ElideRight, int(right - x - 8))
+        p.drawText(QRectF(x, r.top() + 7, right - x, 22), Qt.AlignLeft | Qt.AlignVCenter, name)
+        p.setFont(scaled_font(widget, 0.85))
+        p.setPen(QColor(t.muted))
+        p.drawText(QRectF(x, r.top() + 29, right - x, 18), Qt.AlignLeft | Qt.AlignVCenter,
+                   index.data(self.META) or "")
+
+    def _paint_grade(self, p, r, index, t, widget):
+        x = r.left() + 46
+        display, value, cancelled = index.data(self.CHIPS)[0]
+        small = scaled_font(widget, 0.85, bold=True)
+        w = max(30, QFontMetrics(small).horizontalAdvance(display) + 16)
+        chip = QRectF(r.right() - 8 - (self.PILL_W + w) / 2, r.center().y() - 11, w, 22)
+        self._chip(p, chip, display, value, cancelled, t, small)
+        body = scaled_font(widget, 0.92)
+        fm = QFontMetrics(body)
+        date_text = index.data(self.META) or ""
+        date_w = fm.horizontalAdvance(date_text) + 16
+        p.setFont(body)
+        p.setPen(QColor(t.faint))
+        p.drawText(QRectF(chip.left() - date_w - 8, r.top(), date_w, r.height()),
+                   Qt.AlignRight | Qt.AlignVCenter, date_text)
+        p.setPen(QColor(t.text if not cancelled else t.faint))
+        what = fm.elidedText(index.data(Qt.DisplayRole) or "", Qt.ElideRight,
+                             int(chip.left() - date_w - 16 - x))
+        p.drawText(QRectF(x, r.top(), chip.left() - x, r.height()),
+                   Qt.AlignLeft | Qt.AlignVCenter, what)

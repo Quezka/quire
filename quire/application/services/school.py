@@ -3,8 +3,11 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 
-from ...domain import COURSE_COLORS, Course, Grade, Lesson, NotFound, Subject, Task, average
+from ...domain import (
+    COURSE_COLORS, PASS_MARK, Course, Grade, Lesson, NotFound, Subject, Task, TaskKind, average,
+)
 from ..bus import ChangeBus, Topic
+from ..dto import TaskItem
 from ..errors import AuthenticationError, NotConnected, RegisterError
 from ..ports import (
     Clock, CourseRepository, CredentialStore, Credentials, KeyValueStore, RegisterAccount,
@@ -73,6 +76,18 @@ class SubjectGrades:
     course: Course | None
     grades: tuple[Grade, ...]  # newest first
     average: float | None
+
+
+@dataclass(frozen=True)
+class SchoolOverview:
+    """The numbers at the top of the School page."""
+
+    average: float | None
+    grade_count: int
+    next_test: TaskItem | None
+    homework_due_this_week: int
+    next_homework: TaskItem | None
+    below_pass: tuple[SubjectGrades, ...]  # subjects averaging under the pass mark
 
 
 class SchoolSyncService:
@@ -335,10 +350,22 @@ class SchoolSyncService:
 
     # ---- queries --------------------------------------------------------------
 
-    def grades_by_subject(self) -> list[SubjectGrades]:
+    def periods(self) -> list[str]:
+        """School terms the grades belong to (e.g. "Trimestre"), in calendar order."""
+        first_seen: dict[str, date] = {}
+        for g in self._records.grades():
+            if g.period and (g.period not in first_seen or g.day < first_seen[g.period]):
+                first_seen[g.period] = g.day
+        return sorted(first_seen, key=first_seen.get)
+
+    def _grades(self, period: str | None) -> list[Grade]:
+        return [g for g in self._records.grades() if period is None or g.period == period]
+
+    def grades_by_subject(self, period: str | None = None) -> list[SubjectGrades]:
+        """Grades per subject, optionally for one term only."""
         courses = {c.id: c for c in self._courses.list()}
         groups: dict[str, list[Grade]] = {}
-        for g in self._records.grades():
+        for g in self._grades(period):
             groups.setdefault(g.subject, []).append(g)
         result = []
         for subject in sorted(groups, key=str.casefold):
@@ -347,8 +374,33 @@ class SchoolSyncService:
             result.append(SubjectGrades(subject, course, tuple(grades), average(grades)))
         return result
 
-    def overall_average(self) -> float | None:
-        return average(self._records.grades())
+    def overall_average(self, period: str | None = None) -> float | None:
+        return average(self._grades(period))
+
+    def upcoming(self, days: int = 21) -> list[TaskItem]:
+        """Homework and tests from the register that are still to do, soonest first."""
+        today = self._clock.today()
+        courses = {c.id: c for c in self._courses.list()}
+        tasks = [t for t in self._tasks.by_external_prefix(self._external("agenda", ""))
+                 if not t.done and t.due is not None and 0 <= (t.due - today).days <= days]
+        tasks.sort(key=lambda t: (t.due, t.kind is not TaskKind.EXAM, t.title.casefold()))
+        return [TaskItem(t, courses.get(t.course_id), False) for t in tasks]
+
+    def overview(self, period: str | None = None) -> SchoolOverview:
+        today = self._clock.today()
+        soon = self.upcoming(days=60)
+        tests = [i for i in soon if i.task.kind is TaskKind.EXAM]
+        homework = [i for i in soon if i.task.kind is not TaskKind.EXAM]
+        subjects = self.grades_by_subject(period)
+        return SchoolOverview(
+            average=self.overall_average(period),
+            grade_count=sum(1 for s in subjects for g in s.grades if g.counts),
+            next_test=tests[0] if tests else None,
+            homework_due_this_week=sum(1 for i in homework if (i.task.due - today).days <= 6),
+            next_homework=homework[0] if homework else None,
+            below_pass=tuple(s for s in subjects
+                             if s.average is not None and s.average < PASS_MARK),
+        )
 
     def recent_lessons(self, days: int = 14) -> list[Lesson]:
         today = self._clock.today()

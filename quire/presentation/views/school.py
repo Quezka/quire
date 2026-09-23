@@ -6,8 +6,8 @@ from datetime import datetime
 from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QGuiApplication
 from PySide6.QtWidgets import (
-    QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QMenu, QStackedWidget, QToolButton, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QButtonGroup, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget,
+    QListWidgetItem, QMenu, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
 from ...application.bus import Topic
@@ -19,20 +19,11 @@ from .. import theme
 from ..bridge import ChangeRelay
 from ..formatting import KIND_LABELS, plural, relative_date, relative_timestamp
 from ..notify import notify
-from ..widgets import TwoLineDelegate, color_icon
+from ..dialogs import TaskDialog
+from ..widgets import SubjectDelegate, TwoLineDelegate, mark_color
 from .common import Card, Page, button, icon_button, label, primary_button
 
 AUTO_SYNC_MINUTES = 30
-
-
-def grade_color(value: float | None, t) -> str:
-    if value is None:
-        return t.muted
-    if value < 6:
-        return t.danger
-    if value < 7:
-        return "#f5a524"
-    return t.success
 
 
 def describe(report: SyncReport) -> list[str]:
@@ -69,8 +60,30 @@ class _FetchJob(QRunnable):
             self.signals.failed.emit(f"Sync failed unexpectedly: {e}")
 
 
+class StatTile(Card):
+    """A number at the top of the School page with a caption underneath."""
+
+    def __init__(self, caption: str):
+        super().__init__(padding=16)
+        self.body.setSpacing(4)
+        self.caption = QLabel(caption, objectName="tileCaption")
+        self.value = QLabel(objectName="tileValue")
+        self.detail = label()
+        self.detail.setWordWrap(True)
+        for widget in (self.caption, self.value, self.detail):
+            self.add(widget)
+        self.body.addStretch()
+
+    def show(self, value: str, detail: str = "", color: str | None = None):
+        self.value.setText(value)
+        self.value.setStyleSheet(f"color: {color};" if color else "")
+        self.detail.setText(detail)
+        self.detail.setToolTip(detail)
+
+
 class SchoolView(Page):
     newsChanged = Signal(int)  # number of unseen changes from the last sync
+    openClassNote = Signal(int, object)  # course_id, date
 
     def __init__(self, services: Services, relay: ChangeRelay, parent=None):
         super().__init__(parent)
@@ -87,7 +100,14 @@ class SchoolView(Page):
         menu = QMenu(self.account_btn)
         menu.addAction("Disconnect account", self._disconnect)
         self.account_btn.setMenu(menu)
-        self.add_actions(self.sync_btn, self.account_btn)
+        self._period: str | None = None
+        self.periods = QFrame(objectName="segmented")
+        self._periods_row = QHBoxLayout(self.periods)
+        self._periods_row.setContentsMargins(3, 3, 3, 3)
+        self._periods_row.setSpacing(2)
+        self._period_buttons = QButtonGroup(self)
+        self._period_buttons.setExclusive(True)
+        self.add_actions(self.periods, self.sync_btn, self.account_btn)
 
         self.pages = QStackedWidget()
         self.pages.addWidget(self._build_connect())
@@ -150,49 +170,75 @@ class SchoolView(Page):
         return holder
 
     def _build_dashboard(self) -> QWidget:
-        grades = Card("Grades")
-        self.average = QLabel(objectName="badge")
-        grades.title_row.insertWidget(1, self.average)
-        self.grades = QTreeWidget()
-        self.grades.setHeaderLabels(["SUBJECT", "DATE", "MARK"])
-        self.grades.setIndentation(14)
-        self.grades.setUniformRowHeights(True)
-        head = self.grades.header()
-        head.setStretchLastSection(False)
-        head.setSectionResizeMode(0, QHeaderView.Stretch)
-        head.setSectionResizeMode(1, QHeaderView.ResizeToContents)
-        head.setSectionResizeMode(2, QHeaderView.ResizeToContents)
-        self.grades_empty = label("No grades yet.", "hint")
-        grades.add(self.grades, 1)
-        grades.add(self.grades_empty)
+        # ---- summary tiles ----
+        self.tile_average = StatTile("AVERAGE")
+        self.tile_test = StatTile("NEXT TEST")
+        self.tile_homework = StatTile("HOMEWORK THIS WEEK")
+        self.tile_attention = StatTile("BELOW 6")
+        tiles = QHBoxLayout()
+        tiles.setSpacing(16)
+        for tile in (self.tile_average, self.tile_test, self.tile_homework,
+                     self.tile_attention):
+            tiles.addWidget(tile, 1)
 
-        news = Card("What's new")
-        self.news = QListWidget()
-        self.news.setWordWrap(True)
-        news.add(self.news, 1)
+        # ---- subjects ----
+        subjects = Card("Subjects")
+        self.subjects = QListWidget()
+        self.subjects.setItemDelegate(SubjectDelegate(self.subjects))
+        self.subjects.setMouseTracking(True)
+        self.subjects.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.subjects.itemClicked.connect(self._subject_clicked)
+        self.grades_empty = label("No grades yet. They'll appear here after a sync.", "hint")
+        subjects.add(self.subjects, 1)
+        subjects.add(self.grades_empty)
+        self._expanded: set[str] = set()
 
-        lessons = Card("Recent lessons")
+        # ---- side ----
+        coming = Card("Coming up")
+        self.coming = QListWidget()
+        self.coming.setItemDelegate(TwoLineDelegate(self.coming))
+        self.coming.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.coming.itemDoubleClicked.connect(self._open_task)
+        coming.add(self.coming, 1)
+
+        lessons = Card("Lesson topics")
         self.lessons = QListWidget()
         self.lessons.setItemDelegate(TwoLineDelegate(self.lessons))
         self.lessons.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.lessons.itemDoubleClicked.connect(self._open_lesson_note)
+        self.lessons.setToolTip("Double-click a lesson to open its class notes")
         lessons.add(self.lessons, 1)
+
+        self.news_card = Card("What's new")
+        self.news = QListWidget()
+        self.news.setWordWrap(True)
+        self.news.setResizeMode(QListView.Adjust)
+        self.news.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.news_card.add(self.news, 1)
 
         side = QVBoxLayout()
         side.setSpacing(16)
-        side.addWidget(news, 2)
-        side.addWidget(lessons, 3)
-        holder = QWidget()
-        body = QHBoxLayout(holder)
-        body.setContentsMargins(0, 0, 0, 0)
+        side.addWidget(coming, 3)
+        side.addWidget(lessons, 4)
+        side.addWidget(self.news_card, 2)
+
+        body = QHBoxLayout()
         body.setSpacing(16)
-        body.addWidget(grades, 5)
-        body.addLayout(side, 4)
+        body.addWidget(subjects, 3)
+        body.addLayout(side, 2)
+
+        holder = QWidget()
+        column = QVBoxLayout(holder)
+        column.setContentsMargins(0, 0, 0, 0)
+        column.setSpacing(16)
+        column.addLayout(tiles)
+        column.addLayout(body, 1)
         return holder
 
     # ---- state ----------------------------------------------------------------
 
     def _changed(self, topic: Topic):
-        if topic in (Topic.SCHOOL, Topic.COURSES):
+        if topic in (Topic.SCHOOL, Topic.COURSES, Topic.TASKS):
             self.refresh()
 
     def _update_subtitle(self):
@@ -221,67 +267,159 @@ class SchoolView(Page):
     def refresh(self):
         status = self.school.status()
         self.pages.setCurrentIndex(1 if status.connected else 0)
-        self.sync_btn.setVisible(status.connected)
-        self.account_btn.setVisible(status.connected)
+        for widget in (self.sync_btn, self.account_btn):
+            widget.setVisible(status.connected)
         self.sync_btn.setEnabled(self._job is None)
         self._update_subtitle()
         if status.connected:
-            self._fill_grades()
+            self._fill_periods()
+            self._fill_tiles()
+            self._fill_subjects()
+            self._fill_coming()
             self._fill_lessons()
             self._fill_news()
+        else:
+            self.periods.setVisible(False)
 
-    def _fill_grades(self):
+    # ---- term switcher ----------------------------------------------------------
+
+    def _fill_periods(self):
+        periods = self.school.periods()
+        if self._period not in periods:
+            self._period = None
+        for button in self._period_buttons.buttons():
+            self._period_buttons.removeButton(button)
+            button.deleteLater()
+        for text, value in [("All year", None), *[(p, p) for p in periods]]:
+            button = QPushButton(text, objectName="segment", checkable=True)
+            button.setCursor(Qt.PointingHandCursor)
+            button.setChecked(value == self._period)
+            button.clicked.connect(lambda _on=False, v=value: self._pick_period(v))
+            self._period_buttons.addButton(button)
+            self._periods_row.addWidget(button)
+        self.periods.setVisible(len(periods) > 1)
+
+    def _pick_period(self, period):
+        self._period = period
+        self._fill_tiles()
+        self._fill_subjects()
+
+    # ---- content ----------------------------------------------------------------
+
+    def _fill_tiles(self):
         t = theme.current()
-        subjects = self.school.grades_by_subject()
-        overall = self.school.overall_average()
-        self.average.setText(f"average {overall:.2f}" if overall is not None else "")
-        self.average.setVisible(overall is not None)
         today = self.services.planner.today()
-        self.grades.clear()
+        o = self.school.overview(self._period)
+        self.tile_average.show(f"{o.average:.2f}" if o.average is not None else "–",
+                               plural(o.grade_count, "grade"),
+                               mark_color(o.average, t) if o.average is not None else None)
+        if o.next_test:
+            test = o.next_test
+            self.tile_test.show(relative_date(test.task.due, today),
+                                (f"{test.course.name}: " if test.course else "") + test.task.title)
+        else:
+            self.tile_test.show("None", "No tests on the agenda")
+        caption = "Nothing due"
+        if o.next_homework:
+            caption = (f"Next: {relative_date(o.next_homework.task.due, today)} · "
+                       + (o.next_homework.course.name if o.next_homework.course
+                          else o.next_homework.task.title))
+        self.tile_homework.show(str(o.homework_due_this_week), caption)
+        if o.below_pass:
+            self.tile_attention.show(str(len(o.below_pass)),
+                                     ", ".join(s.subject for s in o.below_pass), t.danger)
+        else:
+            self.tile_attention.show("0", "Every subject is at 6 or above",
+                                     t.success if o.grade_count else None)
+
+    def _fill_subjects(self):
+        today = self.services.planner.today()
+        subjects = self.school.grades_by_subject(self._period)
+        scroll = self.subjects.verticalScrollBar().value()
+        self.subjects.clear()
         for entry in subjects:
-            avg = f"{entry.average:.2f}" if entry.average is not None else "–"
-            parent = QTreeWidgetItem([entry.subject, "", avg])
-            font = parent.font(0)
-            font.setBold(True)
-            parent.setFont(0, font)
-            parent.setFont(2, font)
-            parent.setForeground(2, QColor(grade_color(entry.average, t)))
-            if entry.course:
-                parent.setIcon(0, color_icon(entry.course.color, 10))
-            self.grades.addTopLevelItem(parent)
-            for g in entry.grades:
-                what = " · ".join(filter(None, [g.component, g.notes]))
-                child = QTreeWidgetItem([what or "Grade", relative_date(g.day, today), g.display])
-                child.setForeground(1, QColor(t.muted))
-                child.setForeground(2, QColor(t.faint if g.cancelled
-                                              else grade_color(g.value, t)))
-                if g.cancelled:
-                    f = child.font(2)
-                    f.setStrikeOut(True)
-                    child.setFont(2, f)
-                if g.notes:
-                    child.setToolTip(0, g.notes)
-                parent.addChild(child)
-            parent.setExpanded(True)
-        self.grades.setVisible(bool(subjects))
+            counted = [g for g in entry.grades if g.counts]
+            row = QListWidgetItem(entry.subject)
+            row.setData(SubjectDelegate.KIND, "subject")
+            row.setData(SubjectDelegate.COLOR, entry.course.color if entry.course else None)
+            row.setData(SubjectDelegate.AVERAGE, entry.average)
+            row.setData(SubjectDelegate.CHIPS,
+                        [(g.display, g.value, g.cancelled) for g in entry.grades[:6]])
+            row.setData(SubjectDelegate.TREND, [g.value for g in reversed(counted)])
+            expanded = entry.subject in self._expanded
+            row.setData(SubjectDelegate.EXPANDED, expanded)
+            teachers = entry.course.teacher if entry.course and entry.course.teacher else ""
+            row.setData(SubjectDelegate.META, " · ".join(filter(None, [
+                plural(len(counted), "grade"), teachers])))
+            row.setToolTip("Click to show every grade")
+            self.subjects.addItem(row)
+            if expanded:
+                for g in entry.grades:
+                    what = " · ".join(filter(None, [g.component, g.notes])) or "Grade"
+                    if g.cancelled:
+                        what += " (cancelled)"
+                    child = QListWidgetItem(what)
+                    child.setData(SubjectDelegate.KIND, "grade")
+                    child.setData(SubjectDelegate.CHIPS, [(g.display, g.value, g.cancelled)])
+                    child.setData(SubjectDelegate.META, relative_date(g.day, today))
+                    child.setFlags(Qt.ItemIsEnabled)
+                    if g.notes:
+                        child.setToolTip(g.notes)
+                    self.subjects.addItem(child)
+        self.subjects.verticalScrollBar().setValue(scroll)
+        self.subjects.setVisible(bool(subjects))
         self.grades_empty.setVisible(not subjects)
+
+    def _subject_clicked(self, item: QListWidgetItem):
+        if item.data(SubjectDelegate.KIND) != "subject":
+            return
+        self._expanded ^= {item.text()}
+        self._fill_subjects()
+
+    def _fill_coming(self):
+        today = self.services.planner.today()
+        self.coming.clear()
+        for entry in self.school.upcoming():
+            task = entry.task
+            item = QListWidgetItem(task.title)
+            kind = "Test" if task.kind is TaskKind.EXAM else KIND_LABELS[task.kind]
+            item.setData(TwoLineDelegate.META, " · ".join(filter(None, [
+                relative_date(task.due, today), entry.course.name if entry.course else "",
+                kind])))
+            item.setData(TwoLineDelegate.COLOR, entry.course.color if entry.course else None)
+            item.setData(Qt.UserRole, task.id)
+            item.setToolTip(task.details)
+            self.coming.addItem(item)
+        if not self.coming.count():
+            empty = QListWidgetItem("Nothing on the agenda for the next three weeks")
+            empty.setFlags(Qt.NoItemFlags)
+            self.coming.addItem(empty)
 
     def _fill_lessons(self):
         today = self.services.planner.today()
         courses = {c.id: c for c in self.services.timetable.courses()}
         self.lessons.clear()
+        last_day = None
         for lesson in self.school.recent_lessons():
+            if lesson.day != last_day:
+                last_day = lesson.day
+                header = QListWidgetItem(relative_date(lesson.day, today))
+                header.setData(TwoLineDelegate.HEADER, 2)
+                header.setFlags(Qt.ItemIsEnabled)
+                self.lessons.addItem(header)
             item = QListWidgetItem(lesson.topic or "(no topic recorded)")
             hour = f"hour {lesson.hour}" if lesson.hour else ""
-            meta = " · ".join(filter(None, [relative_date(lesson.day, today), lesson.subject,
-                                            hour]))
-            item.setData(TwoLineDelegate.META, meta)
+            item.setData(TwoLineDelegate.META, " · ".join(filter(None, [
+                lesson.subject, hour, lesson.teacher])))
             course = courses.get(lesson.course_id)
             item.setData(TwoLineDelegate.COLOR, course.color if course else None)
+            item.setData(Qt.UserRole, (lesson.course_id, lesson.day))
             item.setToolTip(lesson.topic)
             self.lessons.addItem(item)
         if not self.lessons.count():
-            self.lessons.addItem(QListWidgetItem("No lessons in the last two weeks"))
+            empty = QListWidgetItem("No lessons in the last two weeks")
+            empty.setFlags(Qt.NoItemFlags)
+            self.lessons.addItem(empty)
 
     def _fill_news(self):
         t = theme.current()
@@ -295,8 +433,8 @@ class SchoolView(Page):
             if report.courses_created:
                 lines.append(
                     f"Added {plural(report.courses_created, 'course')} for your subjects. "
-                    "If you already had one under another name, open it in Week → Courses and "
-                    "pick its subject to merge them.")
+                    "If you already had one under another name, open it in Week → Timetable "
+                    "and pick its subject to merge them.")
         for problem in (report.problems if report else ()):
             item = QListWidgetItem(f"Couldn't sync {problem[0].lower()}{problem[1:]}")
             item.setForeground(QColor(t.danger))
@@ -306,6 +444,15 @@ class SchoolView(Page):
             if not lines:
                 item.setForeground(QColor(t.faint))
             self.news.addItem(item)
+
+    def _open_task(self, item: QListWidgetItem):
+        if item.data(Qt.UserRole) is not None:
+            TaskDialog(self.services, item.data(Qt.UserRole), parent=self).exec()
+
+    def _open_lesson_note(self, item: QListWidgetItem):
+        target = item.data(Qt.UserRole)
+        if target and target[0] is not None:
+            self.openClassNote.emit(*target)
 
     # ---- actions ----------------------------------------------------------------
 

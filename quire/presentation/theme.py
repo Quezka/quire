@@ -174,6 +174,15 @@ def stylesheet(t: Theme) -> str:
     #hint {{ color: {t.faint}; }}
     QLabel#danger {{ color: {t.danger}; }}
     #stat {{ font-size: 22pt; font-weight: 700; color: {t.text}; }}
+    #tileCaption {{ color: {t.muted}; font-size: 8.5pt; font-weight: 600;
+        letter-spacing: 0.5px; }}
+    #tileValue {{ font-size: 20pt; font-weight: 700; color: {t.text}; }}
+    #segmented {{ background: {t.raised}; border: 1px solid {t.border}; border-radius: 9px; }}
+    QPushButton#segment {{ background: transparent; border: none; border-radius: 7px;
+        padding: 5px 12px; color: {t.muted}; font-weight: 500; }}
+    QPushButton#segment:hover {{ color: {t.text}; }}
+    QPushButton#segment:checked {{ background: {t.surface}; color: {t.text};
+        font-weight: 600; border: 1px solid {t.border}; }}
     #badge {{ background: {t.accent_soft}; color: {t.accent}; border-radius: 9px;
               padding: 1px 8px; font-weight: 600; font-size: 9pt; }}
 

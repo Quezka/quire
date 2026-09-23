@@ -280,3 +280,49 @@ def test_a_rejected_session_still_stops_the_sync(connected, register):
     register.failing["grades"] = AuthenticationError("session refused")
     with pytest.raises(AuthenticationError):
         connected.school.sync()
+
+
+def test_periods_filter_grades_and_averages(connected, register):
+    from quire.application.ports import RemoteGrade
+    register.grades_ = [
+        RemoteGrade("t1", date(2026, 10, 1), "1", "MATEMATICA", "5", 5.0, period="Trimestre"),
+        RemoteGrade("t2", date(2026, 10, 9), "1", "MATEMATICA", "7", 7.0, period="Trimestre"),
+        RemoteGrade("p1", date(2027, 2, 3), "1", "MATEMATICA", "9", 9.0, period="Pentamestre"),
+    ]
+    connected.school.sync()
+    assert connected.school.periods() == ["Trimestre", "Pentamestre"]
+    assert connected.school.overall_average("Trimestre") == 6.0
+    assert connected.school.overall_average("Pentamestre") == 9.0
+    assert connected.school.overall_average() == 7.0
+    (maths,) = connected.school.grades_by_subject("Pentamestre")
+    assert [g.display for g in maths.grades] == ["9"]
+
+
+def test_upcoming_lists_register_work_still_to_do(connected, register):
+    from quire.domain import Task
+    register.assignments_ = [
+        homework("h1", day=TODAY + timedelta(days=3), text="Esercizi"),
+        homework("x1", day=TODAY + timedelta(days=3), text="Verifica cap. 2", kind=TaskKind.EXAM),
+        homework("old", day=TODAY - timedelta(days=5), text="Vecchi compiti"),
+    ]
+    connected.school.sync()
+    connected.tasks.save(Task("My own thing", due=TODAY))  # not from the register
+    upcoming = connected.school.upcoming()
+    assert [i.task.title for i in upcoming] == ["Verifica cap. 2", "Esercizi"]  # tests first
+    assert upcoming[0].course.name == "Matematica"
+
+
+def test_overview_numbers(connected, register):
+    register.assignments_ = [
+        homework("h1", day=TODAY + timedelta(days=1), text="Esercizi"),
+        homework("h2", day=TODAY + timedelta(days=10), text="Ricerca"),
+        homework("x1", day=TODAY + timedelta(days=4), text="Verifica", kind=TaskKind.EXAM),
+    ]
+    register.grades_ = [grade("g1", 5.0, "5"), grade("g2", 5.5, "5½"),
+                        grade("s1", 8.0, "8", subject=HISTORY)]
+    connected.school.sync()
+    o = connected.school.overview()
+    assert o.average == 6.17 and o.grade_count == 3
+    assert o.next_test.task.title == "Verifica"
+    assert o.homework_due_this_week == 1 and o.next_homework.task.title == "Esercizi"
+    assert [s.subject for s in o.below_pass] == ["Matematica"]

@@ -129,13 +129,21 @@ class DemoRegister:
 
     def grades(self):
         d = self.today
-        return [
-            RemoteGrade("g1", d - timedelta(days=12), "1", "MATEMATICA", "7½", 7.5, "Scritto"),
-            RemoteGrade("g2", d - timedelta(days=4), "1", "MATEMATICA", "8", 8.0, "Orale"),
-            RemoteGrade("g3", d - timedelta(days=6), "3", "STORIA", "6-", 5.75, "Orale",
-                        notes="Ripassare le date principali"),
-            RemoteGrade("g4", d - timedelta(days=2), "2", "BIOLOGY", "9", 9.0, "Pratico"),
+        marks = [  # (id, days ago, subject id, subject, display, value, type, term, notes)
+            ("g1", 70, "1", "MATEMATICA", "6", 6.0, "Scritto", "Trimestre", ""),
+            ("g2", 55, "1", "MATEMATICA", "6½", 6.5, "Orale", "Trimestre", ""),
+            ("g3", 12, "1", "MATEMATICA", "7½", 7.5, "Scritto", "Pentamestre", ""),
+            ("g4", 4, "1", "MATEMATICA", "8", 8.0, "Orale", "Pentamestre", ""),
+            ("g5", 60, "3", "STORIA", "6", 6.0, "Orale", "Trimestre", ""),
+            ("g6", 20, "3", "STORIA", "5", 5.0, "Scritto", "Pentamestre", ""),
+            ("g7", 6, "3", "STORIA", "6-", 5.75, "Orale", "Pentamestre",
+             "Ripassare le date principali"),
+            ("g8", 50, "2", "BIOLOGY", "8", 8.0, "Scritto", "Trimestre", ""),
+            ("g9", 2, "2", "BIOLOGY", "9", 9.0, "Pratico", "Pentamestre", ""),
         ]
+        return [RemoteGrade(gid, d - timedelta(days=ago), sid, subject, display, value,
+                            kind, period, notes)
+                for gid, ago, sid, subject, display, value, kind, period, notes in marks]
 
     def lessons(self, first, last):
         d = self.today

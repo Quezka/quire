@@ -115,6 +115,7 @@ class MainWindow(QMainWindow):
 
         self.today.openClassNote.connect(self.open_class_note)
         self.week.openClassNote.connect(self.open_class_note)
+        self.school.openClassNote.connect(self.open_class_note)
         self._shortcuts()
 
         settings = QSettings()

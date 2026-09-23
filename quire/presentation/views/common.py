@@ -106,6 +106,38 @@ def label(text: str = "", role: str = "muted") -> QLabel:
     return QLabel(text, objectName=role)
 
 
+def zoom_controls(page: QWidget, zoom) -> QWidget:
+    """− / fit / + buttons for a TimelineZoom, plus Ctrl+= / Ctrl+- / Ctrl+0."""
+    from PySide6.QtGui import QKeySequence, QShortcut
+
+    box = QWidget()
+    row = QHBoxLayout(box)
+    row.setContentsMargins(0, 0, 0, 0)
+    row.setSpacing(0)
+    out = icon_button("zoom-out", "Zoom out (Ctrl+-)")
+    fit = icon_button("fit-day", "Fit the whole day (Ctrl+0)", checkable=True)
+    zoom_in = icon_button("zoom-in", "Zoom in (Ctrl+=, or Ctrl+scroll)")
+    out.clicked.connect(zoom.zoom_out)
+    zoom_in.clicked.connect(zoom.zoom_in)
+    fit.clicked.connect(lambda on: zoom.set_fit(on))
+
+    def sync():
+        fit.blockSignals(True)
+        fit.setChecked(zoom.fit)
+        fit.blockSignals(False)
+
+    zoom.changed.connect(sync)
+    sync()
+    for widget in (out, fit, zoom_in):
+        row.addWidget(widget)
+    for keys, slot in (("Ctrl+=", zoom.zoom_in), ("Ctrl++", zoom.zoom_in),
+                       ("Ctrl+-", zoom.zoom_out), ("Ctrl+0", lambda: zoom.set_fit(True))):
+        QShortcut(QKeySequence(keys), page, activated=slot,
+                  context=Qt.WidgetWithChildrenShortcut)
+    box.fit_button = fit
+    return box
+
+
 def agenda_block(item: AgendaItem, column: int) -> Block:
     if item.kind is ItemKind.CLASS:
         details = [item.room, item.teacher]
@@ -121,4 +153,6 @@ def agenda_block(item: AgendaItem, column: int) -> Block:
     elif is_shift and item.time.start == 0 and item.origin and item.origin[0] != item.day:
         when = f"until {fmt_min(item.time.end)}"
     subtitle = " · ".join([when, *filter(None, details)])
-    return Block(column, item.time.start, item.time.end, item.title, subtitle, item.color, item)
+    carry_over = bool(item.origin and item.origin[0] != item.day)
+    return Block(column, item.time.start, item.time.end, item.title, subtitle, item.color, item,
+                 carry_over)

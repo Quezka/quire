@@ -4,6 +4,25 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.4.0] - 2026-09-23
+
+### Added
+- **Zoomable calendars**: Today and Week zoom vertically. **Fit day** (on by default)
+  shows the whole day without scrolling and keeps fitting as the window resizes. Zoom in
+  and out with the − / + buttons, Ctrl+scroll, a touchpad pinch or Ctrl+= / Ctrl+-, and
+  fit again with Ctrl+0. Each view remembers its zoom.
+- **Redesigned School page**:
+  - summary tiles for your average, next test, homework due this week and subjects below 6;
+  - subject rows with your latest marks as coloured chips, a trend sparkline and the
+    average; click a subject to see every grade;
+  - a term switcher (e.g. Trimestre / Pentamestre) that filters grades and averages;
+  - "Coming up" homework and tests;
+  - lesson topics grouped by day (double-click one to open that lesson's class notes).
+
+### Changed
+- A late shift's after-midnight tail no longer stretches the timeline back to 00:00. It
+  shows as a slim strip at the top of the next day.
+
 ## [0.3.1] - 2026-09-23
 
 ### Fixed
