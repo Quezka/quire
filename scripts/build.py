@@ -2,6 +2,7 @@
 
     python scripts/build.py            # folder build in dist/Quire/
     python scripts/build.py --onefile  # single executable
+    python scripts/build.py --deb      # Debian/Ubuntu package in dist/
 
 Run it on Linux to get a Linux build and on Windows to get a Windows .exe;
 PyInstaller does not cross-compile.
@@ -40,8 +41,12 @@ def render_icons() -> Path:
 
 def main():
     parser = argparse.ArgumentParser()
-    parser.add_argument("--onefile", action="store_true")
+    mode = parser.add_mutually_exclusive_group()
+    mode.add_argument("--onefile", action="store_true", help="single self-contained executable")
+    mode.add_argument("--deb", action="store_true", help="installable .deb (Linux only)")
     args = parser.parse_args()
+    if args.deb and not sys.platform.startswith("linux"):
+        parser.error("--deb can only be built on Linux")
 
     import PyInstaller.__main__
 
@@ -67,7 +72,13 @@ def main():
         "--exclude-module", "PySide6.QtMultimedia",
         "--exclude-module", "tkinter",
     ])
-    print(f"\nBuilt into {ROOT / 'dist'}")
+    if args.deb:
+        from deb import build_deb
+
+        deb = build_deb(ROOT / "dist" / "Quire", icon, ROOT / "dist", BUILD)
+        print(f"\nPackage: {deb}\nInstall with: sudo apt install {deb}")
+    else:
+        print(f"\nBuilt into {ROOT / 'dist'}")
 
 
 if __name__ == "__main__":

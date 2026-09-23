@@ -53,7 +53,19 @@ Windows. Use `--db path/to/file.db` to point somewhere else.
 
 ## Installing
 
-**Linux (per-user, adds a menu entry):**
+**Debian / Ubuntu (.deb):**
+
+```bash
+pip install -e ".[build]"
+python scripts/build.py --deb                  # → dist/quire_<version>_<arch>.deb
+sudo apt install ./dist/quire_*.deb
+```
+
+The package installs the self-contained app to `/opt/quire`, a `quire` command, and a menu
+entry with an icon. Remove it with `sudo apt remove quire`. Your notes and timetable are
+stored in your home folder and are left untouched.
+
+**Linux from source (per-user, no root):**
 
 ```bash
 ./scripts/install-linux.sh
@@ -68,7 +80,7 @@ python scripts/build.py --onefile   # output in dist/
 
 PyInstaller builds for the platform it runs on, so run the build on Windows to get
 `Quire.exe`. The GitHub Actions workflow in `.github/workflows/build.yml` builds both on every
-push and uploads them as artifacts.
+push and uploads the `.deb` and `Quire.exe` as artifacts.
 
 ## Architecture
 
