@@ -6,18 +6,20 @@ from datetime import date
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPlainTextEdit, QPushButton, QSplitter, QStackedWidget, QTextBrowser, QVBoxLayout, QWidget,
+    QComboBox, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QPlainTextEdit,
+    QStackedWidget, QTextBrowser,
 )
 
 from ...application.bus import Topic
 from ...application.dto import NoteSummary
 from ...application.services import Services
 from ...domain import Note
+from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import confirm, fill_course_combo, select_data
 from ..formatting import relative_timestamp
-from ..widgets import NO_COLOR, color_icon, scaled_font
+from ..widgets import TwoLineDelegate, scaled_font
+from .common import Card, Page, icon_button, label, primary_button
 
 PLACEHOLDER = (
     "Start typing. The first line becomes the title.\n\n"
@@ -26,7 +28,7 @@ PLACEHOLDER = (
 )
 
 
-class NotesView(QWidget):
+class NotesView(Page):
     def __init__(self, services: Services, relay: ChangeRelay, parent=None):
         super().__init__(parent)
         self.services = services
@@ -34,80 +36,80 @@ class NotesView(QWidget):
         self.note: Note | None = None
         self._dirty = False
         self._loading = False
+        self.title.setText("Notes")
+
+        new = primary_button("Note")
+        new.clicked.connect(lambda: self.new_note())
+        self.add_actions(new)
 
         # ---- left: list ----
-        self.search = QLineEdit(placeholderText="Search notes…", clearButtonEnabled=True)
+        self.search = QLineEdit(placeholderText="Search notes", clearButtonEnabled=True)
+        self.search.setObjectName("search")
+        self._search_action = self.search.addAction(
+            icons.icon("search", theme.current().faint, size=16), QLineEdit.LeadingPosition)
+        theme.themed(lambda t: self._search_action.setIcon(icons.icon("search", t.faint, size=16)))
         self.search.textChanged.connect(lambda: self.reload_list())
         self.filter = QComboBox()
         self.filter.currentIndexChanged.connect(lambda: self.reload_list())
         self.list = QListWidget()
+        self.list.setItemDelegate(TwoLineDelegate(self.list))
+        self.list.setMouseTracking(True)
+        self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.list.currentItemChanged.connect(self._selected)
-        new = QPushButton("New note")
-        new.clicked.connect(lambda: self.new_note())
-        delete = QPushButton("Delete")
-        delete.clicked.connect(self.delete_current)
         QShortcut(QKeySequence.Delete, self.list, activated=self.delete_current,
                   context=Qt.WidgetShortcut)
 
-        buttons = QHBoxLayout()
-        buttons.addWidget(new)
-        buttons.addWidget(delete)
-        left = QWidget()
-        left_layout = QVBoxLayout(left)
-        left_layout.setContentsMargins(0, 0, 0, 0)
-        left_layout.addWidget(self.search)
-        left_layout.addWidget(self.filter)
-        left_layout.addWidget(self.list, 1)
-        left_layout.addLayout(buttons)
+        left = Card(padding=12)
+        left.setFixedWidth(300)
+        left.add(self.search)
+        left.add(self.filter)
+        left.add(self.list, 1)
 
         # ---- right: editor ----
         self.course = QComboBox()
-        self.course.setMinimumWidth(160)
+        self.course.setMinimumWidth(170)
         self.course.currentIndexChanged.connect(self._meta_changed)
-        self.pin = QCheckBox("Pinned")
+        self.pin = icon_button("pin", "Pin to top", checkable=True)
         self.pin.toggled.connect(self._meta_changed)
-        self.status = QLabel()
-        self.status.setEnabled(False)
-        self.preview_btn = QPushButton("Preview", checkable=True)
+        self.status = label("", "hint")
+        self.preview_btn = icon_button("eye", "Preview (Ctrl+E)", checkable=True)
         self.preview_btn.toggled.connect(self._toggle_preview)
         QShortcut(QKeySequence("Ctrl+E"), self, activated=self.preview_btn.toggle,
                   context=Qt.WidgetWithChildrenShortcut)
+        delete = icon_button("trash", "Delete note")
+        delete.clicked.connect(self.delete_current)
 
         bar = QHBoxLayout()
-        bar.addWidget(QLabel("Course"))
+        bar.setSpacing(6)
         bar.addWidget(self.course)
         bar.addWidget(self.pin)
         bar.addStretch()
         bar.addWidget(self.status)
         bar.addWidget(self.preview_btn)
+        bar.addWidget(delete)
 
         font = scaled_font(self, 1.1)
         self.editor = QPlainTextEdit(placeholderText=PLACEHOLDER)
+        self.editor.setObjectName("bare")
         self.editor.setFont(font)
         self.editor.setTabStopDistance(self.editor.fontMetrics().horizontalAdvance(" ") * 4)
         self.editor.textChanged.connect(self._edited)
         self.viewer = QTextBrowser(openExternalLinks=True)
+        self.viewer.setObjectName("bare")
         self.viewer.setFont(font)
         self.stack = QStackedWidget()
         self.stack.addWidget(self.editor)
         self.stack.addWidget(self.viewer)
 
-        self.right = QWidget()
-        right_layout = QVBoxLayout(self.right)
-        right_layout.setContentsMargins(0, 0, 0, 0)
-        right_layout.addLayout(bar)
-        right_layout.addWidget(self.stack, 1)
+        self.right = Card(padding=14)
+        self.right.body.addLayout(bar)
+        self.right.add(self.stack, 1)
 
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(left)
-        splitter.addWidget(self.right)
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 3)
-        splitter.setChildrenCollapsible(False)
-        splitter.setSizes([280, 800])
-
-        layout = QVBoxLayout(self)
-        layout.addWidget(splitter)
+        body = QHBoxLayout()
+        body.setSpacing(16)
+        body.addWidget(left)
+        body.addWidget(self.right, 1)
+        self.root.addLayout(body, 1)
 
         self._timer = QTimer(self, singleShot=True, interval=700, timeout=self.flush)
         relay.changed.connect(self._changed)
@@ -140,23 +142,23 @@ class NotesView(QWidget):
         self.list.blockSignals(True)
         self.list.clear()
         for summary in self.notes.search(self.search.text(), self.filter.currentData()):
-            item = QListWidgetItem(self._label(summary.title, summary.pinned,
-                                               self._meta(summary, today)))
+            item = QListWidgetItem(summary.title)
             item.setData(Qt.UserRole, summary.id)
-            item.setIcon(color_icon(summary.course.color if summary.course else NO_COLOR))
+            item.setData(TwoLineDelegate.META, self._meta(summary, today))
+            item.setData(TwoLineDelegate.COLOR, summary.course.color if summary.course else None)
+            item.setData(TwoLineDelegate.PINNED, summary.pinned)
             self.list.addItem(item)
             if summary.id == select_id:
                 self.list.setCurrentItem(item)
         self.list.blockSignals(False)
+        count = self.list.count()
+        self.subtitle.setText(f"{count} note{'s' if count != 1 else ''}"
+                              + (" found" if self.search.text().strip() else ""))
 
     @staticmethod
     def _meta(summary: NoteSummary, today: date) -> str:
         meta = relative_timestamp(summary.updated, today)
         return f"{meta} · {summary.course.name}" if summary.course else meta
-
-    @staticmethod
-    def _label(title: str, pinned: bool, meta: str) -> str:
-        return f"{'★ ' if pinned else ''}{title}\n{meta}"
 
     def _selected(self, item, _previous):
         if item is not None and (self.note is None or item.data(Qt.UserRole) != self.note.id):
@@ -206,14 +208,13 @@ class NotesView(QWidget):
         self.status.setText("Saved")
         item = self.list.currentItem()
         if item and item.data(Qt.UserRole) == self.note.id:
-            meta = item.text().split("\n", 1)[-1]
-            item.setText(self._label(self.note.title, self.note.pinned, meta))
+            item.setText(self.note.title)
+            item.setData(TwoLineDelegate.PINNED, self.note.pinned)
 
     def _toggle_preview(self, on: bool):
         if on:
             self.viewer.setMarkdown(self.editor.toPlainText())
         self.stack.setCurrentIndex(1 if on else 0)
-        self.preview_btn.setText("Edit" if on else "Preview")
         if not on:
             self.editor.setFocus()
 

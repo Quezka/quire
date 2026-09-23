@@ -3,44 +3,40 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QColor, QKeySequence, QShortcut
-from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QHBoxLayout, QHeaderView, QLabel, QPushButton, QTreeWidget,
-    QTreeWidgetItem, QVBoxLayout, QWidget,
-)
+from PySide6.QtWidgets import QComboBox, QHeaderView, QLabel, QTreeWidget, QTreeWidgetItem
 
 from ...application.bus import Topic
 from ...application.services import Services
 from ...domain import DueBucket
+from .. import theme
 from ..bridge import ChangeRelay
 from ..dialogs import TaskDialog, confirm, fill_course_combo
-from ..formatting import BUCKET_LABELS, KIND_LABELS, relative_date
-from ..widgets import ALERT_COLOR, color_icon
+from ..formatting import BUCKET_LABELS, KIND_LABELS, plural, relative_date
+from ..widgets import color_icon
+from .common import Card, Page, button, primary_button
 
 
-class CourseworkView(QWidget):
+class CourseworkView(Page):
     def __init__(self, services: Services, relay: ChangeRelay, parent=None):
         super().__init__(parent)
         self.services = services
+        self.title.setText("Coursework")
 
-        new = QPushButton("New task…")
-        new.clicked.connect(self.new_task)
         self.course = QComboBox()
-        self.course.setMinimumWidth(180)
+        self.course.setMinimumWidth(190)
         fill_course_combo(self.course, services.timetable.courses(), "All courses")
         self.course.currentIndexChanged.connect(self.refresh)
-        self.show_done = QCheckBox("Show completed")
+        self.show_done = button("Show completed", "check")
+        self.show_done.setCheckable(True)
         self.show_done.toggled.connect(self.refresh)
-
-        bar = QHBoxLayout()
-        bar.addWidget(new)
-        bar.addStretch()
-        bar.addWidget(QLabel("Course"))
-        bar.addWidget(self.course)
-        bar.addWidget(self.show_done)
+        new = primary_button("Task")
+        new.clicked.connect(self.new_task)
+        self.add_actions(self.course, self.show_done, new)
 
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Task", "Type", "Course", "Due"])
+        self.tree.setHeaderLabels(["TASK", "TYPE", "COURSE", "DUE"])
         self.tree.setUniformRowHeights(True)
+        self.tree.setIndentation(14)
         head = self.tree.header()
         head.setStretchLastSection(False)
         head.setSectionResizeMode(0, QHeaderView.Stretch)
@@ -51,16 +47,17 @@ class CourseworkView(QWidget):
         QShortcut(QKeySequence.Delete, self.tree, activated=self._delete_selected,
                   context=Qt.WidgetShortcut)
 
-        self.empty = QLabel("No tasks here. Press “New task…” or Ctrl+T.")
+        self.empty = QLabel("Nothing to do. Add a task with the button above or Ctrl+T.",
+                            objectName="hint")
         self.empty.setAlignment(Qt.AlignCenter)
-        self.empty.setEnabled(False)
 
-        layout = QVBoxLayout(self)
-        layout.addLayout(bar)
-        layout.addWidget(self.tree, 1)
-        layout.addWidget(self.empty)
+        card = Card(padding=10)
+        card.add(self.tree, 1)
+        card.add(self.empty, 1)
+        self.root.addWidget(card, 1)
 
         relay.changed.connect(self._changed)
+        theme.manager().changed.connect(lambda _t: self.refresh())
         self.refresh()
 
     def _changed(self, topic: Topic):
@@ -73,48 +70,58 @@ class CourseworkView(QWidget):
         TaskDialog(self.services, course_id=self.course.currentData(), parent=self).exec()
 
     def refresh(self):
+        t = theme.current()
         today = self.services.planner.today()
         groups = self.services.tasks.groups(self.show_done.isChecked(),
                                             self.course.currentData())
-        muted = self.palette().placeholderText()
+        open_count = sum(len(g.items) for g in groups if g.bucket is not DueBucket.DONE)
+        overdue = sum(len(g.items) for g in groups if g.bucket is DueBucket.OVERDUE)
+        summary = [plural(open_count, "open task")]
+        if overdue:
+            summary.append(f"{overdue} overdue")
+        self.subtitle.setText(" · ".join(summary))
+
         self.tree.blockSignals(True)
         self.tree.clear()
         for group in groups:
-            parent = QTreeWidgetItem([f"{BUCKET_LABELS[group.bucket]}  ({len(group.items)})"])
+            parent = QTreeWidgetItem([f"{BUCKET_LABELS[group.bucket]}   {len(group.items)}"])
             font = parent.font(0)
             font.setBold(True)
             parent.setFont(0, font)
             parent.setFlags(Qt.ItemIsEnabled)
-            if group.bucket is DueBucket.OVERDUE:
-                parent.setForeground(0, QColor(ALERT_COLOR))
+            parent.setForeground(0, QColor(t.danger if group.bucket is DueBucket.OVERDUE
+                                           else t.muted))
             self.tree.addTopLevelItem(parent)
             parent.setFirstColumnSpanned(True)
             for entry in group.items:
-                t = entry.task
+                task = entry.task
                 child = QTreeWidgetItem([
-                    t.title,
-                    KIND_LABELS[t.kind],
+                    task.title,
+                    KIND_LABELS[task.kind],
                     entry.course.name if entry.course else "",
-                    relative_date(t.due, today) if t.due else "",
+                    relative_date(task.due, today) if task.due else "",
                 ])
-                child.setData(0, Qt.UserRole, t.id)
+                child.setData(0, Qt.UserRole, task.id)
                 child.setFlags(child.flags() | Qt.ItemIsUserCheckable)
-                child.setCheckState(0, Qt.Checked if t.done else Qt.Unchecked)
+                child.setCheckState(0, Qt.Checked if task.done else Qt.Unchecked)
+                for col in (1, 3):
+                    child.setForeground(col, QColor(t.muted))
                 if entry.course:
-                    child.setIcon(2, color_icon(entry.course.color))
-                if t.details:
-                    child.setToolTip(0, t.details)
-                if t.done:
+                    child.setIcon(2, color_icon(entry.course.color, 10))
+                if task.details:
+                    child.setToolTip(0, task.details)
+                if task.done:
                     f = child.font(0)
                     f.setStrikeOut(True)
                     child.setFont(0, f)
                     for col in range(4):
-                        child.setForeground(col, muted)
+                        child.setForeground(col, QColor(t.faint))
                 elif entry.overdue:
-                    child.setForeground(3, QColor(ALERT_COLOR))
+                    child.setForeground(3, QColor(t.danger))
                 parent.addChild(child)
             parent.setExpanded(True)
         self.tree.blockSignals(False)
+        self.tree.setVisible(bool(groups))
         self.empty.setVisible(not groups)
 
     def _toggled(self, item: QTreeWidgetItem, column: int):

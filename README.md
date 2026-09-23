@@ -23,8 +23,8 @@ your machine in a single SQLite file.
   press Delete to remove one.
 - **Notes**: Markdown notes with live search, course filing, pinning, autosave and a
   preview mode (Ctrl+E). Checklists work: `- [ ]`.
-- Follows your system's light or dark theme. **File → Back up data…** writes a copy of
-  your database.
+- A modern sidebar layout with light and dark themes. It follows your system by default; change
+  it under **More → Appearance**. **More → Back up data…** writes a copy of your database.
 
 ### Keyboard shortcuts
 
@@ -35,6 +35,7 @@ your machine in a single SQLite file.
 | Ctrl+T | New task |
 | Ctrl+Shift+E | New event |
 | Ctrl+Shift+C | Courses & timetable |
+| Ctrl+Q | Quit |
 | Ctrl+D | Jump to today |
 | Ctrl+F | Search notes |
 | Ctrl+E | Toggle note preview |

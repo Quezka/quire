@@ -6,22 +6,23 @@ from datetime import date, datetime, timedelta
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QDateEdit, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem,
-    QPlainTextEdit, QPushButton, QScrollArea, QSplitter, QVBoxLayout, QWidget,
+    QCalendarWidget, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QMenu,
+    QPlainTextEdit, QScrollArea, QToolButton, QVBoxLayout, QWidgetAction,
 )
 
 from ...application.bus import Topic
 from ...application.dto import AgendaItem, DayAgenda, ItemKind
 from ...application.services import Services
 from ...domain import Task, TaskKind
+from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import EventDialog, TaskDialog, class_menu, to_qdate
 from ..formatting import KIND_LABELS, long_date, plural, relative_date
-from ..widgets import ALERT_COLOR, NO_COLOR, TimeGrid, color_icon, scaled_font
-from .common import agenda_block, nav_button
+from ..widgets import NO_COLOR, TimeGrid, color_icon
+from .common import Card, Page, agenda_block, badge, button, icon_button, primary_button
 
 
-class TodayView(QWidget):
+class TodayView(Page):
     openClassNote = Signal(int, object)  # course_id, date
 
     def __init__(self, services: Services, relay: ChangeRelay, parent=None):
@@ -30,74 +31,80 @@ class TodayView(QWidget):
         self.planner = services.planner
         self.day = self.planner.today()
 
-        prev_btn = nav_button("‹")
+        # ---- header ----
+        prev_btn = icon_button("chevron-left", "Previous day")
         prev_btn.clicked.connect(lambda: self.set_day(self.day - timedelta(days=1)))
-        next_btn = nav_button("›")
+        next_btn = icon_button("chevron-right", "Next day")
         next_btn.clicked.connect(lambda: self.set_day(self.day + timedelta(days=1)))
-        self.today_btn = QPushButton("Today")
+        self.leading.addWidget(prev_btn)
+        self.leading.addWidget(next_btn)
+
+        self.calendar = QCalendarWidget()
+        self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
+        self.calendar.clicked.connect(self._calendar_picked)
+        pick = icon_button("calendar-day", "Pick a date")
+        pick.setPopupMode(QToolButton.InstantPopup)
+        self._calendar_menu = QMenu(pick)
+        holder = QWidgetAction(self._calendar_menu)
+        holder.setDefaultWidget(self.calendar)
+        self._calendar_menu.addAction(holder)
+        pick.setMenu(self._calendar_menu)
+
+        self.today_btn = button("Today")
         self.today_btn.clicked.connect(lambda: self.set_day(self.planner.today()))
-        self.title = QLabel()
-        self.title.setFont(scaled_font(self.title, 1.6, bold=True))
-        self.summary = QLabel()
-        self.summary.setEnabled(False)
-        self.date_edit = QDateEdit(calendarPopup=True)
-        self.date_edit.setDisplayFormat("ddd d MMM yyyy")
-        self.date_edit.dateChanged.connect(lambda qd: self.set_day(qd.toPython()))
+        add_event = primary_button("Event")
+        add_event.clicked.connect(
+            lambda: EventDialog(self.services, day=self.day, parent=self).exec())
+        self.add_actions(pick, self.today_btn, add_event)
 
-        titles = QVBoxLayout()
-        titles.setSpacing(0)
-        titles.addWidget(self.title)
-        titles.addWidget(self.summary)
-        header = QHBoxLayout()
-        header.addWidget(prev_btn)
-        header.addWidget(next_btn)
-        header.addSpacing(6)
-        header.addLayout(titles)
-        header.addStretch()
-        header.addWidget(self.date_edit)
-        header.addWidget(self.today_btn)
-
+        # ---- timeline ----
         self.grid = TimeGrid()
         self.grid.blockActivated.connect(self._block_activated)
         self.grid.emptyActivated.connect(self._empty_activated)
-        self.scroll = QScrollArea(widgetResizable=True, frameShape=QFrame.NoFrame)
+        self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setWidget(self.grid)
+        timeline = Card(padding=6)
+        timeline.add(self.scroll, 1)
 
+        # ---- due ----
+        due = Card("Due")
+        self.due_count = badge()
+        due.title_row.insertWidget(1, self.due_count)
         self.tasks = QListWidget()
         self.tasks.itemChanged.connect(self._task_toggled)
         self.tasks.itemDoubleClicked.connect(self._task_open)
-        self.quick = QLineEdit(placeholderText="Add a task for this day, press Enter",
-                               clearButtonEnabled=True)
+        self.quick = QLineEdit(placeholderText="Add a task for this day", clearButtonEnabled=True)
+        self.quick.setObjectName("search")
+        self._quick_action = self.quick.addAction(icons.icon("plus", theme.current().faint, size=16),
+                                                  QLineEdit.LeadingPosition)
+        theme.themed(lambda t: self._quick_action.setIcon(icons.icon("plus", t.faint, size=16)))
         self.quick.returnPressed.connect(self._quick_add)
+        due.add(self.tasks, 1)
+        due.add(self.quick)
+
+        # ---- journal ----
+        notes = Card("Day notes")
         self.journal = QPlainTextEdit(placeholderText="Anything to remember about this day…")
+        self.journal.setObjectName("bare")
+        notes.add(self.journal, 1)
         self._journal_timer = QTimer(self, singleShot=True, interval=600,
                                      timeout=self.flush_journal)
         self.journal.textChanged.connect(self._journal_edited)
         self._journal_day: date | None = None
         self._journal_dirty = False
 
-        side = QWidget()
-        side_layout = QVBoxLayout(side)
-        side_layout.setContentsMargins(8, 0, 0, 0)
-        side_layout.addWidget(QLabel("<b>Due</b>"))
-        side_layout.addWidget(self.tasks, 3)
-        side_layout.addWidget(self.quick)
-        side_layout.addSpacing(8)
-        side_layout.addWidget(QLabel("<b>Day notes</b>"))
-        side_layout.addWidget(self.journal, 2)
-
-        splitter = QSplitter(Qt.Horizontal)
-        splitter.addWidget(self.scroll)
-        splitter.addWidget(side)
-        splitter.setStretchFactor(0, 3)
-        splitter.setStretchFactor(1, 2)
-        splitter.setChildrenCollapsible(False)
-
-        layout = QVBoxLayout(self)
-        layout.addLayout(header)
-        layout.addWidget(splitter, 1)
+        side = QVBoxLayout()
+        side.setSpacing(16)
+        side.addWidget(due, 3)
+        side.addWidget(notes, 2)
+        body = QHBoxLayout()
+        body.setSpacing(16)
+        body.addWidget(timeline, 5)
+        body.addLayout(side, 3)
+        self.root.addLayout(body, 1)
 
         relay.changed.connect(self._changed)
+        theme.manager().changed.connect(lambda _t: self.refresh())
         # Roll over to the new day at midnight if the app is left open.
         self._last_seen_today = self.day
         QTimer(self, interval=60_000, timeout=self._check_midnight).start()
@@ -108,15 +115,17 @@ class TodayView(QWidget):
     def set_day(self, day: date):
         self.flush_journal()
         self.day = day
-        self.date_edit.blockSignals(True)
-        self.date_edit.setDate(to_qdate(day))
-        self.date_edit.blockSignals(False)
+        self.calendar.setSelectedDate(to_qdate(day))
         agenda = self.refresh()
         self.journal.blockSignals(True)
         self.journal.setPlainText(agenda.journal)
         self.journal.blockSignals(False)
         self._journal_day = day
         QTimer.singleShot(0, self._scroll_to_focus)
+
+    def _calendar_picked(self, qdate):
+        self._calendar_menu.close()
+        self.set_day(qdate.toPython())
 
     def _check_midnight(self):
         today = self.planner.today()
@@ -158,9 +167,7 @@ class TodayView(QWidget):
         today = self.planner.today()
         self.today_btn.setEnabled(not agenda.is_today)
         title = long_date(agenda.day)
-        if agenda.is_today:
-            title = f"Today · {title}"
-        elif agenda.day.year != today.year:
+        if agenda.day.year != today.year:
             title += f" {agenda.day.year}"
         self.title.setText(title)
 
@@ -168,44 +175,46 @@ class TodayView(QWidget):
                            now_col=0 if agenda.is_today else -1)
         self._fill_tasks(agenda, today)
 
-        parts = []
+        parts = [relative_date(agenda.day, today)]
         if agenda.class_count:
             parts.append(plural(agenda.class_count, "class", "es"))
         if agenda.event_count:
             parts.append(plural(agenda.event_count, "event"))
-        parts.append(plural(agenda.open_task_count, "task") + " left")
         if not agenda.has_courses:
-            parts.append("add your timetable in the Week tab")
-        self.summary.setText(" · ".join(parts))
+            parts.append("add your timetable in Week")
+        self.subtitle.setText(" · ".join(parts))
+        self.due_count.setText(str(agenda.open_task_count))
+        self.due_count.setVisible(agenda.open_task_count > 0)
         return agenda
 
     def _fill_tasks(self, agenda: DayAgenda, today: date):
-        muted = self.palette().placeholderText()
+        t = theme.current()
         self.tasks.blockSignals(True)
         self.tasks.clear()
         for entry in agenda.tasks:
-            t = entry.task
-            meta = [KIND_LABELS[t.kind]] if t.kind is not TaskKind.TASK else []
+            task = entry.task
+            meta = [KIND_LABELS[task.kind]] if task.kind is not TaskKind.TASK else []
             if entry.course:
                 meta.append(entry.course.name)
             if entry.overdue:
-                meta.append("overdue · " + relative_date(t.due, today))
-            item = QListWidgetItem(t.title + ("\n" + " · ".join(meta) if meta else ""))
-            item.setData(Qt.UserRole, t.id)
+                meta.append("overdue · " + relative_date(task.due, today))
+            item = QListWidgetItem(task.title + ("\n" + " · ".join(meta) if meta else ""))
+            item.setData(Qt.UserRole, task.id)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
-            item.setCheckState(Qt.Checked if t.done else Qt.Unchecked)
-            item.setIcon(color_icon(entry.course.color if entry.course else NO_COLOR))
-            if t.done:
+            item.setCheckState(Qt.Checked if task.done else Qt.Unchecked)
+            item.setIcon(color_icon(entry.course.color if entry.course else NO_COLOR, 10))
+            if task.done:
                 font = item.font()
                 font.setStrikeOut(True)
                 item.setFont(font)
-                item.setForeground(muted)
+                item.setForeground(QColor(t.faint))
             elif entry.overdue:
-                item.setForeground(QColor(ALERT_COLOR))
+                item.setForeground(QColor(t.danger))
             self.tasks.addItem(item)
         if not agenda.tasks:
             empty = QListWidgetItem("Nothing due. Nice.")
             empty.setFlags(Qt.NoItemFlags)
+            empty.setForeground(QColor(t.faint))
             self.tasks.addItem(empty)
         self.tasks.blockSignals(False)
 

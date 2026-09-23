@@ -62,8 +62,11 @@ def _buttons(dialog: QDialog, on_save, on_delete=None, delete_label="Delete") ->
     buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
     buttons.accepted.connect(on_save)
     buttons.rejected.connect(dialog.reject)
+    buttons.button(QDialogButtonBox.Save).setObjectName("primary")
     if on_delete:
-        buttons.addButton(delete_label, QDialogButtonBox.DestructiveRole).clicked.connect(on_delete)
+        delete = buttons.addButton(delete_label, QDialogButtonBox.DestructiveRole)
+        delete.setObjectName("danger")
+        delete.clicked.connect(on_delete)
     return buttons
 
 
@@ -306,7 +309,7 @@ class TaskDialog(QDialog):
         self.due = QDateEdit(calendarPopup=True)
         self.due.setDisplayFormat("ddd d MMM yyyy")
         self.has_due.toggled.connect(self.due.setEnabled)
-        self.done = QCheckBox("Completed")
+        self.completed = QCheckBox("Completed")
         self.details = QPlainTextEdit(placeholderText="Details (optional)")
         self.details.setFixedHeight(90)
 
@@ -320,7 +323,7 @@ class TaskDialog(QDialog):
         form.addRow("Course", self.course)
         form.addRow("Date", due_row)
         form.addRow("Details", self.details)
-        form.addRow("", self.done)
+        form.addRow("", self.completed)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
@@ -331,9 +334,9 @@ class TaskDialog(QDialog):
             self.title.setText(t.title)
             kind, course_id, due = t.kind, t.course_id, t.due
             self.details.setPlainText(t.details)
-            self.done.setChecked(t.done)
+            self.completed.setChecked(t.done)
         else:
-            self.done.hide()
+            self.completed.hide()
         select_data(self.kind, kind)
         select_data(self.course, course_id)
         self.has_due.setChecked(due is not None)
@@ -343,7 +346,7 @@ class TaskDialog(QDialog):
     def _save(self):
         task = Task(self.title.text(), self.kind.currentData(), self.course.currentData(),
                     self.due.date().toPython() if self.has_due.isChecked() else None,
-                    self.done.isChecked(), self.details.toPlainText(), self.task_id)
+                    self.completed.isChecked(), self.details.toPlainText(), self.task_id)
         if attempt(self, lambda: self.tasks.save(task)):
             self.accept()
 

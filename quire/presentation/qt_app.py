@@ -1,16 +1,13 @@
 """Starts the Qt event loop around an already-wired set of services."""
 from __future__ import annotations
 
-from pathlib import Path
-
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication
 
 from .. import APP_ID
 from ..application.services import Services
-from .main_window import MainWindow
-
-ICON = Path(__file__).resolve().parent.parent / "assets" / "icon.svg"
+from . import theme
+from .icons import APP_ICON
 
 
 def create_application(argv: list[str]) -> QApplication:
@@ -19,11 +16,14 @@ def create_application(argv: list[str]) -> QApplication:
     QApplication.setDesktopFileName(APP_ID)
     app = QApplication(argv)
     app.setStyle("Fusion")
-    app.setWindowIcon(QIcon(str(ICON)))
+    app.setWindowIcon(QIcon(str(APP_ICON)))
+    theme.install(app)
     return app
 
 
 def run(services: Services, argv: list[str]) -> int:
+    from .main_window import MainWindow
+
     app = create_application(argv)
     window = MainWindow(services)
     window.show()

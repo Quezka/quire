@@ -7,13 +7,14 @@ from datetime import datetime
 
 from PySide6.QtCore import QEvent, QPoint, QPointF, QRectF, QSize, Qt, QTime, QTimer, Signal
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
-from PySide6.QtWidgets import QColorDialog, QPushButton, QToolTip, QWidget
+from PySide6.QtWidgets import QColorDialog, QPushButton, QStyle, QStyledItemDelegate, QToolTip, QWidget
+
+from . import icons, theme
 
 PALETTE = [
     "#4f7cff", "#e5484d", "#30a46c", "#f5a524", "#8e4ec6",
     "#12a594", "#e93d82", "#f76b15", "#0090ff", "#978365",
 ]
-ALERT_COLOR = "#e5484d"
 NO_COLOR = "#00000000"
 
 
@@ -36,10 +37,6 @@ def color_icon(color: str, size: int = 12) -> QIcon:
     p.drawEllipse(0, 0, size, size)
     p.end()
     return QIcon(pm)
-
-
-def is_dark(widget: QWidget) -> bool:
-    return widget.palette().color(QPalette.Base).lightness() < 128
 
 
 def scaled_font(widget: QWidget, factor: float, bold: bool = False) -> QFont:
@@ -185,49 +182,38 @@ class TimeGrid(QWidget):
     # ---- painting -----------------------------------------------------------
 
     def paintEvent(self, _event):
+        t = theme.current()
         p = QPainter(self)
         p.setRenderHint(QPainter.Antialiasing)
-        pal = self.palette()
-        dark = is_dark(self)
-        text = pal.color(QPalette.Text)
-        muted = QColor(text)
-        muted.setAlpha(140)
-        line = QColor(text)
-        line.setAlpha(34)
-        faint = QColor(text)
-        faint.setAlpha(14)
         width = self.width()
         colw = self.column_width()
+        line = QColor(t.border)
 
-        p.fillRect(self.rect(), pal.color(QPalette.Base))
+        p.fillRect(self.rect(), QColor(t.surface))
 
         if 0 <= self.now_col < self.column_count and self.column_count > 1:
-            tint = QColor(pal.color(QPalette.Highlight))
-            tint.setAlpha(18)
+            tint = QColor(t.accent)
+            tint.setAlpha(14 if t.dark else 10)
             p.fillRect(QRectF(self.GUTTER + self.now_col * colw, 0, colw, self.height()), tint)
 
-        small = scaled_font(self, 0.85)
+        small = scaled_font(self, 0.82)
         p.setFont(small)
         for hour in range(self.start_min // 60, self.end_min // 60 + 1):
             y = self.y_for(hour * 60)
             p.setPen(QPen(line, 1))
-            p.drawLine(QPointF(self.GUTTER - 6, y), QPointF(width, y))
-            if hour * 60 < self.end_min:
-                p.setPen(QPen(faint, 1, Qt.DashLine))
-                y_half = self.y_for(hour * 60 + 30)
-                p.drawLine(QPointF(self.GUTTER, y_half), QPointF(width, y_half))
-            p.setPen(muted)
-            p.drawText(QRectF(0, y - 9, self.GUTTER - 10, 18), Qt.AlignRight | Qt.AlignVCenter,
+            p.drawLine(QPointF(self.GUTTER, y), QPointF(width, y))
+            p.setPen(QColor(t.faint))
+            p.drawText(QRectF(0, y - 9, self.GUTTER - 12, 18), Qt.AlignRight | Qt.AlignVCenter,
                        f"{hour:02d}:00")
 
         p.setPen(QPen(line, 1))
-        for i in range(self.column_count + 1):
+        for i in range(1, self.column_count):
             x = self.GUTTER + i * colw
             p.drawLine(QPointF(x, 0), QPointF(x, self.height()))
 
-        bold = scaled_font(self, 1.0, bold=True)
+        bold = scaled_font(self, 0.95, bold=True)
         for b, rect in self._layout():
-            self._paint_block(p, b, rect.adjusted(2, 1, -2, -1), dark, text, bold, small)
+            self._paint_block(p, b, rect.adjusted(3, 2, -3, -2), t, bold, small)
 
         if 0 <= self.now_col < self.column_count:
             now = datetime.now()
@@ -235,7 +221,7 @@ class TimeGrid(QWidget):
             if self.start_min <= minute <= self.end_min:
                 y = self.y_for(minute)
                 x0 = self.GUTTER + self.now_col * colw
-                color = QColor(ALERT_COLOR)
+                color = QColor(t.danger)
                 p.setPen(QPen(color, 2))
                 p.drawLine(QPointF(x0, y), QPointF(x0 + colw, y))
                 p.setPen(Qt.NoPen)
@@ -243,29 +229,32 @@ class TimeGrid(QWidget):
                 p.drawEllipse(QPointF(x0, y), 4.5, 4.5)
         p.end()
 
-    def _paint_block(self, p, b, r, dark, text, bold, small):
-        accent = QColor(b.color)
-        fill = QColor(accent)
-        fill.setAlpha(80 if dark else 48)
+    @staticmethod
+    def _mix(color: str, base: str, amount: float) -> QColor:
+        a, b = QColor(color), QColor(base)
+        return QColor(int(a.red() * amount + b.red() * (1 - amount)),
+                      int(a.green() * amount + b.green() * (1 - amount)),
+                      int(a.blue() * amount + b.blue() * (1 - amount)))
+
+    def _paint_block(self, p, b, r, t, bold, small):
         path = QPainterPath()
-        path.addRoundedRect(r, 6, 6)
-        p.fillPath(path, fill)
+        path.addRoundedRect(r, 8, 8)
+        p.fillPath(path, self._mix(b.color, t.surface, 0.30 if t.dark else 0.16))
         p.save()
         p.setClipPath(path)
-        p.fillRect(QRectF(r.left(), r.top(), 4, r.height()), accent)
-        inner = r.adjusted(10, 3, -5, -2)
-        muted = QColor(text)
-        muted.setAlpha(170)
+        p.fillRect(QRectF(r.left(), r.top(), 3, r.height()), QColor(b.color))
+        inner = r.adjusted(11, 4, -6, -3)
+        title_color = QColor(t.text) if t.dark else self._mix(b.color, t.text, 0.35)
         bold_fm = QFontMetrics(bold)
         p.setFont(bold)
-        p.setPen(text)
-        if r.height() < 38:
+        p.setPen(title_color)
+        if r.height() < 40:
             title = bold_fm.elidedText(b.title, Qt.ElideRight, int(inner.width()))
             p.drawText(inner, Qt.AlignLeft | Qt.AlignVCenter, title)
             title_w = bold_fm.horizontalAdvance(title) + 8
             if title_w < inner.width():
                 p.setFont(small)
-                p.setPen(muted)
+                p.setPen(QColor(t.muted))
                 sub = QFontMetrics(small).elidedText(b.subtitle, Qt.ElideRight,
                                                      int(inner.width() - title_w))
                 p.drawText(inner.adjusted(title_w, 0, 0, 0), Qt.AlignLeft | Qt.AlignVCenter, sub)
@@ -273,8 +262,8 @@ class TimeGrid(QWidget):
             p.drawText(inner, Qt.AlignLeft | Qt.AlignTop,
                        bold_fm.elidedText(b.title, Qt.ElideRight, int(inner.width())))
             p.setFont(small)
-            p.setPen(muted)
-            p.drawText(inner.adjusted(0, bold_fm.height() + 1, 0, 0),
+            p.setPen(QColor(t.muted))
+            p.drawText(inner.adjusted(0, bold_fm.height() + 2, 0, 0),
                        Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap, b.subtitle)
         p.restore()
 
@@ -321,32 +310,96 @@ class GridHeader(QWidget):
     def __init__(self, grid: TimeGrid, parent=None):
         super().__init__(parent)
         self.grid = grid
-        self.labels: list[str] = []
+        self.days: list[tuple[str, int]] = []  # (weekday abbreviation, day of month)
         self.current = -1
-        self.setFixedHeight(32)
+        self.setFixedHeight(58)
 
-    def set_labels(self, labels, current=-1):
-        self.labels = list(labels)
+    def set_days(self, days, current=-1):
+        self.days = list(days)
         self.current = current
         self.update()
 
     def paintEvent(self, _event):
+        t = theme.current()
         p = QPainter(self)
-        pal = self.palette()
+        p.setRenderHint(QPainter.Antialiasing)
         area = self.contentsRect()
-        p.fillRect(self.rect(), pal.color(QPalette.Base))
-        colw = (area.width() - TimeGrid.GUTTER) / max(1, len(self.labels))
-        for i, label in enumerate(self.labels):
-            r = QRectF(TimeGrid.GUTTER + i * colw, 0, colw, self.height())
-            if i == self.current:
-                p.setFont(scaled_font(self, 1.0, bold=True))
-                p.setPen(pal.color(QPalette.Highlight))
-            else:
-                p.setFont(self.font())
-                p.setPen(pal.color(QPalette.Text))
-            p.drawText(r, Qt.AlignCenter, label)
-        line = QColor(pal.color(QPalette.Text))
-        line.setAlpha(34)
-        p.setPen(QPen(line, 1))
+        colw = (area.width() - TimeGrid.GUTTER) / max(1, len(self.days))
+        label_font = scaled_font(self, 0.78, bold=True)
+        label_font.setLetterSpacing(QFont.AbsoluteSpacing, 1.0)
+        number_font = scaled_font(self, 1.35, bold=True)
+        for i, (name, number) in enumerate(self.days):
+            x = TimeGrid.GUTTER + i * colw
+            today = i == self.current
+            p.setFont(label_font)
+            p.setPen(QColor(t.accent if today else t.faint))
+            p.drawText(QRectF(x, 6, colw, 16), Qt.AlignCenter, name.upper())
+            circle = QRectF(x + colw / 2 - 15, 24, 30, 30)
+            if today:
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor(t.accent))
+                p.drawEllipse(circle)
+            p.setFont(number_font)
+            p.setPen(QColor(t.on_accent if today else t.text))
+            p.drawText(circle, Qt.AlignCenter, str(number))
+        p.setPen(QPen(QColor(t.border), 1))
         p.drawLine(0, self.height() - 1, self.width(), self.height() - 1)
         p.end()
+
+
+class TwoLineDelegate(QStyledItemDelegate):
+    """List row with a colour dot, a bold title and a muted second line.
+
+    Title comes from the display role; the rest from the roles below.
+    """
+
+    META = Qt.UserRole + 1
+    COLOR = Qt.UserRole + 2
+    PINNED = Qt.UserRole + 3
+
+    def sizeHint(self, option, index):
+        return QSize(0, 54)
+
+    def paint(self, p, option, index):
+        t = theme.current()
+        p.save()
+        p.setRenderHint(QPainter.Antialiasing)
+        r = QRectF(option.rect).adjusted(0, 2, 0, -2)
+        if option.state & QStyle.State_Selected:
+            bg = QColor(t.accent_soft)
+        elif option.state & QStyle.State_MouseOver:
+            bg = QColor(t.hover)
+        else:
+            bg = None
+        if bg is not None:
+            path = QPainterPath()
+            path.addRoundedRect(r, 8, 8)
+            p.fillPath(path, bg)
+
+        x = r.left() + 12
+        color = index.data(self.COLOR)
+        if color:
+            p.setPen(Qt.NoPen)
+            p.setBrush(QColor(color))
+            p.drawEllipse(QPointF(x + 4, r.top() + 17), 4, 4)
+        x += 16
+        right = r.right() - 10
+        if index.data(self.PINNED):
+            pin = icons.pixmap("pin", t.accent, 14)
+            p.drawPixmap(int(right - 14), int(r.top() + 10), pin)
+            right -= 20
+
+        title_font = scaled_font(option.widget or self.parent(), 1.0, bold=True)
+        meta_font = scaled_font(option.widget or self.parent(), 0.85)
+        p.setFont(title_font)
+        p.setPen(QColor(t.text))
+        title = QFontMetrics(title_font).elidedText(index.data(Qt.DisplayRole) or "",
+                                                   Qt.ElideRight, int(right - x))
+        p.drawText(QRectF(x, r.top() + 6, right - x, 22), Qt.AlignLeft | Qt.AlignVCenter, title)
+        p.setFont(meta_font)
+        p.setPen(QColor(t.muted))
+        meta = QFontMetrics(meta_font).elidedText(index.data(self.META) or "", Qt.ElideRight,
+                                                  int(r.right() - 10 - x))
+        p.drawText(QRectF(x, r.top() + 27, r.right() - 10 - x, 18),
+                   Qt.AlignLeft | Qt.AlignVCenter, meta)
+        p.restore()
