@@ -210,3 +210,27 @@ def test_state_follows_the_running_timer(focus_env):
     state = services.focus.state()
     assert state.running and state.started and state.phase is Phase.WORK
     assert state.remaining_seconds == 15 * 60 and round(state.progress, 2) == 0.4
+
+
+def test_ad_hoc_projects_are_logged_and_offered_again(focus_env):
+    services, clock, _ = focus_env
+    focus = services.focus
+    task_id = services.tasks.save(None, TaskInput("Essay"))
+    focus.set_focus_task(task_id)
+    focus.set_focus_project("  Portfolio   website ")
+    assert focus.focus_project() == "Portfolio website" and focus.focus_task() is None
+
+    focus.toggle()
+    clock.advance(minutes=25)
+    focus.tick()
+    clock.advance(minutes=5)
+    focus.tick()
+    focus.set_focus_task(task_id)  # picking a task clears the project
+    assert focus.focus_project() == ""
+    clock.advance(minutes=25)
+    focus.tick()
+
+    assert focus.recent_projects() == ["Portfolio website"]  # tasks aren't projects
+    assert focus.stats().today_by_project == (("Essay", 25), ("Portfolio website", 25))
+    focus.set_focus_project("")
+    assert focus.focus_project() == "" and focus.focus_task() is None

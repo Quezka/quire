@@ -473,4 +473,6 @@ MESSAGES = {
     "from {time}": "с {time}",
     "{title} in {minutes} min": "{title} через {minutes} мин",
     "{title} starts now": "{title} начинается",
+    # Focus
+    "Pick a task or type a project…": "Выберите задачу или введите проект…",
 }

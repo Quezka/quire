@@ -98,6 +98,9 @@ class Clock(Protocol):
 class FocusLogRepository(Protocol):
     def add(self, session: FocusSession) -> None: ...
     def between(self, first: date, last: date) -> list[FocusSession]: ...
+    def recent_labels(self, limit: int) -> list[str]:
+        """Ad-hoc projects (sessions without a task), most recently used first."""
+        ...
 
 
 class KeyValueStore(Protocol):

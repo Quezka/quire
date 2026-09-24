@@ -19,6 +19,7 @@ class FocusStats:
     today_minutes: int
     week_sessions: int
     week_minutes: int
+    today_by_project: tuple[tuple[str, int], ...] = ()  # (task or project, minutes), most first
 
 
 class FocusService:
@@ -85,6 +86,20 @@ class FocusService:
 
     def set_focus_task(self, task_id: int | None):
         self._settings.set(self.PREFIX + "task", None if task_id is None else str(task_id))
+        self._settings.set(self.PREFIX + "project", None)
+
+    def focus_project(self) -> str:
+        """The ad-hoc project you're on, when it isn't one of your tasks ("" for none)."""
+        return self._settings.get(self.PREFIX + "project") or ""
+
+    def set_focus_project(self, name: str):
+        """Focus on something that isn't a task, e.g. a side project; "" for nothing."""
+        name = " ".join(name.split())
+        self._settings.set(self.PREFIX + "project", name or None)
+        self._settings.set(self.PREFIX + "task", None)
+
+    def recent_projects(self, limit: int = 8) -> list[str]:
+        return self._log.recent_labels(limit)
 
     def candidate_tasks(self, days: int = 14) -> list[TaskItem]:
         """Open tasks worth focusing on: overdue, due soon, or without a date."""
@@ -130,7 +145,8 @@ class FocusService:
             if event.phase is Phase.WORK:
                 task = self._focus_task()
                 self._log.add(FocusSession(event.started, event.minutes,
-                                           task.id if task else None))
+                                           task.id if task else None,
+                                           task.title if task else self.focus_project()))
                 self._bus.publish(Topic.FOCUS)
         return last
 
@@ -141,5 +157,10 @@ class FocusService:
         monday = today - timedelta(days=today.weekday())
         week = self._log.between(monday, monday + timedelta(days=6))
         todays = [s for s in week if s.started.date() == today]
+        projects: dict[str, int] = {}
+        for s in todays:
+            if s.label:
+                projects[s.label] = projects.get(s.label, 0) + s.minutes
         return FocusStats(len(todays), sum(s.minutes for s in todays),
-                          len(week), sum(s.minutes for s in week))
+                          len(week), sum(s.minutes for s in week),
+                          tuple(sorted(projects.items(), key=lambda p: (-p[1], p[0]))))

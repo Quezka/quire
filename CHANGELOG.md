@@ -4,6 +4,19 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.10.0] - 2026-09-24
+
+### Added
+- **Focus on anything, not just tasks.** Type into "Focusing on" on the Focus page, e.g. a
+  side project, or pick one of your tasks as before.
+  - Finished sessions are logged under that name.
+  - Your recent projects are offered in the list again.
+  - The Today card shows how long you spent on each task or project.
+
+### Fixed
+- Switching the language back to English left Qt's own number and date formats in
+  Russian until restart.
+
 ## [0.9.0] - 2026-09-24
 
 ### Added

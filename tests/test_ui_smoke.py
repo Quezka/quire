@@ -30,6 +30,9 @@ def app():
     app.setOrganizationName("QuireTests")
     app.setApplicationName("QuireTests")
     QSettings().clear()
+    # The app started with the developer's own settings; tests always run in English.
+    from quire.presentation import i18n
+    i18n.install("en", app)
     return app
 
 
@@ -739,3 +742,25 @@ def test_reminder_settings_and_notification_text(window, services, monkeypatch):
         Reminder(item, datetime(2026, 9, 23, 14, 0), 10)])
     window.reminders.check()
     assert shown == [("Dentist in 10 min", "Event · 14:00–15:00 · Via Roma 3\nBring the card")]
+
+
+def test_focus_page_takes_a_typed_project_or_a_task(window, services):
+    page = window.focus
+    window.show_page(window.stack.indexOf(page))
+    page.task.lineEdit().setText("Portfolio website")
+    page.task.lineEdit().editingFinished.emit()
+    assert services.focus.focus_project() == "Portfolio website"
+    assert services.focus.focus_task() is None
+
+    first = page.task.itemData(0)  # one of the demo tasks
+    page.task.setCurrentIndex(0)
+    page.task.activated.emit(0)
+    assert services.focus.focus_task().id == first and services.focus.focus_project() == ""
+
+    page.task.lineEdit().clear()
+    page.task.lineEdit().editingFinished.emit()
+    assert services.focus.focus_task() is None and services.focus.focus_project() == ""
+
+    services.focus.set_focus_project("Guitar")
+    page._fill_tasks()
+    assert page.task.currentText() == "Guitar"

@@ -57,9 +57,14 @@ class FocusView(Page):
         controls.addWidget(skip)
         controls.addStretch()
 
-        self.task = QComboBox()
-        self.task.setMinimumWidth(260)
-        self.task.currentIndexChanged.connect(self._task_picked)
+        # Pick one of your tasks, or type anything else you're working on.
+        self.task = QComboBox(editable=True)
+        self.task.setMinimumWidth(320)
+        self.task.setInsertPolicy(QComboBox.NoInsert)
+        self.task.lineEdit().setPlaceholderText(_("Pick a task or type a project…"))
+        self.task.lineEdit().setClearButtonEnabled(True)
+        self.task.activated.connect(lambda _row: self._task_picked())
+        self.task.lineEdit().editingFinished.connect(self._task_picked)
         task_row = QHBoxLayout()
         task_row.addStretch()
         task_row.addWidget(label(_("Focusing on"), "muted"))
@@ -76,8 +81,10 @@ class FocusView(Page):
         stats = Card(_("Today"))
         self.today_value = QLabel(objectName="tileValue")
         self.today_detail = label()
+        self.projects = label("", "muted")
+        self.projects.setWordWrap(True)
         self.week_detail = label()
-        for widget in (self.today_value, self.today_detail, self.week_detail):
+        for widget in (self.today_value, self.today_detail, self.projects, self.week_detail):
             stats.add(widget)
 
         # ---- settings ----
@@ -187,6 +194,9 @@ class FocusView(Page):
         self.today_value.setText(plural(s.today_sessions, "pomodoro"))
         self.today_detail.setText(_("{duration} of focus").format(duration=fmt_duration(s.today_minutes))
                                   if s.today_minutes else _("No focus sessions yet today"))
+        self.projects.setText("\n".join(f"{name}  ·  {fmt_duration(minutes)}"
+                                         for name, minutes in s.today_by_project[:5]))
+        self.projects.setVisible(bool(s.today_by_project))
         self.week_detail.setText(_("This week: {sessions}, {duration}").format(
             sessions=plural(s.week_sessions, "pomodoro"),
             duration=fmt_duration(s.week_minutes)) if s.week_minutes else "")
@@ -198,24 +208,43 @@ class FocusView(Page):
             self._fill_tasks()
         if topic is Topic.FOCUS:
             self._render_stats()
+            if not self.task.lineEdit().hasFocus():  # don't disturb typing
+                self._fill_tasks()  # a finished session may add a recent project
 
     def _fill_tasks(self):
         current = self.focus.focus_task()
+        project = self.focus.focus_project()
         self.task.blockSignals(True)
         self.task.clear()
-        self.task.addItem(_("Nothing in particular"), None)
         for entry in self.focus.candidate_tasks():
             text = entry.task.title + (f"  ·  {entry.course.name}" if entry.course else "")
             if entry.course:
                 self.task.addItem(color_icon(entry.course.color), text, entry.task.id)
             else:
                 self.task.addItem(text, entry.task.id)
-        index = self.task.findData(current.id) if current else 0
-        self.task.setCurrentIndex(max(index, 0))
+        recent = self.focus.recent_projects()
+        if recent and self.task.count():
+            self.task.insertSeparator(self.task.count())
+        for name in recent:
+            self.task.addItem(icons.icon("timer", theme.current().muted), name, name)
+        if current:
+            self.task.setCurrentIndex(self.task.findData(current.id))
+        else:
+            self.task.setCurrentIndex(-1)
+            self.task.setEditText(project)
         self.task.blockSignals(False)
 
     def _task_picked(self):
-        self.focus.set_focus_task(self.task.currentData())
+        """A task or recent project from the list, or whatever was typed."""
+        text = self.task.currentText().strip()
+        row = self.task.findText(text)
+        data = self.task.itemData(row) if row >= 0 else None
+        current = self.focus.focus_task()
+        if isinstance(data, int):
+            if current is None or current.id != data:
+                self.focus.set_focus_task(data)
+        elif current is not None or " ".join(text.split()) != self.focus.focus_project():
+            self.focus.set_focus_project(text)
 
     # ---- settings ---------------------------------------------------------------
 

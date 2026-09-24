@@ -35,3 +35,16 @@ def test_v1_database_is_upgraded_in_place(tmp_path):
     db.close()
 
     SqliteDatabase(path).close()  # opening twice is a no-op
+
+
+def test_v7_focus_sessions_gain_a_label(tmp_path):
+    path = tmp_path / "v7.db"
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            CREATE TABLE focus_sessions (id INTEGER PRIMARY KEY, started TEXT NOT NULL,
+                                         minutes INTEGER NOT NULL, task_id INTEGER);
+            INSERT INTO focus_sessions (started, minutes) VALUES ('2026-09-23T10:00:00', 25);
+        """)
+    db = SqliteDatabase(path)
+    assert db.conn.execute("SELECT label FROM focus_sessions").fetchone()["label"] == ""
+    db.close()

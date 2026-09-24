@@ -158,3 +158,4 @@ class FocusSession:
     started: datetime
     minutes: int
     task_id: int | None = None
+    label: str = ""  # what it was spent on: the task's title or an ad-hoc project

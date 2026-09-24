@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 7
+SCHEMA_VERSION = 8
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -118,7 +118,8 @@ CREATE TABLE IF NOT EXISTS focus_sessions (
     id       INTEGER PRIMARY KEY,
     started  TEXT NOT NULL,
     minutes  INTEGER NOT NULL,
-    task_id  INTEGER REFERENCES tasks(id) ON DELETE SET NULL
+    task_id  INTEGER REFERENCES tasks(id) ON DELETE SET NULL,
+    label    TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_focus_started ON focus_sessions(started);
 CREATE TABLE IF NOT EXISTS settings (
@@ -151,6 +152,8 @@ class SqliteDatabase:
         # v7 (focus_sessions) add tables, which SCHEMA creates.
         # v6: share of pay withheld for tax per job.
         self._add_column("jobs", "deductions", "REAL NOT NULL DEFAULT 0")
+        # v8: what a focus session was spent on (task title or ad-hoc project).
+        self._add_column("focus_sessions", "label", "TEXT NOT NULL DEFAULT ''")
         # v3: topics group notes within a course.
         self._add_column("notes", "topic", "TEXT NOT NULL DEFAULT ''")
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"

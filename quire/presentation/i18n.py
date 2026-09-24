@@ -70,7 +70,7 @@ def install(code: str | None = None, app=None) -> str:
             if translator.load(f"qtbase_{_language}", folder):
                 app.installTranslator(translator)
                 _qt_translators.append(translator)
-            QLocale.setDefault(QLocale(QLocale.Russian if _language == "ru" else QLocale.English))
+        QLocale.setDefault(QLocale(QLocale.Russian if _language == "ru" else QLocale.English))
     return _language
 
 
