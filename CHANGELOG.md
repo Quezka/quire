@@ -4,6 +4,14 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.10.1] - 2026-09-24
+
+### Changed
+- **New app icon**: a gathering of pages stitched at the spine (that's what a quire is),
+  with an amber bookmark ribbon.
+  - It uses the app's own indigo, so the icon and the window match.
+  - Redrawn to stay readable at taskbar sizes.
+
 ## [0.10.0] - 2026-09-24
 
 ### Added
