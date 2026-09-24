@@ -829,3 +829,65 @@ class SubjectDelegate(QStyledItemDelegate):
                              int(chip.left() - date_w - 16 - x))
         p.drawText(QRectF(x, r.top(), chip.left() - x, r.height()),
                    Qt.AlignLeft | Qt.AlignVCenter, what)
+
+
+
+class ProgressRing(QWidget):
+    """The Focus page's big round timer: a ring that fills as the phase goes by."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.progress = 0.0
+        self.time_text = "25:00"
+        self.label = "Focus"
+        self.color = PALETTE[0]
+        self.dots = (0, 4)  # (done, total) rounds
+        self.setMinimumSize(260, 260)
+
+    def set_state(self, progress: float, time_text: str, label: str, color: str,
+                  dots: tuple[int, int]):
+        self.progress, self.time_text, self.label = progress, time_text, label
+        self.color, self.dots = color, dots
+        self.update()
+
+    def paintEvent(self, _event):
+        t = theme.current()
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        side = min(self.width(), self.height()) - 16
+        ring = QRectF((self.width() - side) / 2, (self.height() - side) / 2, side, side)
+        thickness = max(10.0, side * 0.045)
+        inner = ring.adjusted(thickness / 2, thickness / 2, -thickness / 2, -thickness / 2)
+
+        p.setPen(QPen(QColor(t.border), thickness, Qt.SolidLine, Qt.RoundCap))
+        p.drawEllipse(inner)
+        if self.progress > 0:
+            p.setPen(QPen(QColor(self.color), thickness, Qt.SolidLine, Qt.RoundCap))
+            # Qt angles are in 1/16 degree, counter-clockwise from 3 o'clock.
+            p.drawArc(inner, 90 * 16, int(-360 * 16 * min(self.progress, 1.0)))
+
+        big = QFont(self.font())
+        big.setPointSizeF(max(20.0, side / 7.5))
+        big.setBold(True)
+        p.setFont(big)
+        p.setPen(QColor(t.text))
+        p.drawText(QRectF(ring.left(), ring.center().y() - side * 0.16, side, side * 0.22),
+                   Qt.AlignCenter, self.time_text)
+
+        small = scaled_font(self, max(0.9, side / 330), bold=True)
+        small.setLetterSpacing(QFont.AbsoluteSpacing, 1.2)
+        p.setFont(small)
+        p.setPen(QColor(self.color))
+        p.drawText(QRectF(ring.left(), ring.center().y() - side * 0.30, side, side * 0.12),
+                   Qt.AlignCenter, self.label.upper())
+
+        done, total = self.dots
+        r = max(4.0, side / 70)
+        gap = r * 3.2
+        x0 = ring.center().x() - gap * (total - 1) / 2
+        y = ring.center().y() + side * 0.20
+        for i in range(total):
+            p.setPen(Qt.NoPen if i < done else QPen(QColor(t.faint), 1.5))
+            p.setBrush(QColor(self.color) if i < done else Qt.NoBrush)
+            p.drawEllipse(QPointF(x0 + i * gap, y), r, r)
+        p.end()

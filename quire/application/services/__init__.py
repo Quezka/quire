@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 from ..bus import ChangeBus
 from ..ports import Storage
+from .focus import FocusService, FocusStats
 from .notes import NoteService
 from .planner import PlannerService
 from .school import SchoolSyncService
@@ -22,9 +23,10 @@ class Services:
     notes: NoteService
     school: SchoolSyncService
     work: WorkService
+    focus: FocusService
     storage: Storage
     bus: ChangeBus
 
 
-__all__ = ["Services", "NoteService", "PlannerService", "SchoolSyncService", "TaskService",
+__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "SchoolSyncService", "TaskService",
            "TimetableService", "WorkService"]

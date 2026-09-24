@@ -13,6 +13,7 @@ class Topic(Enum):
     JOURNAL = "journal"
     SCHOOL = "school"
     WORK = "work"
+    FOCUS = "focus"
 
 
 Listener = Callable[[Topic], None]

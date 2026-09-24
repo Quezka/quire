@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 6
+SCHEMA_VERSION = 7
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -114,6 +114,13 @@ CREATE TABLE IF NOT EXISTS shift_skips (
     start_min INTEGER NOT NULL,
     PRIMARY KEY (job_id, day, start_min)
 );
+CREATE TABLE IF NOT EXISTS focus_sessions (
+    id       INTEGER PRIMARY KEY,
+    started  TEXT NOT NULL,
+    minutes  INTEGER NOT NULL,
+    task_id  INTEGER REFERENCES tasks(id) ON DELETE SET NULL
+);
+CREATE INDEX IF NOT EXISTS idx_focus_started ON focus_sessions(started);
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -140,8 +147,8 @@ class SqliteDatabase:
         # v2: sync ids for records imported from a school register.
         self._add_column("courses", "external_id", "TEXT")
         self._add_column("tasks", "external_id", "TEXT")
-        # v4 (register_subjects), v5 (jobs, shifts) and v6 (shift_patterns, shift_skips)
-        # only add tables, which SCHEMA creates.
+        # v4 (register_subjects), v5 (jobs, shifts), v6 (shift_patterns, shift_skips) and
+        # v7 (focus_sessions) add tables, which SCHEMA creates.
         # v6: share of pay withheld for tax per job.
         self._add_column("jobs", "deductions", "REAL NOT NULL DEFAULT 0")
         # v3: topics group notes within a course.

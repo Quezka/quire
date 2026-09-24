@@ -12,6 +12,7 @@ from .. import theme
 from ..bridge import ChangeRelay
 from ..dialogs import JobsDialog, ShiftDialog, weekly_shift_menu
 from ..formatting import fmt_duration, fmt_min, money, pay_text, plural, relative_date
+from ..preferences import preferences
 from ..widgets import TwoLineDelegate
 from .common import Card, Page, button, label, primary_button
 
@@ -85,7 +86,11 @@ class WorkView(Page):
         self.root.addLayout(body, 1)
 
         relay.changed.connect(lambda topic: topic is Topic.WORK and self.refresh())
-        theme.manager().changed.connect(lambda _t: self.refresh())
+        theme.manager().changed.connect(self._theme_changed)
+        preferences().changed.connect(self._preference_changed)
+        self.refresh()
+
+    def _preference_changed(self, _name: str):
         self.refresh()
 
     def new_shift(self):
@@ -98,6 +103,9 @@ class WorkView(Page):
             weekly_shift_menu(self, self.services, job_id, (day, start), QCursor.pos())
         elif item.data(Qt.UserRole) is not None:
             ShiftDialog(self.services, item.data(Qt.UserRole), parent=self).exec()
+
+    def _theme_changed(self, _theme):
+        self.refresh()
 
     def refresh(self):
         week, month = self.work.week_summary(), self.work.month_summary()

@@ -29,7 +29,8 @@ def test_v1_database_is_upgraded_in_place(tmp_path):
     note = db.conn.execute("SELECT title, topic FROM notes").fetchone()
     assert (note["title"], note["topic"]) == ("Old note", "")
     tables = {r["name"] for r in db.conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
-    assert {"jobs", "shifts", "register_subjects", "grades", "lessons", "settings"} <= tables
+    assert {"jobs", "shifts", "register_subjects", "grades", "lessons", "settings",
+            "shift_patterns", "shift_skips", "focus_sessions"} <= tables
     assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     db.close()
 

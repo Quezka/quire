@@ -20,6 +20,7 @@
       <li>Week: a colour-coded timetable; open a lesson's notes or add homework from any class</li>
       <li>Coursework: homework, assignments, readings and exams grouped by when they are due</li>
       <li>Notes: Markdown notes with search, course filing, pinning and autosave</li>
+      <li>Focus: a Pomodoro timer with breaks, task focus and daily stats</li>
     </ul>
   </description>
 
@@ -51,6 +52,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.6.0" date="2026-09-24">
+      <description>
+        <p>A Pomodoro focus timer, a Settings dialog, and a choice of currency.</p>
+      </description>
+    </release>
     <release version="0.5.0" date="2026-09-23">
       <description>
         <p>Homework from Classeviva's homework feature, and a Homework &amp; tests list on the

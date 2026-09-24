@@ -4,6 +4,26 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.6.0] - 2026-09-24
+
+### Added
+- **Focus timer** (Ctrl+7), a Pomodoro timer in the spirit of KDE's Francis.
+  - A ring counts down focus sessions and breaks: 25 minutes of focus and 5 minute
+    breaks, with a 15 minute long break after 4 rounds (all adjustable).
+  - Start/pause, reset and skip; the next phase can start by itself.
+  - Pick the task or homework you're working on.
+  - You get a notification when a phase ends.
+  - It counts completed pomodoros and focus time for today and the week.
+  - While it runs, the countdown shows in the sidebar and the window title.
+  - The timer measures against the clock, so it stays exact through sleep or a busy app.
+- **Settings** (More → Settings…, Ctrl+,) for appearance, currency and your data (backup,
+  data folder).
+- **Currency choice**: Euro, Pound, US dollar, Swiss franc or Russian ruble, or follow the
+  system. Pay used the system's currency before, which showed £ on English (UK) systems.
+
+### Changed
+- The Appearance submenu and the backup/data-folder entries moved from More into Settings.
+
 ## [0.5.0] - 2026-09-23
 
 ### Added

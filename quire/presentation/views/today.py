@@ -109,7 +109,7 @@ class TodayView(Page):
         self.root.addLayout(body, 1)
 
         relay.changed.connect(self._changed)
-        theme.manager().changed.connect(lambda _t: self.refresh())
+        theme.manager().changed.connect(self._theme_changed)
         # Roll over to the new day at midnight if the app is left open.
         self._last_seen_today = self.day
         QTimer(self, interval=60_000, timeout=self._check_midnight).start()
@@ -165,6 +165,9 @@ class TodayView(Page):
     def _changed(self, topic: Topic):
         if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS, Topic.WORK):
             self.refresh()
+
+    def _theme_changed(self, _theme):
+        self.refresh()
 
     def refresh(self) -> DayAgenda:
         agenda = self.planner.day_agenda(self.day)

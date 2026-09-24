@@ -41,6 +41,9 @@ def window(app, services):
     yield w
     w.close()
     w.deleteLater()
+    # Actually destroy it, so its pages stop listening to app-wide signals.
+    from PySide6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
 
 @pytest.mark.parametrize("mode", ["light", "dark"])
@@ -523,3 +526,63 @@ def test_school_agenda_lists_homework_and_ticks_it_off(window, services, registe
     assert "Workbook p. 18" not in [page.coming.item(i).text() for i in range(page.coming.count())]
     page.show_done.setChecked(True)
     assert "Workbook p. 18" in [page.coming.item(i).text() for i in range(page.coming.count())]
+
+
+
+def test_focus_page_start_pause_and_sidebar_countdown(window, services, app):
+    from quire.domain import Phase
+
+    page = window.focus
+    window.show_page(window.stack.indexOf(page))
+    button = window.sidebar.group.button(window.stack.indexOf(page))
+    assert page.start_btn.text() == "Start" and button.text() == "  Focus"
+
+    page._toggle()
+    assert page.start_btn.text() == "Pause"
+    assert button.text().startswith("  Focus   2")  # e.g. "  Focus   25:00"
+    assert window.windowTitle().endswith("· Quire")
+
+    page._toggle()
+    assert page.start_btn.text() == "Resume" and button.text() == "  Focus"
+    assert window.windowTitle() == "Quire"
+
+    page._skip()
+    assert services.focus.timer.phase is Phase.SHORT_BREAK
+    page._reset()
+    assert services.focus.timer.phase is Phase.WORK and page.start_btn.text() == "Start"
+    assert not window.grab().isNull()
+
+
+def test_focus_redraws_do_not_pile_up_theme_listeners(window, app):
+    from quire.presentation import theme
+
+    page = window.focus
+    page._toggle()
+    before = theme.manager().receivers("2changed(PyObject)")
+    for _ in range(50):
+        page._tick()
+    assert theme.manager().receivers("2changed(PyObject)") == before
+    page._toggle()
+
+
+def test_settings_currency_changes_the_work_page(window, services, app):
+    from quire.domain import Job, Shift
+    from quire.presentation.formatting import money
+    from quire.presentation.preferences import preferences
+    from quire.presentation.settings import SettingsDialog
+
+    from .conftest import TODAY
+
+    job_id = services.work.save_job(Job("Café", hourly_rate=10.0))
+    services.work.save_shift(Shift.between(job_id, TODAY, 18 * 60, 20 * 60))
+    dialog = SettingsDialog(services, lambda: None, window)
+    dialog.currency.setCurrentIndex(dialog.currency.findData("EUR"))
+    assert preferences().currency() == "EUR"
+    assert "€" in money(8.5) and "€" in dialog.sample.text()
+    assert "€" in window.work.week.detail.text()
+
+    dialog.appearance.setCurrentIndex(dialog.appearance.findData("dark"))
+    from quire.presentation import theme
+    assert theme.current().dark
+    dialog.currency.setCurrentIndex(0)  # back to the system default
+    assert preferences().currency() == ""

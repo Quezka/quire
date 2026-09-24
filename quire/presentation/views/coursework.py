@@ -57,7 +57,7 @@ class CourseworkView(Page):
         self.root.addWidget(card, 1)
 
         relay.changed.connect(self._changed)
-        theme.manager().changed.connect(lambda _t: self.refresh())
+        theme.manager().changed.connect(self._theme_changed)
         self.refresh()
 
     def _changed(self, topic: Topic):
@@ -68,6 +68,9 @@ class CourseworkView(Page):
 
     def new_task(self):
         TaskDialog(self.services, course_id=self.course.currentData(), parent=self).exec()
+
+    def _theme_changed(self, _theme):
+        self.refresh()
 
     def refresh(self):
         t = theme.current()

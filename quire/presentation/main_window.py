@@ -20,6 +20,8 @@ from .views.notes import NotesView
 from .views.school import SchoolView
 from .views.today import TodayView
 from .views.week import WeekView
+from .settings import SettingsDialog
+from .views.focus import FocusView
 from .views.work import WorkView
 
 
@@ -73,7 +75,8 @@ class Sidebar(QFrame):
 
 class MainWindow(QMainWindow):
     PAGES = [("today", "Today"), ("week", "Week"), ("coursework", "Coursework"),
-             ("notes", "Notes"), ("school", "School"), ("briefcase", "Work")]
+             ("notes", "Notes"), ("school", "School"), ("briefcase", "Work"),
+             ("timer", "Focus")]
 
     def __init__(self, services: Services):
         super().__init__()
@@ -89,16 +92,19 @@ class MainWindow(QMainWindow):
         self.notes = NotesView(services, relay)
         self.school = SchoolView(services, relay)
         self.work = WorkView(services, relay)
+        self.focus = FocusView(services, relay)
 
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         for i, (page, (icon_name, label)) in enumerate(zip(
-                [self.today, self.week, self.coursework, self.notes, self.school, self.work],
+                [self.today, self.week, self.coursework, self.notes, self.school, self.work,
+                 self.focus],
                 self.PAGES)):
             self.stack.addWidget(page)
             self.sidebar.add_page(icon_name, label, f"Ctrl+{i + 1}")
         self.sidebar.group.idClicked.connect(self.show_page)
         self.school.newsChanged.connect(self._school_news)
+        self.focus.statusChanged.connect(self._focus_status)
 
         more = self.sidebar.nav_button("more", "More", checkable=False)
         more.setPopupMode(QToolButton.InstantPopup)
@@ -134,6 +140,12 @@ class MainWindow(QMainWindow):
         if self.stack.currentWidget() is self.school:
             self._school_news(0)
 
+    def _focus_status(self, remaining: str):
+        """Show the running focus timer on its sidebar entry and in the title bar."""
+        button = self.sidebar.group.button(self.stack.indexOf(self.focus))
+        button.setText("  Focus" + (f"   {remaining}" if remaining else ""))
+        self.setWindowTitle(f"{remaining} · Quire" if remaining else "Quire")
+
     def _school_news(self, count: int):
         button = self.sidebar.group.button(self.stack.indexOf(self.school))
         seen = self.stack.currentWidget() is self.school
@@ -154,6 +166,7 @@ class MainWindow(QMainWindow):
         self._shortcut("Ctrl+Shift+E", self.new_event)
         self._shortcut("Ctrl+Shift+C", self.open_courses)
         self._shortcut("Ctrl+Shift+W", self.new_shift)
+        self._shortcut("Ctrl+,", self.open_settings)
         self._shortcut("Ctrl+D", self._go_today)
         self._shortcut("Ctrl+R", lambda: self.school.sync())
         self._shortcut(QKeySequence.Find, self._search_notes)
@@ -171,10 +184,7 @@ class MainWindow(QMainWindow):
             ("Jobs", None, lambda: JobsDialog(self.services, self).exec()),
             ("Sync school register", "Ctrl+R", lambda: self.school.sync()),
             None,
-            ("Back up data…", None, self.backup),
-            ("Open data folder", None, self.open_data_folder),
-            None,
-            "appearance",
+            ("Settings…", "Ctrl+,", self.open_settings),
             ("Keyboard shortcuts", None, self.show_shortcuts),
             ("About Quire", None, self.about),
         ]
@@ -182,25 +192,12 @@ class MainWindow(QMainWindow):
             if entry is None:
                 menu.addSeparator()
                 continue
-            if entry == "appearance":
-                menu.addMenu(self._appearance_menu(menu))
-                continue
             text, keys, slot = entry
             action = menu.addAction(text, slot)
             if keys:
                 action.setShortcut(QKeySequence(keys))
                 action.setShortcutVisibleInContextMenu(True)
                 action.setShortcutContext(Qt.WidgetShortcut)  # the window-level ones fire
-        return menu
-
-    def _appearance_menu(self, parent) -> QMenu:
-        menu = QMenu("Appearance", parent)
-        group = QActionGroup(menu)
-        for mode, text in [("system", "Match system"), ("light", "Light"), ("dark", "Dark")]:
-            action = menu.addAction(text, lambda m=mode: theme.manager().set_mode(m))
-            action.setCheckable(True)
-            action.setChecked(theme.manager().mode == mode)
-            group.addAction(action)
         return menu
 
     # ---- actions ----------------------------------------------------------
@@ -214,6 +211,9 @@ class MainWindow(QMainWindow):
 
     def new_event(self):
         EventDialog(self.services, day=self.today.day, parent=self).exec()
+
+    def open_settings(self):
+        SettingsDialog(self.services, self.backup, self).exec()
 
     def new_shift(self):
         ShiftDialog(self.services, day=self.today.day, parent=self).exec()
@@ -251,7 +251,8 @@ class MainWindow(QMainWindow):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.services.storage.location.parent)))
 
     def show_shortcuts(self):
-        rows = [("Ctrl+1 … 6", "Today / Week / Coursework / Notes / School / Work"),
+        rows = [("Ctrl+1 … 7", "Today / Week / Coursework / Notes / School / Work / Focus"),
+                ("Ctrl+,", "Settings"),
                 ("Ctrl+Shift+W", "New work shift"),
                 ("Ctrl+D", "Jump to today"), ("Ctrl+R", "Sync school register"),
                 ("Ctrl+N", "New note"), ("Ctrl+T", "New task"), ("Ctrl+Shift+E", "New event"),

@@ -20,6 +20,7 @@ from ..domain import (
 from .formatting import (
     KIND_LABELS, WEEKDAYS, fmt_days, fmt_duration, fmt_min, fmt_range, money, pay_text,
 )
+from .preferences import preferences
 from .widgets import (
     PALETTE, AmountEdit, ColorButton, DaysPicker, SpinBox, color_icon, min_to_qtime,
     qtime_to_min,
@@ -444,7 +445,7 @@ class JobDialog(QDialog):
         self.name = QLineEdit(placeholderText="e.g. Pizzeria Da Mario")
         used = {j.color for j in self.work.jobs()}
         self.color = ColorButton(next((c for c in reversed(PALETTE) if c not in used), PALETTE[-2]))
-        currency = QLocale.system().currencySymbol()
+        currency = preferences().currency_symbol()
         self.rate = AmountEdit(placeholderText="e.g. 8.50 (optional)")
         rate_row = QHBoxLayout()
         rate_row.addWidget(self.rate, 1)

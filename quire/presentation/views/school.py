@@ -115,7 +115,7 @@ class SchoolView(Page):
         self.root.addWidget(self.pages, 1)
 
         relay.changed.connect(self._changed)
-        theme.manager().changed.connect(lambda _t: self.refresh())
+        theme.manager().changed.connect(self._theme_changed)
         self._auto = QTimer(self, interval=AUTO_SYNC_MINUTES * 60_000, timeout=self._auto_sync)
         self._auto.start()
         self._ticker = QTimer(self, interval=60_000, timeout=self._update_subtitle)
@@ -273,6 +273,9 @@ class SchoolView(Page):
             when = "not synced yet"
         who = status.student_name or status.username
         self.subtitle.setText(f"{status.register} · {who} · {when}")
+
+    def _theme_changed(self, _theme):
+        self.refresh()
 
     def refresh(self):
         status = self.school.status()

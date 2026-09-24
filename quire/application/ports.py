@@ -11,7 +11,9 @@ from typing import Protocol
 
 from dataclasses import dataclass, field
 
-from ..domain import Course, Event, Grade, Job, Lesson, Note, Shift, Subject, Task, TaskKind
+from ..domain import (
+    Course, Event, FocusSession, Grade, Job, Lesson, Note, Shift, Subject, Task, TaskKind,
+)
 
 
 class CourseRepository(Protocol):
@@ -91,6 +93,11 @@ class Storage(Protocol):
 class Clock(Protocol):
     def today(self) -> date: ...
     def now(self) -> datetime: ...
+
+
+class FocusLogRepository(Protocol):
+    def add(self, session: FocusSession) -> None: ...
+    def between(self, first: date, last: date) -> list[FocusSession]: ...
 
 
 class KeyValueStore(Protocol):

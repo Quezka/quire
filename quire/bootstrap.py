@@ -6,14 +6,15 @@ from pathlib import Path
 from .application.bus import ChangeBus
 from .application.ports import Clock, CredentialStore, SchoolRegister
 from .application.services import (
-    NoteService, PlannerService, SchoolSyncService, Services, TaskService, TimetableService,
-    WorkService,
+    FocusService, NoteService, PlannerService, SchoolSyncService, Services, TaskService,
+    TimetableService, WorkService,
 )
 from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
 from .infrastructure.credentials import KeyringCredentialStore
 from .infrastructure.repositories import (
-    SqliteCourseRepository, SqliteEventRepository, SqliteJobRepository, SqliteJournalRepository,
+    SqliteCourseRepository, SqliteEventRepository, SqliteFocusLogRepository, SqliteJobRepository,
+    SqliteJournalRepository,
     SqliteKeyValueStore, SqliteNoteRepository, SqliteSchoolRecordRepository,
     SqliteShiftRepository, SqliteTaskRepository,
 )
@@ -34,6 +35,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     journal = SqliteJournalRepository(db)
     jobs = SqliteJobRepository(db)
     shifts = SqliteShiftRepository(db)
+    settings = SqliteKeyValueStore(db)
     services = Services(
         timetable=TimetableService(courses, bus),
         planner=PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts),
@@ -41,9 +43,9 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         notes=NoteService(notes, courses, clock, bus),
         school=SchoolSyncService(
             register or ClassevivaRegister(), credentials or KeyringCredentialStore(),
-            courses, tasks, SqliteSchoolRecordRepository(db), SqliteKeyValueStore(db),
-            clock, bus),
+            courses, tasks, SqliteSchoolRecordRepository(db), settings, clock, bus),
         work=WorkService(jobs, shifts, clock, bus),
+        focus=FocusService(SqliteFocusLogRepository(db), settings, tasks, courses, clock, bus),
         storage=db,
         bus=bus,
     )

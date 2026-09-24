@@ -1,9 +1,12 @@
 """SQLite implementations of the application's repository ports."""
 from __future__ import annotations
 
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 
-from ..domain import ClassSlot, Course, Event, Grade, Job, Lesson, Note, Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange
+from ..domain import (
+    ClassSlot, Course, Event, FocusSession, Grade, Job, Lesson, Note, Shift, ShiftPattern,
+    Subject, Task, TaskKind, TimeRange,
+)
 from .sqlite import SqliteDatabase
 
 
@@ -401,3 +404,17 @@ class SqliteShiftRepository(_Repo):
     def skip(self, job_id, day, start):
         self._write("INSERT OR IGNORE INTO shift_skips (job_id, day, start_min) VALUES (?, ?, ?)",
                     job_id, day.isoformat(), start)
+
+
+class SqliteFocusLogRepository(_Repo):
+    def add(self, session: FocusSession) -> None:
+        self._write("INSERT INTO focus_sessions (started, minutes, task_id) VALUES (?, ?, ?)",
+                    session.started.isoformat(timespec="seconds"), session.minutes,
+                    session.task_id)
+
+    def between(self, first, last):
+        rows = self._all("SELECT * FROM focus_sessions WHERE started >= ? AND started < ?"
+                         " ORDER BY started", first.isoformat(),
+                         (last + timedelta(days=1)).isoformat())
+        return [FocusSession(datetime.fromisoformat(r["started"]), r["minutes"], r["task_id"])
+                for r in rows]

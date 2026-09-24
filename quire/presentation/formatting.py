@@ -68,9 +68,12 @@ def fmt_duration(minutes: int) -> str:
 
 
 def money(value: float) -> str:
+    """An amount in the chosen currency, with the system's number format."""
     from PySide6.QtCore import QLocale
 
-    return QLocale.system().toCurrencyString(value)
+    from .preferences import preferences
+
+    return QLocale.system().toCurrencyString(value, preferences().currency_symbol())
 
 
 def fmt_days(weekdays) -> str:

@@ -45,6 +45,11 @@ your machine in a single SQLite file.
     week and this month, per job. Take-home pay is an estimate: real withholding depends on
     your contract and yearly income.
   - Double-click an empty time in Today or Week to add an event or a shift there.
+- **Focus**: a Pomodoro timer in the spirit of KDE's Francis. You get 25 minute focus
+  sessions and 5 minute breaks, with a long break every 4 rounds (all adjustable).
+  - Pick the task you're working on, and get a notification when each phase ends.
+  - Pomodoros and focus time are counted for today and the week.
+  - The countdown shows in the sidebar from any page.
 - **School (Classeviva)**: connect your Classeviva student account to pull in what teachers
   post:
   - homework and tests from the agenda and from Classeviva's homework feature ("Compiti").
@@ -63,7 +68,7 @@ your machine in a single SQLite file.
   across syncs. If a teacher deletes an assignment, Quire removes it too, unless you had
   already finished it.
 - A modern sidebar layout with light and dark themes. It follows your system by default; change
-  it under **More → Appearance**. **More → Back up data…** writes a copy of your database.
+  it in **More → Settings**, which also sets your currency and backs up your data.
 
 ### About the Classeviva connection
 
@@ -83,7 +88,8 @@ If Spaggiari changes that API, the sync may stop working until Quire is updated.
 
 | Keys | Action |
 | --- | --- |
-| Ctrl+1 … Ctrl+6 | Today / Week / Coursework / Notes / School / Work |
+| Ctrl+1 … Ctrl+7 | Today / Week / Coursework / Notes / School / Work / Focus |
+| Ctrl+, | Settings (appearance, currency, backup) |
 | Ctrl+Shift+W | New work shift |
 | Ctrl+R | Sync school register |
 | Ctrl+N | New note |
