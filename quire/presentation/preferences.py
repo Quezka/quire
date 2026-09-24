@@ -3,13 +3,15 @@ from __future__ import annotations
 
 from PySide6.QtCore import QLocale, QObject, QSettings, Signal
 
+from .i18n import N_
+
 # (ISO code, name, symbol). An empty code means "use the system's".
 CURRENCIES = [
-    ("EUR", "Euro", "€"),
-    ("GBP", "Pound sterling", "£"),
-    ("USD", "US dollar", "$"),
-    ("CHF", "Swiss franc", "CHF"),
-    ("RUB", "Russian ruble", "₽"),
+    ("EUR", N_("Euro"), "€"),
+    ("GBP", N_("Pound sterling"), "£"),
+    ("USD", N_("US dollar"), "$"),
+    ("CHF", N_("Swiss franc"), "CHF"),
+    ("RUB", N_("Russian ruble"), "₽"),
 ]
 SYMBOLS = {code: symbol for code, _name, symbol in CURRENCIES}
 

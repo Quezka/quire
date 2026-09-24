@@ -67,6 +67,7 @@ your machine in a single SQLite file.
   desktop notification when something new appears. Ticking off an imported task sticks
   across syncs. If a teacher deletes an assignment, Quire removes it too, unless you had
   already finished it.
+- **Languages**: English and Русский (Russian). Change it in **More → Settings → Language**.
 - A modern sidebar layout with light and dark themes. It follows your system by default; change
   it in **More → Settings**, which also sets your currency and backs up your data.
 
@@ -201,6 +202,21 @@ against an in-memory database with a fixed clock:
 pip install pytest
 pytest
 ```
+
+## Translations
+
+On-screen text goes through `quire/presentation/i18n.py`:
+
+- Wrap text in `_("…")`. Put values in named placeholders:
+  `_("Delete “{title}”?").format(title=…)`.
+- Use `N_("…")` for text defined in a table and translated where it's shown.
+- Use `C_("button", "Start")` when one English word needs different translations.
+- Use `plural(n, "lesson")` for counts, and the name helpers (`weekday_name`, `month_of`, …)
+  for dates; never use `strftime("%A")`.
+
+Russian lives in `quire/presentation/locales/ru.py`. `tests/test_i18n.py` fails when a string,
+error message or plural word has no Russian translation, or when a translation's placeholders
+differ from the English.
 
 ## Adding a feature
 

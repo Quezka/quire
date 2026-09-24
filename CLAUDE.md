@@ -11,3 +11,4 @@ Python 3.10+ / PySide6 desktop app (Linux + Windows). Clean Architecture; see RE
 - Classeviva is an unofficial API (`quire/infrastructure/classeviva.py`); tests use canned JSON (`tests/test_classeviva.py`) and `tests/fakes.FakeRegister`, never the network.
 - Schema changes: bump `SCHEMA_VERSION` in `infrastructure/sqlite.py` and add an idempotent step in `_migrate()`; cover it in `tests/test_migration.py`.
 - Never name a Qt subclass attribute after a Qt method (e.g. `self.done` on a QDialog); UI smoke tests in `tests/test_ui_smoke.py` catch these.
+- UI text must be translatable: wrap it in `_()` (or `N_()`/`C_()`), add the Russian to `quire/presentation/locales/ru.py`; `tests/test_i18n.py` enforces it. Never format dates with strftime names; use the i18n name helpers.

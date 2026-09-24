@@ -14,27 +14,28 @@ from ..dialogs import TaskDialog, confirm, fill_course_combo
 from ..formatting import BUCKET_LABELS, KIND_LABELS, plural, relative_date
 from ..widgets import color_icon
 from .common import Card, Page, button, primary_button
+from ..i18n import _
 
 
 class CourseworkView(Page):
     def __init__(self, services: Services, relay: ChangeRelay, parent=None):
         super().__init__(parent)
         self.services = services
-        self.title.setText("Coursework")
+        self.title.setText(_("Coursework"))
 
         self.course = QComboBox()
         self.course.setMinimumWidth(190)
-        fill_course_combo(self.course, services.timetable.courses(), "All courses")
+        fill_course_combo(self.course, services.timetable.courses(), _("All courses"))
         self.course.currentIndexChanged.connect(self.refresh)
-        self.show_done = button("Show completed", "check")
+        self.show_done = button(_("Show completed"), "check")
         self.show_done.setCheckable(True)
         self.show_done.toggled.connect(self.refresh)
-        new = primary_button("Task")
+        new = primary_button(_("Task"))
         new.clicked.connect(self.new_task)
         self.add_actions(self.course, self.show_done, new)
 
         self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["TASK", "TYPE", "COURSE", "DUE"])
+        self.tree.setHeaderLabels([_("TASK"), _("TYPE"), _("COURSE"), _("DUE")])
         self.tree.setUniformRowHeights(True)
         self.tree.setIndentation(14)
         head = self.tree.header()
@@ -47,7 +48,7 @@ class CourseworkView(Page):
         QShortcut(QKeySequence.Delete, self.tree, activated=self._delete_selected,
                   context=Qt.WidgetShortcut)
 
-        self.empty = QLabel("Nothing to do. Add a task with the button above or Ctrl+T.",
+        self.empty = QLabel(_("Nothing to do. Add a task with the button above or Ctrl+T."),
                             objectName="hint")
         self.empty.setAlignment(Qt.AlignCenter)
 
@@ -62,7 +63,7 @@ class CourseworkView(Page):
 
     def _changed(self, topic: Topic):
         if topic is Topic.COURSES:
-            fill_course_combo(self.course, self.services.timetable.courses(), "All courses")
+            fill_course_combo(self.course, self.services.timetable.courses(), _("All courses"))
         if topic in (Topic.COURSES, Topic.TASKS):
             self.refresh()
 
@@ -81,7 +82,7 @@ class CourseworkView(Page):
         overdue = sum(len(g.items) for g in groups if g.bucket is DueBucket.OVERDUE)
         summary = [plural(open_count, "open task")]
         if overdue:
-            summary.append(f"{overdue} overdue")
+            summary.append(_("{count} overdue").format(count=overdue))
         self.subtitle.setText(" · ".join(summary))
 
         self.tree.blockSignals(True)
@@ -141,5 +142,5 @@ class CourseworkView(Page):
     def _delete_selected(self):
         item = self.tree.currentItem()
         task_id = item.data(0, Qt.UserRole) if item else None
-        if task_id is not None and confirm(self, "Delete task", f"Delete “{item.text(0)}”?"):
+        if task_id is not None and confirm(self, _("Delete task"), _("Delete “{title}”?").format(title=item.text(0))):
             self.services.tasks.delete(task_id)

@@ -102,6 +102,8 @@ def main():
         "--distpath", str(ROOT / "dist"),
         "--workpath", str(BUILD / "pyinstaller"),
         "--specpath", str(BUILD),
+        # Translations are imported by name at run time, so PyInstaller can't see them.
+        "--collect-submodules", "quire.presentation.locales",
         # keyring finds its OS backends through entry points; bundle them explicitly.
         "--collect-submodules", "keyring.backends",
         "--copy-metadata", "keyring",

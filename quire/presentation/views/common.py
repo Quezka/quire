@@ -10,6 +10,7 @@ from ...application.dto import AgendaItem, ItemKind
 from .. import theme
 from ..formatting import fmt_min, fmt_range
 from ..widgets import Block
+from ..i18n import _
 
 
 class Page(QWidget):
@@ -114,9 +115,9 @@ def zoom_controls(page: QWidget, zoom) -> QWidget:
     row = QHBoxLayout(box)
     row.setContentsMargins(0, 0, 0, 0)
     row.setSpacing(0)
-    out = icon_button("zoom-out", "Zoom out (Ctrl+-)")
-    fit = icon_button("fit-day", "Fit the whole day (Ctrl+0)", checkable=True)
-    zoom_in = icon_button("zoom-in", "Zoom in (Ctrl+=, or Ctrl+scroll)")
+    out = icon_button("zoom-out", _("Zoom out (Ctrl+-)"))
+    fit = icon_button("fit-day", _("Fit the whole day (Ctrl+0)"), checkable=True)
+    zoom_in = icon_button("zoom-in", _("Zoom in (Ctrl+=, or Ctrl+scroll)"))
     out.clicked.connect(zoom.zoom_out)
     zoom_in.clicked.connect(zoom.zoom_in)
     fit.clicked.connect(lambda on: zoom.set_fit(on))
@@ -142,16 +143,16 @@ def agenda_block(item: AgendaItem, column: int) -> Block:
     if item.kind is ItemKind.CLASS:
         details = [item.room, item.teacher]
     elif item.kind in (ItemKind.SHIFT, ItemKind.WEEKLY_SHIFT):
-        label_ = "regular shift" if item.kind is ItemKind.WEEKLY_SHIFT else "work shift"
+        label_ = _("regular shift") if item.kind is ItemKind.WEEKLY_SHIFT else _("work shift")
         details = [label_, item.details.splitlines()[0] if item.details else ""]
     else:
         details = [item.details.splitlines()[0] if item.details else ""]
     when = fmt_range(item.time)
     is_shift = item.kind in (ItemKind.SHIFT, ItemKind.WEEKLY_SHIFT)
     if is_shift and item.time.end == 24 * 60:
-        when = f"{fmt_min(item.time.start)} → next day"
+        when = _("{start} → next day").format(start=fmt_min(item.time.start))
     elif is_shift and item.time.start == 0 and item.origin and item.origin[0] != item.day:
-        when = f"until {fmt_min(item.time.end)}"
+        when = _("until {end}").format(end=fmt_min(item.time.end))
     subtitle = " · ".join([when, *filter(None, details)])
     carry_over = bool(item.origin and item.origin[0] != item.day)
     return Block(column, item.time.start, item.time.end, item.title, subtitle, item.color, item,

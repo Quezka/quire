@@ -16,6 +16,7 @@ from ..dialogs import (
 )
 from ..widgets import GridHeader, TimeGrid, TimelineZoom
 from .common import Card, Page, agenda_block, button, icon_button, menu_button, zoom_controls
+from ..i18n import _, month_name, month_short, weekday_short
 
 
 class WeekView(Page):
@@ -28,22 +29,22 @@ class WeekView(Page):
         self.anchor = self.planner.today()
         self.days: tuple[date, ...] = ()
 
-        prev_btn = icon_button("chevron-left", "Previous week")
+        prev_btn = icon_button("chevron-left", _("Previous week"))
         prev_btn.clicked.connect(lambda: self.set_week(self.anchor - timedelta(days=7)))
-        next_btn = icon_button("chevron-right", "Next week")
+        next_btn = icon_button("chevron-right", _("Next week"))
         next_btn.clicked.connect(lambda: self.set_week(self.anchor + timedelta(days=7)))
         self.leading.addWidget(prev_btn)
         self.leading.addWidget(next_btn)
 
         timetable = QMenu(self)
-        timetable.addAction("Courses && class times…",
+        timetable.addAction(_("Courses && class times…"),
                             lambda: CoursesDialog(self.services, self).exec())
-        timetable.addAction("Jobs && work schedule…",
+        timetable.addAction(_("Jobs && work schedule…"),
                             lambda: JobsDialog(self.services, self).exec())
-        self.this_week = button("This week")
+        self.this_week = button(_("This week"))
         self.this_week.clicked.connect(lambda: self.set_week(self.planner.today()))
-        add = menu_button("Add", add_menu(self, self.services, self._default_day), primary=True)
-        self.add_actions(menu_button("Timetable", timetable, "week"), self.this_week, add)
+        add = menu_button(_("Add"), add_menu(self, self.services, self._default_day), primary=True)
+        self.add_actions(menu_button(_("Timetable"), timetable, "week"), self.this_week, add)
 
         self.grid = TimeGrid()
         self.grid.blockActivated.connect(self._block_activated)
@@ -90,21 +91,21 @@ class WeekView(Page):
         monday, sunday = week.monday, week.monday + timedelta(days=6)
         self.this_week.setEnabled(week.today_index is None)
         if monday.month == sunday.month:
-            self.title.setText(f"{monday:%B %Y}")
+            self.title.setText(f"{month_name(monday)} {monday.year}")
         else:
-            self.title.setText(f"{monday:%b} – {sunday:%b %Y}")
+            self.title.setText(f"{month_short(monday).capitalize()} – "
+                               f"{month_short(sunday)} {sunday.year}")
 
         now_col = -1 if week.today_index is None else week.today_index
         blocks = [agenda_block(i, week.days.index(i.day)) for i in week.items]
         self.grid.set_data(len(week.days), blocks, now_col)
         self.zoom.apply()
-        self.day_header.set_days([(f"{d:%a}", d.day) for d in week.days], now_col)
+        self.day_header.set_days([(weekday_short(d), d.day) for d in week.days], now_col)
 
         if week.has_courses:
-            self.subtitle.setText("Double-click a class for notes and homework, "
-                                  "or an empty slot to add an event or work shift")
+            self.subtitle.setText(_("Double-click a class for notes and homework, or an empty slot to add an event or work shift"))
         else:
-            self.subtitle.setText("Add your classes and work schedule under Timetable")
+            self.subtitle.setText(_("Add your classes and work schedule under Timetable"))
 
     def _block_activated(self, item: AgendaItem, pos):
         if item.kind is ItemKind.EVENT:

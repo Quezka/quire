@@ -10,6 +10,7 @@ from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
 from .. import APP_ID
 from .icons import APP_ICON
+from .i18n import _
 
 _tray: QSystemTrayIcon | None = None
 
@@ -27,6 +28,6 @@ def notify(title: str, body: str) -> None:
         return
     if _tray is None:
         _tray = QSystemTrayIcon(QIcon(str(APP_ICON)), QApplication.instance())
-        _tray.setToolTip("Quire")
+        _tray.setToolTip(_("Quire"))
         _tray.show()
     _tray.showMessage(title, body, QIcon(str(APP_ICON)), 8000)

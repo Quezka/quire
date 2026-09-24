@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from .. import APP_ID
 from ..application.services import Services
-from . import theme
+from . import i18n, theme
 from .icons import APP_ICON
 
 
@@ -17,6 +17,7 @@ def create_application(argv: list[str]) -> QApplication:
     app = QApplication(argv)
     app.setStyle("Fusion")
     app.setWindowIcon(QIcon(str(APP_ICON)))
+    i18n.install(app=app)  # before any window is built: texts are translated as they're made
     theme.install(app)
     return app
 

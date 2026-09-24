@@ -12,18 +12,35 @@ from .. import __version__
 from ..application.services import Services
 from . import theme
 from .formatting import money
+from .i18n import LANGUAGES, chosen_language, language, resolve, set_chosen_language
 from .preferences import CURRENCIES, preferences
+from .i18n import _
+
+
+def restart_app():
+    """Start a fresh Quire and quit this one (the window saves on close)."""
+    import sys
+
+    from PySide6.QtCore import QProcess
+    from PySide6.QtWidgets import QApplication
+
+    args = sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv
+    if QProcess.startDetached(sys.executable, args):
+        for window in QApplication.topLevelWidgets():
+            window.close()
+        QApplication.quit()
 
 
 class SettingsDialog(QDialog):
     def __init__(self, services: Services, backup, parent=None):
         super().__init__(parent)
         self.services = services
-        self.setWindowTitle("Settings")
+        self.setWindowTitle(_("Settings"))
         self.setMinimumWidth(460)
 
         self.appearance = QComboBox()
-        for mode, text in (("system", "Match system"), ("light", "Light"), ("dark", "Dark")):
+        for mode, text in (("system", _("Match system")), ("light", _("Light")),
+                           ("dark", _("Dark"))):
             self.appearance.addItem(text, mode)
         self.appearance.setCurrentIndex(max(self.appearance.findData(theme.manager().mode), 0))
         self.appearance.currentIndexChanged.connect(
@@ -32,18 +49,32 @@ class SettingsDialog(QDialog):
         self.currency = QComboBox()
         from PySide6.QtCore import QLocale
         system = QLocale.system().currencySymbol()
-        self.currency.addItem(f"System default ({system})", "")
+        self.currency.addItem(_("System default ({system})").format(system=system), "")
         for code, name, symbol in CURRENCIES:
-            self.currency.addItem(f"{name} ({symbol})", code)
+            self.currency.addItem(f"{_(name)} ({symbol})", code)
         self.currency.setCurrentIndex(max(self.currency.findData(preferences().currency()), 0))
         # currentIndexChanged passes the row number; don't let it land in `save`.
         self.currency.currentIndexChanged.connect(lambda _row: self._currency_picked())
         self.sample = QLabel(objectName="hint")
         self._show_sample()
 
-        backup_btn = QPushButton("Back up data…")
+        self.language = QComboBox()
+        for code, name in LANGUAGES:
+            self.language.addItem(_(name) if code == "" else name, code)
+        self.language.setCurrentIndex(max(self.language.findData(chosen_language()), 0))
+        self.language.currentIndexChanged.connect(lambda _row: self._language_picked())
+        self.restart = QPushButton(_("Restart now"))
+        self.restart.clicked.connect(restart_app)
+        self.language_hint = QLabel(objectName="hint")
+        self.language_hint.setWordWrap(True)
+        language_row = QHBoxLayout()
+        language_row.addWidget(self.language, 1)
+        language_row.addWidget(self.restart)
+        self.restart.setVisible(False)
+
+        backup_btn = QPushButton(_("Back up data…"))
         backup_btn.clicked.connect(backup)
-        folder = QPushButton("Open data folder")
+        folder = QPushButton(_("Open data folder"))
         folder.clicked.connect(lambda: QDesktopServices.openUrl(
             QUrl.fromLocalFile(str(services.storage.location.parent))))
         data_row = QHBoxLayout()
@@ -53,31 +84,41 @@ class SettingsDialog(QDialog):
 
         form = QFormLayout()
         form.setVerticalSpacing(12)
-        form.addRow(self._section("Look"))
-        form.addRow("Appearance", self.appearance)
-        form.addRow(self._section("Money"))
-        form.addRow("Currency", self.currency)
+        form.addRow(self._section(_("Look")))
+        form.addRow(_("Appearance"), self.appearance)
+        form.addRow(_("Language"), language_row)
+        form.addRow("", self.language_hint)
+        form.addRow(self._section(_("Money")))
+        form.addRow(_("Currency"), self.currency)
         form.addRow("", self.sample)
-        form.addRow(self._section("Your data"))
+        form.addRow(self._section(_("Your data")))
         form.addRow("", data_row)
         location = QLabel(str(services.storage.location), objectName="hint")
         location.setWordWrap(True)
-        form.addRow("Stored in", location)
+        form.addRow(_("Stored in"), location)
 
         close = QDialogButtonBox(QDialogButtonBox.Close)
         close.rejected.connect(self.accept)
         layout = QVBoxLayout(self)
         layout.addLayout(form)
-        layout.addWidget(QLabel(f"Quire {__version__}", objectName="hint"))
+        layout.addWidget(QLabel(_("Quire {version}").format(version=__version__), objectName="hint"))
         layout.addWidget(close)
 
     @staticmethod
     def _section(text: str) -> QLabel:
-        return QLabel(f"<b>{text}</b>")
+        return QLabel(_("<b>{text}</b>").format(text=text))
+
+    def _language_picked(self):
+        code = self.language.currentData()
+        set_chosen_language(code)
+        changed = resolve(code) != language()
+        self.language_hint.setText(_("Quire needs to restart to switch language.")
+                                   if changed else "")
+        self.restart.setVisible(changed)
 
     def _currency_picked(self):
         preferences().set_currency(self.currency.currentData())
         self._show_sample()
 
     def _show_sample(self):
-        self.sample.setText(f"Shows as {money(8.5)} per hour")
+        self.sample.setText(_("Shows as {amount} per hour").format(amount=money(8.5)))

@@ -4,6 +4,21 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.7.0] - 2026-09-24
+
+### Added
+- **Русский язык** (Russian). Choose it in **Settings → Language** (System / English /
+  Русский). "System" picks Russian on Russian systems. It covers:
+  - the whole interface, including day and month names in the right grammatical case
+    ("23 сентября"), Russian plurals (1 урок, 2 урока, 5 уроков), and error messages;
+  - Qt's own buttons and dialogs ("Сохранить", "Отмена");
+  - Russian date pickers.
+  Switching language offers a "Restart now" button.
+
+### Changed
+- All on-screen text goes through a translation layer, and a test fails if any of it lacks
+  a Russian translation or a translation drops a `{placeholder}`.
+
 ## [0.6.0] - 2026-09-24
 
 ### Added

@@ -25,6 +25,7 @@ from ..widgets import NO_COLOR, TimeGrid, TimelineZoom, color_icon
 from .common import (
     Card, Page, agenda_block, badge, button, icon_button, menu_button, zoom_controls,
 )
+from ..i18n import _
 
 
 class TodayView(Page):
@@ -37,9 +38,9 @@ class TodayView(Page):
         self.day = self.planner.today()
 
         # ---- header ----
-        prev_btn = icon_button("chevron-left", "Previous day")
+        prev_btn = icon_button("chevron-left", _("Previous day"))
         prev_btn.clicked.connect(lambda: self.set_day(self.day - timedelta(days=1)))
-        next_btn = icon_button("chevron-right", "Next day")
+        next_btn = icon_button("chevron-right", _("Next day"))
         next_btn.clicked.connect(lambda: self.set_day(self.day + timedelta(days=1)))
         self.leading.addWidget(prev_btn)
         self.leading.addWidget(next_btn)
@@ -47,7 +48,7 @@ class TodayView(Page):
         self.calendar = QCalendarWidget()
         self.calendar.setVerticalHeaderFormat(QCalendarWidget.NoVerticalHeader)
         self.calendar.clicked.connect(self._calendar_picked)
-        pick = icon_button("calendar-day", "Pick a date")
+        pick = icon_button("calendar-day", _("Pick a date"))
         pick.setPopupMode(QToolButton.InstantPopup)
         self._calendar_menu = QMenu(pick)
         holder = QWidgetAction(self._calendar_menu)
@@ -55,9 +56,9 @@ class TodayView(Page):
         self._calendar_menu.addAction(holder)
         pick.setMenu(self._calendar_menu)
 
-        self.today_btn = button("Today")
+        self.today_btn = button(_("Today"))
         self.today_btn.clicked.connect(lambda: self.set_day(self.planner.today()))
-        add = menu_button("Add", add_menu(self, self.services, lambda: self.day), primary=True)
+        add = menu_button(_("Add"), add_menu(self, self.services, lambda: self.day), primary=True)
         self.add_actions(pick, self.today_btn, add)
 
         # ---- timeline ----
@@ -72,13 +73,13 @@ class TodayView(Page):
         timeline.add(self.scroll, 1)
 
         # ---- due ----
-        due = Card("Due")
+        due = Card(_("Due"))
         self.due_count = badge()
         due.title_row.insertWidget(1, self.due_count)
         self.tasks = QListWidget()
         self.tasks.itemChanged.connect(self._task_toggled)
         self.tasks.itemDoubleClicked.connect(self._task_open)
-        self.quick = QLineEdit(placeholderText="Add a task for this day", clearButtonEnabled=True)
+        self.quick = QLineEdit(placeholderText=_("Add a task for this day"), clearButtonEnabled=True)
         self.quick.setObjectName("search")
         self._quick_action = self.quick.addAction(icons.icon("plus", theme.current().faint, size=16),
                                                   QLineEdit.LeadingPosition)
@@ -88,8 +89,8 @@ class TodayView(Page):
         due.add(self.quick)
 
         # ---- journal ----
-        notes = Card("Day notes")
-        self.journal = QPlainTextEdit(placeholderText="Anything to remember about this day…")
+        notes = Card(_("Day notes"))
+        self.journal = QPlainTextEdit(placeholderText=_("Anything to remember about this day…"))
         self.journal.setObjectName("bare")
         notes.add(self.journal, 1)
         self._journal_timer = QTimer(self, singleShot=True, interval=600,
@@ -191,7 +192,7 @@ class TodayView(Page):
         if agenda.shift_count:
             parts.append(plural(agenda.shift_count, "work shift"))
         if not agenda.has_courses:
-            parts.append("add your timetable in Week")
+            parts.append(_("add your timetable in Week"))
         self.subtitle.setText(" · ".join(parts))
         self.due_count.setText(str(agenda.open_task_count))
         self.due_count.setVisible(agenda.open_task_count > 0)
@@ -207,7 +208,7 @@ class TodayView(Page):
             if entry.course:
                 meta.append(entry.course.name)
             if entry.overdue:
-                meta.append("overdue · " + relative_date(task.due, today))
+                meta.append(_("overdue · {when}").format(when=relative_date(task.due, today)))
             item = QListWidgetItem(task.title + ("\n" + " · ".join(meta) if meta else ""))
             item.setData(Qt.UserRole, task.id)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
@@ -222,7 +223,7 @@ class TodayView(Page):
                 item.setForeground(QColor(t.danger))
             self.tasks.addItem(item)
         if not agenda.tasks:
-            empty = QListWidgetItem("Nothing due. Nice.")
+            empty = QListWidgetItem(_("Nothing due. Nice."))
             empty.setFlags(Qt.NoItemFlags)
             empty.setForeground(QColor(t.faint))
             self.tasks.addItem(empty)

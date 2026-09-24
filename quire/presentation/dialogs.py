@@ -18,13 +18,14 @@ from ..domain import (
     TaskKind, TimeRange, net_pay,
 )
 from .formatting import (
-    KIND_LABELS, WEEKDAYS, fmt_days, fmt_duration, fmt_min, fmt_range, money, pay_text,
+    KIND_LABELS, fmt_days, fmt_duration, fmt_min, fmt_range, money, pay_text,
 )
 from .preferences import preferences
 from .widgets import (
     PALETTE, AmountEdit, ColorButton, DaysPicker, SpinBox, color_icon, min_to_qtime,
     qtime_to_min,
 )
+from .i18n import N_, _, weekday_name, weekday_names
 
 
 def to_qdate(d: date) -> QDate:
@@ -57,7 +58,7 @@ def attempt(parent, action: Callable[[], object]) -> bool:
     try:
         action()
     except DomainError as e:
-        QMessageBox.warning(parent, "Can't save", str(e))
+        QMessageBox.warning(parent, _("Can't save"), _(str(e)))
         return False
     return True
 
@@ -68,13 +69,13 @@ def _time_edit(minutes: int) -> QTimeEdit:
     return edit
 
 
-def _buttons(dialog: QDialog, on_save, on_delete=None, delete_label="Delete") -> QDialogButtonBox:
+def _buttons(dialog: QDialog, on_save, on_delete=None, delete_label=None) -> QDialogButtonBox:
     buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
     buttons.accepted.connect(on_save)
     buttons.rejected.connect(dialog.reject)
     buttons.button(QDialogButtonBox.Save).setObjectName("primary")
     if on_delete:
-        delete = buttons.addButton(delete_label, QDialogButtonBox.DestructiveRole)
+        delete = buttons.addButton(delete_label or _("Delete"), QDialogButtonBox.DestructiveRole)
         delete.setObjectName("danger")
         delete.clicked.connect(on_delete)
     return buttons
@@ -87,21 +88,21 @@ class CourseDialog(QDialog):
         self.school = services.school
         self.course_id = course_id
         self._external_id = None
-        self.setWindowTitle("Edit course" if course_id else "New course")
+        self.setWindowTitle(_("Edit course") if course_id else _("New course"))
         self.setMinimumWidth(600)
 
-        self.name = QLineEdit(placeholderText="e.g. Biology")
-        self.teacher = QLineEdit(placeholderText="optional")
-        self.room = QLineEdit(placeholderText="default room, optional")
+        self.name = QLineEdit(placeholderText=_("e.g. Biology"))
+        self.teacher = QLineEdit(placeholderText=_("optional"))
+        self.room = QLineEdit(placeholderText=_("default room, optional"))
         used = {c.color for c in self.timetable.courses()}
         self.color = ColorButton(next((c for c in PALETTE if c not in used),
                                       PALETTE[len(used) % len(PALETTE)]))
 
         form = QFormLayout()
-        form.addRow("Name", self.name)
-        form.addRow("Teacher", self.teacher)
-        form.addRow("Room", self.room)
-        form.addRow("Colour", self.color)
+        form.addRow(_("Name"), self.name)
+        form.addRow(_("Teacher"), self.teacher)
+        form.addRow(_("Room"), self.room)
+        form.addRow(_("Colour"), self.color)
 
         # Which register subject feeds homework and grades into this course.
         self.subject = None
@@ -109,31 +110,32 @@ class CourseDialog(QDialog):
         if links:
             register = self.school.status().register
             self.subject = QComboBox()
-            self.subject.addItem("Not linked", None)
+            self.subject.addItem(_("Not linked"), None)
             for link in links:
                 text = link.subject.name
                 if link.course and link.course.id != course_id:
-                    text += f"   (now in {link.course.name})"
+                    text += "   " + _("(now in {course})").format(course=link.course.name)
                 self.subject.addItem(text, link.subject.external_id)
             self.subject.currentIndexChanged.connect(self._subject_picked)
-            hint = QLabel(f"Homework, tests and grades for this {register} subject go into this "
-                          "course. Linking merges any course the sync created for it.")
+            hint = QLabel(_("Homework, tests and grades for this {register} subject go into this "
+                            "course. Linking merges any course the sync created for it.").format(
+                                register=register))
             hint.setObjectName("hint")
             hint.setWordWrap(True)
-            form.addRow(f"{register} subject", self.subject)
+            form.addRow(_("{register} subject").format(register=register), self.subject)
             form.addRow("", hint)
 
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Day", "Start", "End", "Room (if different)"])
+        self.table.setHorizontalHeaderLabels([_("Day"), _("Start"), _("End"), _("Room (if different)")])
         self.table.verticalHeader().hide()
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.horizontalHeader().setSectionResizeMode(3, QHeaderView.Stretch)
         self.table.setColumnWidth(0, 130)
         self.table.setMinimumHeight(180)
 
-        add = QPushButton("Add class time")
+        add = QPushButton(_("Add class time"))
         add.clicked.connect(lambda: self._add_row())
-        remove = QPushButton("Remove selected")
+        remove = QPushButton(_("Remove selected"))
         remove.clicked.connect(self._remove_rows)
         row_buttons = QHBoxLayout()
         row_buttons.addWidget(add)
@@ -143,11 +145,11 @@ class CourseDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addSpacing(6)
-        layout.addWidget(QLabel("<b>Weekly timetable</b>"))
+        layout.addWidget(QLabel(_("<b>Weekly timetable</b>")))
         layout.addWidget(self.table)
         layout.addLayout(row_buttons)
         layout.addWidget(_buttons(self, self._save, self._delete if course_id else None,
-                                  "Delete course"))
+                                  _("Delete course")))
 
         if course_id:
             c = self.timetable.course(course_id)
@@ -178,7 +180,7 @@ class CourseDialog(QDialog):
                 weekday, start, end = 0, 9 * 60, 10 * 60
         self.table.insertRow(row)
         day = QComboBox()
-        day.addItems(WEEKDAYS)
+        day.addItems(weekday_names())
         day.setCurrentIndex(weekday)
         self.table.setCellWidget(row, 0, day)
         self.table.setCellWidget(row, 1, _time_edit(start))
@@ -207,7 +209,7 @@ class CourseDialog(QDialog):
             try:
                 slots.append(ClassSlot(weekday, TimeRange(start, end), room))
             except DomainError as e:
-                QMessageBox.warning(self, "Check class times", f"Class time {r + 1}: {e}")
+                QMessageBox.warning(self, _("Check class times"), _("Class time {number}: {problem}").format(number=r + 1, problem=_(str(e))))
                 return
         # Carry the existing link through the save; relinking is a separate use case.
         course = Course(self.name.text().strip(), self.teacher.text().strip(),
@@ -222,8 +224,7 @@ class CourseDialog(QDialog):
         self.accept()
 
     def _delete(self):
-        if confirm(self, "Delete course", "Delete this course and its timetable?\n"
-                                          "Its notes and tasks are kept, just unlinked."):
+        if confirm(self, _("Delete course"), _("Delete this course and its timetable?\nIts notes and tasks are kept, just unlinked.")):
             self.timetable.delete_course(self.course_id)
             self.accept()
 
@@ -234,14 +235,14 @@ class CoursesDialog(QDialog):
     def __init__(self, services: Services, parent=None):
         super().__init__(parent)
         self.services = services
-        self.setWindowTitle("Courses & timetable")
+        self.setWindowTitle(_("Courses & timetable"))
         self.setMinimumSize(480, 380)
 
         self.list = QListWidget()
         self.list.itemDoubleClicked.connect(self._edit)
-        add = QPushButton("Add course…")
+        add = QPushButton(_("Add course…"))
         add.clicked.connect(self._add)
-        edit = QPushButton("Edit…")
+        edit = QPushButton(_("Edit…"))
         edit.clicked.connect(lambda: self._edit(self.list.currentItem()))
         close = QDialogButtonBox(QDialogButtonBox.Close)
         close.rejected.connect(self.accept)
@@ -261,8 +262,8 @@ class CoursesDialog(QDialog):
     def _reload(self):
         self.list.clear()
         for c in self.services.timetable.courses():
-            when = ", ".join(f"{WEEKDAYS[s.weekday][:3]} {fmt_min(s.time.start)}"
-                             for s in c.slots) or "no class times yet"
+            when = ", ".join(f"{weekday_names()[s.weekday][:3]} {fmt_min(s.time.start)}"
+                             for s in c.slots) or _("no class times yet")
             item = QListWidgetItem(color_icon(c.color, 14), f"{c.name}\n{when}")
             item.setData(Qt.UserRole, c.id)
             self.list.addItem(item)
@@ -282,30 +283,30 @@ class EventDialog(QDialog):
         super().__init__(parent)
         self.planner = services.planner
         self.event_id = event_id
-        self.setWindowTitle("Edit event" if event_id else "New event")
+        self.setWindowTitle(_("Edit event") if event_id else _("New event"))
         self.setMinimumWidth(420)
 
-        self.title = QLineEdit(placeholderText="What's happening?")
+        self.title = QLineEdit(placeholderText=_("What's happening?"))
         self.date = QDateEdit(calendarPopup=True)
         self.date.setDisplayFormat("ddd d MMM yyyy")
         self.start = _time_edit(start)
         self.end = _time_edit(min(start + 60, 24 * 60 - 1))
         self.color = ColorButton("#8a8f98")
-        self.details = QPlainTextEdit(placeholderText="Details (optional)")
+        self.details = QPlainTextEdit(placeholderText=_("Details (optional)"))
         self.details.setFixedHeight(90)
 
         times = QHBoxLayout()
         times.addWidget(self.start)
-        times.addWidget(QLabel("to"))
+        times.addWidget(QLabel(_("to")))
         times.addWidget(self.end)
         times.addStretch()
 
         form = QFormLayout()
-        form.addRow("Title", self.title)
-        form.addRow("Date", self.date)
-        form.addRow("Time", times)
-        form.addRow("Colour", self.color)
-        form.addRow("Details", self.details)
+        form.addRow(_("Title"), self.title)
+        form.addRow(_("Date"), self.date)
+        form.addRow(_("Time"), times)
+        form.addRow(_("Colour"), self.color)
+        form.addRow(_("Details"), self.details)
 
         layout = QVBoxLayout(self)
         layout.addLayout(form)
@@ -334,7 +335,7 @@ class EventDialog(QDialog):
             self.accept()
 
     def _delete(self):
-        if confirm(self, "Delete event", "Delete this event?"):
+        if confirm(self, _("Delete event"), _("Delete this event?")):
             self.planner.delete_event(self.event_id)
             self.accept()
 
@@ -345,21 +346,21 @@ class TaskDialog(QDialog):
         super().__init__(parent)
         self.tasks = services.tasks
         self.task_id = task_id
-        self.setWindowTitle("Edit task" if task_id else "New task")
+        self.setWindowTitle(_("Edit task") if task_id else _("New task"))
         self.setMinimumWidth(440)
 
-        self.title = QLineEdit(placeholderText="e.g. Chapter 4 questions")
+        self.title = QLineEdit(placeholderText=_("e.g. Chapter 4 questions"))
         self.kind = QComboBox()
         for k, label in KIND_LABELS.items():
             self.kind.addItem(label, k)
         self.course = QComboBox()
-        fill_course_combo(self.course, services.timetable.courses(), "No course")
-        self.has_due = QCheckBox("Due")
+        fill_course_combo(self.course, services.timetable.courses(), _("No course"))
+        self.has_due = QCheckBox(_("Due"))
         self.due = QDateEdit(calendarPopup=True)
         self.due.setDisplayFormat("ddd d MMM yyyy")
         self.has_due.toggled.connect(self.due.setEnabled)
-        self.completed = QCheckBox("Completed")
-        self.details = QPlainTextEdit(placeholderText="Details (optional)")
+        self.completed = QCheckBox(_("Completed"))
+        self.details = QPlainTextEdit(placeholderText=_("Details (optional)"))
         self.details.setFixedHeight(90)
 
         due_row = QHBoxLayout()
@@ -367,11 +368,11 @@ class TaskDialog(QDialog):
         due_row.addWidget(self.due, 1)
 
         form = QFormLayout()
-        form.addRow("Title", self.title)
-        form.addRow("Type", self.kind)
-        form.addRow("Course", self.course)
-        form.addRow("Date", due_row)
-        form.addRow("Details", self.details)
+        form.addRow(_("Title"), self.title)
+        form.addRow(_("Type"), self.kind)
+        form.addRow(_("Course"), self.course)
+        form.addRow(_("Date"), due_row)
+        form.addRow(_("Details"), self.details)
         form.addRow("", self.completed)
 
         layout = QVBoxLayout(self)
@@ -400,7 +401,7 @@ class TaskDialog(QDialog):
             self.accept()
 
     def _delete(self):
-        if confirm(self, "Delete task", "Delete this task?"):
+        if confirm(self, _("Delete task"), _("Delete this task?")):
             self.tasks.delete(self.task_id)
             self.accept()
 
@@ -409,9 +410,9 @@ def class_menu(parent, services: Services, course_id: int, day: date, pos,
                open_note: Callable[[int, date], None]):
     """Menu shown when a class block is activated in the day or week view."""
     menu = QMenu(parent)
-    note = menu.addAction("Open class notes")
-    homework = menu.addAction("Add homework…")
-    edit = menu.addAction("Edit course…")
+    note = menu.addAction(_("Open class notes"))
+    homework = menu.addAction(_("Add homework…"))
+    edit = menu.addAction(_("Edit course…"))
     chosen = menu.exec(pos)
     if chosen is note:
         open_note(course_id, day)
@@ -426,10 +427,10 @@ def class_menu(parent, services: Services, course_id: int, day: date, pos,
 # Common withholding on student jobs (Italy). Estimates only: the real figure
 # depends on the contract and on total yearly income.
 DEDUCTION_PRESETS = [
-    ("No deductions", 0.0),
-    ("Occasional work: ritenuta d'acconto (20%)", 20.0),
-    ("Employee: INPS contributions (9.19%)", 9.19),
-    ("Custom…", None),
+    (N_("No deductions"), 0.0),
+    (N_("Occasional work: ritenuta d'acconto (20%)"), 20.0),
+    (N_("Employee: INPS contributions (9.19%)"), 9.19),
+    (N_("Custom…"), None),
 ]
 
 
@@ -439,21 +440,21 @@ class JobDialog(QDialog):
         self.services = services
         self.work = services.work
         self.job_id = job_id
-        self.setWindowTitle("Edit job" if job_id else "New job")
+        self.setWindowTitle(_("Edit job") if job_id else _("New job"))
         self.setMinimumWidth(620)
 
-        self.name = QLineEdit(placeholderText="e.g. Pizzeria Da Mario")
+        self.name = QLineEdit(placeholderText=_("e.g. Pizzeria Da Mario"))
         used = {j.color for j in self.work.jobs()}
         self.color = ColorButton(next((c for c in reversed(PALETTE) if c not in used), PALETTE[-2]))
         currency = preferences().currency_symbol()
-        self.rate = AmountEdit(placeholderText="e.g. 8.50 (optional)")
+        self.rate = AmountEdit(placeholderText=_("e.g. 8.50 (optional)"))
         rate_row = QHBoxLayout()
         rate_row.addWidget(self.rate, 1)
-        rate_row.addWidget(QLabel(f"{currency} per hour, before tax"))
+        rate_row.addWidget(QLabel(_("{currency} per hour, before tax").format(currency=currency)))
 
         self.preset = QComboBox()
         for text, value in DEDUCTION_PRESETS:
-            self.preset.addItem(text, value)
+            self.preset.addItem(_(text), value)
         self.deductions = AmountEdit(placeholderText="0")
         self.deductions.setMaximumWidth(90)
         deduction_row = QHBoxLayout()
@@ -464,25 +465,24 @@ class JobDialog(QDialog):
         self.deductions.textEdited.connect(self._deductions_typed)
 
         form = QFormLayout()
-        form.addRow("Name", self.name)
-        form.addRow("Colour", self.color)
-        form.addRow("Hourly pay", rate_row)
-        form.addRow("Tax & deductions", deduction_row)
-        hint = QLabel("Take-home pay is an estimate: what's really withheld depends on your "
-                      "contract and your total income for the year.", objectName="hint")
+        form.addRow(_("Name"), self.name)
+        form.addRow(_("Colour"), self.color)
+        form.addRow(_("Hourly pay"), rate_row)
+        form.addRow(_("Tax & deductions"), deduction_row)
+        hint = QLabel(_("Take-home pay is an estimate: what's really withheld depends on your contract and your total income for the year."), objectName="hint")
         hint.setWordWrap(True)
         form.addRow("", hint)
 
         self.table = QTableWidget(0, 4)
-        self.table.setHorizontalHeaderLabels(["Days", "Start", "End", "Unpaid break"])
+        self.table.setHorizontalHeaderLabels([_("Days"), _("Start"), _("End"), _("Unpaid break")])
         self.table.verticalHeader().hide()
         self.table.setSelectionBehavior(QAbstractItemView.SelectRows)
         self.table.horizontalHeader().setSectionResizeMode(0, QHeaderView.Stretch)
         self.table.verticalHeader().setDefaultSectionSize(38)
         self.table.setMinimumHeight(160)
-        add = QPushButton("Add regular shift")
+        add = QPushButton(_("Add regular shift"))
         add.clicked.connect(lambda: self._add_row())
-        remove = QPushButton("Remove selected")
+        remove = QPushButton(_("Remove selected"))
         remove.clicked.connect(self._remove_rows)
         row_buttons = QHBoxLayout()
         row_buttons.addWidget(add)
@@ -492,15 +492,14 @@ class JobDialog(QDialog):
         layout = QVBoxLayout(self)
         layout.addLayout(form)
         layout.addSpacing(6)
-        layout.addWidget(QLabel("<b>Weekly schedule</b>"))
-        schedule_hint = QLabel("Shifts you work every week. They show up in Week next to your "
-                               "classes. Changes apply from this week on.", objectName="hint")
+        layout.addWidget(QLabel(_("<b>Weekly schedule</b>")))
+        schedule_hint = QLabel(_("Shifts you work every week. They show up in Week next to your classes. Changes apply from this week on."), objectName="hint")
         schedule_hint.setWordWrap(True)
         layout.addWidget(schedule_hint)
         layout.addWidget(self.table)
         layout.addLayout(row_buttons)
         layout.addWidget(_buttons(self, self._save, self._delete if job_id else None,
-                                  "Delete job"))
+                                  _("Delete job")))
 
         if job_id:
             job = self.work.job(job_id)
@@ -552,8 +551,8 @@ class JobDialog(QDialog):
         self.table.setCellWidget(row, 0, DaysPicker(days))
         self.table.setCellWidget(row, 1, _time_edit(start))
         self.table.setCellWidget(row, 2, _time_edit(end))
-        pause_box = SpinBox(maximum=240, singleStep=5, suffix=" min")
-        pause_box.setSpecialValueText("None")
+        pause_box = SpinBox(maximum=240, singleStep=5, suffix=" " + _("min"))
+        pause_box.setSpecialValueText(_("None"))
         pause_box.setValue(pause)
         self.table.setCellWidget(row, 3, pause_box)
 
@@ -569,8 +568,8 @@ class JobDialog(QDialog):
         for r in range(self.table.rowCount()):
             days = self.table.cellWidget(r, 0).days()
             if not days:
-                QMessageBox.warning(self, "Pick the days",
-                                    f"Regular shift {r + 1} has no days selected.")
+                QMessageBox.warning(self, _("Pick the days"),
+                                    _("Regular shift {number} has no days selected.").format(number=r + 1))
                 return None
             start = qtime_to_min(self.table.cellWidget(r, 1).time())
             end = qtime_to_min(self.table.cellWidget(r, 2).time())
@@ -585,9 +584,8 @@ class JobDialog(QDialog):
             rate = self.rate.amount()
             deductions = self.deductions.amount() or 0.0
         except ValueError:
-            QMessageBox.warning(self, "Check the numbers",
-                                "Type the hourly pay and deductions as numbers, like 8.50 or "
-                                "8,50. Leave the pay empty if you don't want to track it.")
+            QMessageBox.warning(self, _("Check the numbers"),
+                                _("Type the hourly pay and deductions as numbers, like 8.50 or 8,50. Leave the pay empty if you don't want to track it."))
             return
         weekly = self._schedule()
         if weekly is None:
@@ -599,8 +597,7 @@ class JobDialog(QDialog):
             self.accept()
 
     def _delete(self):
-        if confirm(self, "Delete job", "Delete this job, its weekly schedule and all of its "
-                                       "shifts?"):
+        if confirm(self, _("Delete job"), _("Delete this job, its weekly schedule and all of its shifts?")):
             self.work.delete_job(self.job_id)
             self.accept()
 
@@ -609,13 +606,13 @@ class JobsDialog(QDialog):
     def __init__(self, services: Services, parent=None):
         super().__init__(parent)
         self.services = services
-        self.setWindowTitle("Jobs & work schedule")
+        self.setWindowTitle(_("Jobs & work schedule"))
         self.setMinimumSize(460, 340)
         self.list = QListWidget()
         self.list.itemDoubleClicked.connect(self._edit)
-        add = QPushButton("Add job…")
+        add = QPushButton(_("Add job…"))
         add.clicked.connect(self._add)
-        edit = QPushButton("Edit…")
+        edit = QPushButton(_("Edit…"))
         edit.clicked.connect(lambda: self._edit(self.list.currentItem()))
         close = QDialogButtonBox(QDialogButtonBox.Close)
         close.rejected.connect(self.accept)
@@ -637,7 +634,7 @@ class JobsDialog(QDialog):
         for job in self.services.work.jobs():
             details = []
             if job.hourly_rate:
-                rate = f"{money(job.hourly_rate)} / hour"
+                rate = _("{amount} / hour").format(amount=money(job.hourly_rate))
                 if job.deductions:
                     rate += f" (−{job.deductions:g}%)"
                 details.append(rate)
@@ -647,7 +644,7 @@ class JobsDialog(QDialog):
             details += [f"{fmt_days(days)} {fmt_min(start)}–{fmt_min((start + dur) % 1440)}"
                         for (start, dur), days in slots.items()]
             item = QListWidgetItem(color_icon(job.color, 14),
-                                   job.name + "\n" + (" · ".join(details) or "no schedule yet"))
+                                   job.name + "\n" + (" · ".join(details) or _("no schedule yet")))
             item.setData(Qt.UserRole, job.id)
             self.list.addItem(item)
 
@@ -673,12 +670,12 @@ class ShiftDialog(QDialog):
         self.work = services.work
         self.shift_id = shift_id
         self.replaces = replaces
-        self.setWindowTitle("Edit shift" if shift_id else
-                            "Change this week's shift" if replaces else "New shift")
+        self.setWindowTitle(_("Edit shift") if shift_id else
+                            _("Change this week's shift") if replaces else _("New shift"))
         self.setMinimumWidth(480)
 
         self.job = QComboBox()
-        new_job = QPushButton("New job…")
+        new_job = QPushButton(_("New job…"))
         new_job.clicked.connect(self._new_job)
         job_row = QHBoxLayout()
         job_row.addWidget(self.job, 1)
@@ -691,18 +688,18 @@ class ShiftDialog(QDialog):
         self.next_day = QLabel("", objectName="hint")
         times = QHBoxLayout()
         times.addWidget(self.start)
-        times.addWidget(QLabel("to"))
+        times.addWidget(QLabel(_("to")))
         times.addWidget(self.end)
         times.addWidget(self.next_day)
         times.addStretch()
 
-        self.break_min = SpinBox(maximum=240, singleStep=5, suffix=" min")
-        self.break_min.setSpecialValueText("No break")
+        self.break_min = SpinBox(maximum=240, singleStep=5, suffix=" " + _("min"))
+        self.break_min.setSpecialValueText(_("No break"))
         self.break_min.setValue(break_minutes)
 
         self.repeat = QComboBox()
         self.days = DaysPicker()
-        self.has_until = QCheckBox("Ends on")
+        self.has_until = QCheckBox(_("Ends on"))
         self.until = QDateEdit(calendarPopup=True)
         self.until.setDisplayFormat("ddd d MMM yyyy")
         self.has_until.toggled.connect(self.until.setEnabled)
@@ -711,23 +708,23 @@ class ShiftDialog(QDialog):
         until_row.addWidget(self.has_until)
         until_row.addWidget(self.until, 1)
 
-        self.notes = QPlainTextEdit(placeholderText="Notes (optional)")
+        self.notes = QPlainTextEdit(placeholderText=_("Notes (optional)"))
         self.notes.setFixedHeight(64)
         self.summary = QLabel("", objectName="muted")
         self.clash = QLabel("", objectName="danger")
         self.clash.setWordWrap(True)
 
         form = QFormLayout()
-        form.addRow("Job", job_row)
-        form.addRow("Date", self.date)
-        form.addRow("Time", times)
-        form.addRow("Unpaid break", self.break_min)
+        form.addRow(_("Job"), job_row)
+        form.addRow(_("Date"), self.date)
+        form.addRow(_("Time"), times)
+        form.addRow(_("Unpaid break"), self.break_min)
         can_repeat = shift_id is None and replaces is None
         if can_repeat:
-            form.addRow("Repeat", self.repeat)
+            form.addRow(_("Repeat"), self.repeat)
             form.addRow("", self.days)
             form.addRow("", until_row)
-        form.addRow("Notes", self.notes)
+        form.addRow(_("Notes"), self.notes)
         form.addRow("", self.summary)
         form.addRow("", self.clash)
         self._repeat_rows = [self.days, self.has_until, self.until]
@@ -763,11 +760,11 @@ class ShiftDialog(QDialog):
 
     def _fill_repeat(self):
         index = max(self.repeat.currentIndex(), 0)
-        weekday = self.date.date().toPython().strftime("%A")
+        weekday = weekday_name(self.date.date().toPython())
         self.repeat.blockSignals(True)
         self.repeat.clear()
-        self.repeat.addItems(["Doesn't repeat", f"Every week on {weekday}",
-                              "Every work day (Mon–Fri)", "Every day", "Custom days…"])
+        self.repeat.addItems([_("Doesn't repeat"), _("Every week on {weekday}").format(weekday=weekday),
+                              _("Every work day (Mon–Fri)"), _("Every day"), _("Custom days…")])
         self.repeat.setCurrentIndex(index)
         self.repeat.blockSignals(False)
         self._repeat_changed()
@@ -825,32 +822,33 @@ class ShiftDialog(QDialog):
 
     def _update_preview(self):
         shift = self._shift()
-        self.next_day.setText("ends next day" if shift.ends_next_day else "")
+        self.next_day.setText(_("ends next day") if shift.ends_next_day else "")
         job = next((j for j in self.work.jobs() if j.id == shift.job_id), None)
         gross = shift.pay(job.hourly_rate if job else None)
         net = net_pay(gross, job.deductions if job else 0.0)
-        text = f"{fmt_duration(max(shift.paid_minutes, 0))} paid"
+        text = _("{duration} paid").format(duration=fmt_duration(max(shift.paid_minutes, 0)))
         if gross is not None and shift.paid_minutes > 0:
             text += "  ·  ≈ " + pay_text(gross, net)
         if self._repeating():
             days = self._repeat_days()
-            text += (f"  ·  each {fmt_days(days)}" if days else "  ·  pick the days")
+            text += "  ·  " + (_("each {days}").format(days=fmt_days(days)) if days
+                               else _("pick the days"))
         self.summary.setText(text)
         try:
             items = self.services.planner.items_between(shift.day, shift.day + timedelta(days=1))
             clashes = self.work.clashes(shift, items, self.replaces)
         except DomainError:
             clashes = []
-        self.clash.setText("Overlaps " + ", ".join(
-            f"{c.title} ({fmt_range(c.time)})" for c in clashes) if clashes else "")
+        self.clash.setText(_("Overlaps {items}").format(items=", ".join(
+            f"{c.title} ({fmt_range(c.time)})" for c in clashes)) if clashes else "")
         self.clash.setVisible(bool(clashes))
 
     # ---- save -------------------------------------------------------------------
 
     def _save(self):
         if self.job.currentData() is None:
-            QMessageBox.information(self, "Add a job first",
-                                    "Create the job this shift is for with “New job…”.")
+            QMessageBox.information(self, _("Add a job first"),
+                                    _("Create the job this shift is for with “New job…”."))
             return
         shift = self._shift()
         if self._repeating():
@@ -864,7 +862,7 @@ class ShiftDialog(QDialog):
             self.accept()
 
     def _delete(self):
-        if confirm(self, "Delete shift", "Delete this shift?"):
+        if confirm(self, _("Delete shift"), _("Delete this shift?")):
             self.work.delete_shift(self.shift_id)
             self.accept()
 
@@ -875,10 +873,10 @@ def weekly_shift_menu(parent, services: Services, job_id: int, origin: tuple[dat
     job = services.work.job(job_id)
     pattern = next((p for p in job.schedule if p.occurs_on(day) and p.start == start), None)
     menu = QMenu(parent)
-    change = menu.addAction("Change just this week…")
-    skip = menu.addAction("Skip this week")
+    change = menu.addAction(_("Change just this week…"))
+    skip = menu.addAction(_("Skip this week"))
     menu.addSeparator()
-    edit = menu.addAction(f"Edit {job.name}'s weekly schedule…")
+    edit = menu.addAction(_("Edit {name}'s weekly schedule…").format(name=job.name))
     chosen = menu.exec(pos)
     if chosen is skip:
         services.work.skip_occurrence(job_id, day, start)
@@ -894,9 +892,9 @@ def weekly_shift_menu(parent, services: Services, job_id: int, origin: tuple[dat
 def add_menu(parent, services: Services, day_provider) -> QMenu:
     """The "+ Add" button's menu: an event or a work shift on the shown day."""
     menu = QMenu(parent)
-    menu.addAction("Event…", lambda: EventDialog(services, day=day_provider(),
+    menu.addAction(_("Event…"), lambda: EventDialog(services, day=day_provider(),
                                                  parent=parent).exec())
-    menu.addAction("Work shift…", lambda: ShiftDialog(services, day=day_provider(),
+    menu.addAction(_("Work shift…"), lambda: ShiftDialog(services, day=day_provider(),
                                                       parent=parent).exec())
     return menu
 
@@ -906,8 +904,8 @@ def new_item_menu(parent, services: Services, day: date, minute: int, pos=None):
     from PySide6.QtGui import QCursor
 
     menu = QMenu(parent)
-    event = menu.addAction("Event…")
-    shift = menu.addAction("Work shift…")
+    event = menu.addAction(_("Event…"))
+    shift = menu.addAction(_("Work shift…"))
     chosen = menu.exec(pos or QCursor.pos())
     if chosen is event:
         EventDialog(services, day=day, start=minute, parent=parent).exec()

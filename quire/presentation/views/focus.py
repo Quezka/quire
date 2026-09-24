@@ -14,9 +14,10 @@ from ..formatting import fmt_duration, plural
 from ..notify import notify
 from ..widgets import ProgressRing, SpinBox, color_icon
 from .common import Card, Page, button, icon_button, label, primary_button
+from ..i18n import C_, N_, Translated, _
 
-PHASE_LABELS = {Phase.WORK: "Focus", Phase.SHORT_BREAK: "Short break",
-                Phase.LONG_BREAK: "Long break"}
+PHASE_LABELS = Translated({Phase.WORK: N_("Focus"), Phase.SHORT_BREAK: N_("Short break"),
+                           Phase.LONG_BREAK: N_("Long break")})
 
 
 def phase_color(phase: Phase, t) -> str:
@@ -37,16 +38,16 @@ class FocusView(Page):
         super().__init__(parent)
         self.services = services
         self.focus = services.focus
-        self.title.setText("Focus")
+        self.title.setText(_("Focus"))
 
         # ---- timer ----
         self.ring = ProgressRing()
-        self.start_btn = primary_button("Start", "play")
+        self.start_btn = primary_button(C_("button", "Start"), "play")
         self.start_btn.setMinimumWidth(130)
         self.start_btn.clicked.connect(self._toggle)
-        reset = icon_button("reset", "Reset the cycle")
+        reset = icon_button("reset", _("Reset the cycle"))
         reset.clicked.connect(self._reset)
-        skip = icon_button("skip", "Skip to the next phase")
+        skip = icon_button("skip", _("Skip to the next phase"))
         skip.clicked.connect(self._skip)
         controls = QHBoxLayout()
         controls.addStretch()
@@ -60,7 +61,7 @@ class FocusView(Page):
         self.task.currentIndexChanged.connect(self._task_picked)
         task_row = QHBoxLayout()
         task_row.addStretch()
-        task_row.addWidget(label("Focusing on", "muted"))
+        task_row.addWidget(label(_("Focusing on"), "muted"))
         task_row.addWidget(self.task)
         task_row.addStretch()
 
@@ -71,7 +72,7 @@ class FocusView(Page):
         timer_card.body.addLayout(task_row)
 
         # ---- stats ----
-        stats = Card("Today")
+        stats = Card(_("Today"))
         self.today_value = QLabel(objectName="tileValue")
         self.today_detail = label()
         self.week_detail = label()
@@ -79,17 +80,17 @@ class FocusView(Page):
             stats.add(widget)
 
         # ---- settings ----
-        settings = Card("Timer")
-        self.work_min = SpinBox(minimum=1, maximum=180, suffix=" min")
-        self.short_min = SpinBox(minimum=1, maximum=60, suffix=" min")
-        self.long_min = SpinBox(minimum=1, maximum=120, suffix=" min")
+        settings = Card(_("Timer"))
+        self.work_min = SpinBox(minimum=1, maximum=180, suffix=" " + _("min"))
+        self.short_min = SpinBox(minimum=1, maximum=60, suffix=" " + _("min"))
+        self.long_min = SpinBox(minimum=1, maximum=120, suffix=" " + _("min"))
         self.rounds = SpinBox(minimum=1, maximum=12)
-        self.auto = QCheckBox("Start the next phase automatically")
+        self.auto = QCheckBox(_("Start the next phase automatically"))
         form = QFormLayout()
-        form.addRow("Focus", self.work_min)
-        form.addRow("Short break", self.short_min)
-        form.addRow("Long break", self.long_min)
-        form.addRow("Rounds before a long break", self.rounds)
+        form.addRow(_("Focus"), self.work_min)
+        form.addRow(_("Short break"), self.short_min)
+        form.addRow(_("Long break"), self.long_min)
+        form.addRow(_("Rounds before a long break"), self.rounds)
         form.addRow("", self.auto)
         settings.body.addLayout(form)
         self.settings_hint = label("", "hint")
@@ -139,11 +140,13 @@ class FocusView(Page):
     def _tick(self):
         event = self.focus.tick()
         if event is not None:
-            nxt = PHASE_LABELS[event.next_phase].lower()
             if event.phase is Phase.WORK:
-                notify("Focus session done", f"Nice work. Time for a {nxt}.")
+                notify(_("Focus session done"),
+                       _("Nice work. Time for a long break.")
+                       if event.next_phase is Phase.LONG_BREAK
+                       else _("Nice work. Time for a short break."))
             else:
-                notify("Break's over", "Ready for the next focus session?")
+                notify(_("Break's over"), _("Ready for the next focus session?"))
             self._render_stats()
         self._render()
 
@@ -160,15 +163,17 @@ class FocusView(Page):
         self.ring.set_state(timer.progress(now), clock_text(remaining),
                             PHASE_LABELS[timer.phase], color, (done, timer.settings.rounds))
         running = timer.running
-        self.start_btn.setText("Pause" if running else "Resume" if timer.started else "Start")
+        self.start_btn.setText(_("Pause") if running else _("Resume") if timer.started
+                               else C_("button", "Start"))
         icon = "pause" if running else "play"
         if icon != self._icon_state:  # set_icon registers a theme listener: only on change
             self._icon_state = icon
             self.start_btn.setIcon(icons.icon(icon, theme.current().on_accent, size=16))
         phase = PHASE_LABELS[timer.phase]
         self.subtitle.setText(
-            f"{phase} · round {timer.round} of {timer.settings.rounds}"
-            + ("" if running else " · paused" if timer.started else ""))
+            _("{phase} · round {round} of {rounds}").format(
+                phase=phase, round=timer.round, rounds=timer.settings.rounds)
+            + ("" if running else " · " + _("paused") if timer.started else ""))
         status = clock_text(remaining) if running else ""
         if status != self._status:
             self._status = status
@@ -181,10 +186,11 @@ class FocusView(Page):
     def _render_stats(self):
         s = self.focus.stats()
         self.today_value.setText(plural(s.today_sessions, "pomodoro"))
-        self.today_detail.setText(f"{fmt_duration(s.today_minutes)} of focus"
-                                  if s.today_minutes else "No focus sessions yet today")
-        self.week_detail.setText(f"This week: {plural(s.week_sessions, 'pomodoro')}, "
-                                 f"{fmt_duration(s.week_minutes)}" if s.week_minutes else "")
+        self.today_detail.setText(_("{duration} of focus").format(duration=fmt_duration(s.today_minutes))
+                                  if s.today_minutes else _("No focus sessions yet today"))
+        self.week_detail.setText(_("This week: {sessions}, {duration}").format(
+            sessions=plural(s.week_sessions, "pomodoro"),
+            duration=fmt_duration(s.week_minutes)) if s.week_minutes else "")
 
     # ---- tasks ------------------------------------------------------------------
 
@@ -198,7 +204,7 @@ class FocusView(Page):
         current = self.focus.focus_task()
         self.task.blockSignals(True)
         self.task.clear()
-        self.task.addItem("Nothing in particular", None)
+        self.task.addItem(_("Nothing in particular"), None)
         for entry in self.focus.candidate_tasks():
             text = entry.task.title + (f"  ·  {entry.course.name}" if entry.course else "")
             if entry.course:
@@ -232,8 +238,8 @@ class FocusView(Page):
         try:
             self.focus.save_settings(settings)
         except (DomainError, ApplicationError) as e:
-            self.settings_hint.setText(str(e))
+            self.settings_hint.setText(_(str(e)))
             return
-        self.settings_hint.setText("New durations apply from the next phase."
+        self.settings_hint.setText(_("New durations apply from the next phase.")
                                    if self.focus.timer.started else "")
         self._render()

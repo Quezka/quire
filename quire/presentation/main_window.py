@@ -23,6 +23,7 @@ from .views.week import WeekView
 from .settings import SettingsDialog
 from .views.focus import FocusView
 from .views.work import WorkView
+from .i18n import N_, _
 
 
 class Sidebar(QFrame):
@@ -39,7 +40,7 @@ class Sidebar(QFrame):
         brand.setContentsMargins(12, 4, 12, 0)
         brand.setSpacing(10)
         brand.addWidget(brand_icon)
-        brand.addWidget(QLabel("Quire", objectName="brand"))
+        brand.addWidget(QLabel(_("Quire"), objectName="brand"))
         brand.addStretch()
 
         self.nav = QVBoxLayout()
@@ -74,14 +75,14 @@ class Sidebar(QFrame):
 
 
 class MainWindow(QMainWindow):
-    PAGES = [("today", "Today"), ("week", "Week"), ("coursework", "Coursework"),
-             ("notes", "Notes"), ("school", "School"), ("briefcase", "Work"),
-             ("timer", "Focus")]
+    PAGES = [("today", N_("Today")), ("week", N_("Week")), ("coursework", N_("Coursework")),
+             ("notes", N_("Notes")), ("school", N_("School")), ("briefcase", N_("Work")),
+             ("timer", N_("Focus"))]
 
     def __init__(self, services: Services):
         super().__init__()
         self.services = services
-        self.setWindowTitle("Quire")
+        self.setWindowTitle(_("Quire"))
         self.resize(1240, 800)
         self.setMinimumSize(980, 620)
 
@@ -101,12 +102,12 @@ class MainWindow(QMainWindow):
                  self.focus],
                 self.PAGES)):
             self.stack.addWidget(page)
-            self.sidebar.add_page(icon_name, label, f"Ctrl+{i + 1}")
+            self.sidebar.add_page(icon_name, _(label), f"Ctrl+{i + 1}")
         self.sidebar.group.idClicked.connect(self.show_page)
         self.school.newsChanged.connect(self._school_news)
         self.focus.statusChanged.connect(self._focus_status)
 
-        more = self.sidebar.nav_button("more", "More", checkable=False)
+        more = self.sidebar.nav_button("more", _("More"), checkable=False)
         more.setPopupMode(QToolButton.InstantPopup)
         more.setMenu(self._more_menu())
         self.sidebar.footer.addWidget(more)
@@ -143,13 +144,14 @@ class MainWindow(QMainWindow):
     def _focus_status(self, remaining: str):
         """Show the running focus timer on its sidebar entry and in the title bar."""
         button = self.sidebar.group.button(self.stack.indexOf(self.focus))
-        button.setText("  Focus" + (f"   {remaining}" if remaining else ""))
-        self.setWindowTitle(f"{remaining} · Quire" if remaining else "Quire")
+        button.setText("  " + _("Focus") + (f"   {remaining}" if remaining else ""))
+        self.setWindowTitle(_("{remaining} · Quire").format(remaining=remaining) if remaining else _("Quire"))
 
     def _school_news(self, count: int):
         button = self.sidebar.group.button(self.stack.indexOf(self.school))
         seen = self.stack.currentWidget() is self.school
-        button.setText("  School" + (f"   {count} new" if count and not seen else ""))
+        badge = "   " + _("{count} new").format(count=count) if count and not seen else ""
+        button.setText("  " + _("School") + badge)
 
     def _shortcut(self, keys, slot):
         action = QAction(self)
@@ -175,18 +177,18 @@ class MainWindow(QMainWindow):
     def _more_menu(self) -> QMenu:
         menu = QMenu(self)
         entries = [
-            ("New task", "Ctrl+T", self.new_task),
-            ("New event", "Ctrl+Shift+E", self.new_event),
-            ("New note", "Ctrl+N", self.new_note),
-            ("New work shift", "Ctrl+Shift+W", self.new_shift),
+            (_("New task"), "Ctrl+T", self.new_task),
+            (_("New event"), "Ctrl+Shift+E", self.new_event),
+            (_("New note"), "Ctrl+N", self.new_note),
+            (_("New work shift"), "Ctrl+Shift+W", self.new_shift),
             None,
-            ("Courses && timetable", "Ctrl+Shift+C", self.open_courses),
-            ("Jobs", None, lambda: JobsDialog(self.services, self).exec()),
-            ("Sync school register", "Ctrl+R", lambda: self.school.sync()),
+            (_("Courses && timetable"), "Ctrl+Shift+C", self.open_courses),
+            (_("Jobs"), None, lambda: JobsDialog(self.services, self).exec()),
+            (_("Sync school register"), "Ctrl+R", lambda: self.school.sync()),
             None,
-            ("Settings…", "Ctrl+,", self.open_settings),
-            ("Keyboard shortcuts", None, self.show_shortcuts),
-            ("About Quire", None, self.about),
+            (_("Settings…"), "Ctrl+,", self.open_settings),
+            (_("Keyboard shortcuts"), None, self.show_shortcuts),
+            (_("About Quire"), None, self.about),
         ]
         for entry in entries:
             if entry is None:
@@ -241,34 +243,36 @@ class MainWindow(QMainWindow):
     def backup(self):
         self._flush()
         path, _ = QFileDialog.getSaveFileName(
-            self, "Back up data", f"quire-backup-{date.today().isoformat()}.db",
-            "Quire database (*.db)")
+            self, _("Back up data"), f"quire-backup-{date.today().isoformat()}.db",
+            _("Quire database") + " (*.db)")
         if path:
             self.services.storage.backup_to(path)
-            QMessageBox.information(self, "Backed up", f"Saved a copy of your data to\n{path}")
+            QMessageBox.information(self, _("Backed up"), _("Saved a copy of your data to\n{path}").format(path=path))
 
     def open_data_folder(self):
         QDesktopServices.openUrl(QUrl.fromLocalFile(str(self.services.storage.location.parent)))
 
     def show_shortcuts(self):
-        rows = [("Ctrl+1 … 7", "Today / Week / Coursework / Notes / School / Work / Focus"),
-                ("Ctrl+,", "Settings"),
-                ("Ctrl+Shift+W", "New work shift"),
-                ("Ctrl+D", "Jump to today"), ("Ctrl+R", "Sync school register"),
-                ("Ctrl+N", "New note"), ("Ctrl+T", "New task"), ("Ctrl+Shift+E", "New event"),
-                ("Ctrl+Shift+C", "Courses & timetable"), ("Ctrl+F", "Search notes"),
-                ("Ctrl+E", "Toggle note preview")]
+        pages = " / ".join(_(label) for _icon, label in self.PAGES)
+        rows = [("Ctrl+1 … 7", pages), ("Ctrl+,", _("Settings")),
+                ("Ctrl+Shift+W", _("New work shift")), ("Ctrl+D", _("Jump to today")),
+                ("Ctrl+R", _("Sync school register")), ("Ctrl+N", _("New note")),
+                ("Ctrl+T", _("New task")), ("Ctrl+Shift+E", _("New event")),
+                ("Ctrl+Shift+C", _("Courses & timetable")), ("Ctrl+F", _("Search notes")),
+                ("Ctrl+E", _("Toggle note preview")),
+                ("Ctrl+= / Ctrl+- / Ctrl+0", _("Zoom in / out / fit the day"))]
         table = "".join(f"<tr><td style='padding:3px 18px 3px 0'><b>{k}</b></td><td>{v}</td></tr>"
                         for k, v in rows)
-        QMessageBox.information(self, "Keyboard shortcuts", f"<table>{table}</table>")
+        QMessageBox.information(self, _("Keyboard shortcuts"), f"<table>{table}</table>")
 
     def about(self):
         QMessageBox.about(
-            self, "About Quire",
+            self, _("About Quire"),
             f"<h3>Quire {__version__}</h3>"
-            "<p>Notes, day planner and school timetable.</p>"
-            f"<p>By {DEVELOPER} · <a href='{HOMEPAGE}'>{HOMEPAGE}</a></p>"
-            f"<p>Your data lives in:<br><code>{self.services.storage.location}</code></p>")
+            f"<p>{_('Notes, day planner and school timetable.')}</p>"
+            f"<p>{_('By {developer}').format(developer=DEVELOPER)} · "
+            f"<a href='{HOMEPAGE}'>{HOMEPAGE}</a></p>"
+            f"<p>{_('Your data lives in:')}<br><code>{self.services.storage.location}</code></p>")
 
     def closeEvent(self, event):
         self._flush()

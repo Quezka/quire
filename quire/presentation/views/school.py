@@ -22,6 +22,7 @@ from ..notify import notify
 from ..dialogs import TaskDialog
 from ..widgets import SubjectDelegate, TwoLineDelegate, mark_color
 from .common import Card, Page, button, icon_button, label, primary_button
+from ..i18n import _
 
 AUTO_SYNC_MINUTES = 30
 
@@ -30,12 +31,20 @@ def describe(report: SyncReport) -> list[str]:
     """One line per change, newest kinds first."""
     lines = []
     for task in report.new_tasks:
-        lines.append(f"New {KIND_LABELS[task.kind].lower()}: {task.title}")
+        lines.append(_("New {kind}: {title}").format(kind=KIND_LABELS[task.kind].lower(),
+                                                      title=task.title))
     for task in report.updated_tasks:
-        lines.append(f"Changed: {task.title}")
+        lines.append(_("Changed: {title}").format(title=task.title))
     for grade in report.new_grades:
-        lines.append(f"New grade in {grade.subject}: {grade.display}")
+        lines.append(_("New grade in {subject}: {mark}").format(subject=grade.subject,
+                                                                mark=grade.display))
     return lines
+
+
+def problem_text(problem: str) -> str:
+    """"Grades: endpoint moved" -> "Couldn't sync grades: …", with both halves translated."""
+    part, _sep, reason = problem.partition(": ")
+    return _("Couldn't sync {part}: {reason}").format(part=_(part).lower(), reason=_(reason))
 
 
 class _SyncSignals(QObject):
@@ -89,16 +98,16 @@ class SchoolView(Page):
         super().__init__(parent)
         self.services = services
         self.school = services.school
-        self.title.setText("School")
+        self.title.setText(_("School"))
         self._job: _FetchJob | None = None
         self._error = ""
 
-        self.sync_btn = button("Sync now", "refresh")
+        self.sync_btn = button(_("Sync now"), "refresh")
         self.sync_btn.clicked.connect(self.sync)
-        self.account_btn = icon_button("more", "Account")
+        self.account_btn = icon_button("more", _("Account"))
         self.account_btn.setPopupMode(QToolButton.InstantPopup)
         menu = QMenu(self.account_btn)
-        menu.addAction("Disconnect account", self._disconnect)
+        menu.addAction(_("Disconnect account"), self._disconnect)
         self.account_btn.setMenu(menu)
         self._period: str | None = None
         self.periods = QFrame(objectName="segmented")
@@ -128,33 +137,33 @@ class SchoolView(Page):
 
     def _build_connect(self) -> QWidget:
         name = self.school.status().register
-        card = Card(f"Connect {name}", padding=22)
+        card = Card(_("Connect {name}").format(name=name), padding=22)
         card.setFixedWidth(460)
         card.body.setSpacing(14)
-        intro = label(f"Sign in with your {name} student account. Quire will pull in homework, "
-                      "tests, grades and lesson topics, and check for updates every "
-                      f"{AUTO_SYNC_MINUTES} minutes while it's open.")
+        intro = label(_("Sign in with your {register} student account. Quire will pull in "
+                        "homework, tests, grades and lesson topics, and check for updates every "
+                        "{minutes} minutes while it's open.").format(register=name,
+                                                                     minutes=AUTO_SYNC_MINUTES))
         intro.setWordWrap(True)
         card.add(intro)
-        self.username = QLineEdit(placeholderText="e.g. S1234567X or email")
-        self.password = QLineEdit(placeholderText="Password", echoMode=QLineEdit.Password)
+        self.username = QLineEdit(placeholderText=_("e.g. S1234567X or email"))
+        self.password = QLineEdit(placeholderText=_("Password"), echoMode=QLineEdit.Password)
         self.password.returnPressed.connect(self._connect)
         form = QFormLayout()
         form.setVerticalSpacing(10)
-        form.addRow("Username", self.username)
-        form.addRow("Password", self.password)
+        form.addRow(_("Username"), self.username)
+        form.addRow(_("Password"), self.password)
         card.body.addLayout(form)
         self.connect_error = label("", "hint")
         self.connect_error.setWordWrap(True)
         card.add(self.connect_error)
-        connect = primary_button("Connect", None)
+        connect = primary_button(_("Connect"), None)
         connect.clicked.connect(self._connect)
         row = QHBoxLayout()
         row.addStretch()
         row.addWidget(connect)
         card.body.addLayout(row)
-        privacy = label("Your password is kept in your system keyring, not in Quire's data "
-                        "file. Quire only talks to web.spaggiari.eu.", "hint")
+        privacy = label(_("Your password is kept in your system keyring, not in Quire's data file. Quire only talks to web.spaggiari.eu."), "hint")
         privacy.setWordWrap(True)
         card.add(privacy)
 
@@ -171,10 +180,10 @@ class SchoolView(Page):
 
     def _build_dashboard(self) -> QWidget:
         # ---- summary tiles ----
-        self.tile_average = StatTile("AVERAGE")
-        self.tile_test = StatTile("NEXT TEST")
-        self.tile_homework = StatTile("HOMEWORK THIS WEEK")
-        self.tile_attention = StatTile("BELOW 6")
+        self.tile_average = StatTile(_("AVERAGE"))
+        self.tile_test = StatTile(_("NEXT TEST"))
+        self.tile_homework = StatTile(_("HOMEWORK THIS WEEK"))
+        self.tile_attention = StatTile(_("BELOW 6"))
         tiles = QHBoxLayout()
         tiles.setSpacing(16)
         for tile in (self.tile_average, self.tile_test, self.tile_homework,
@@ -182,20 +191,20 @@ class SchoolView(Page):
             tiles.addWidget(tile, 1)
 
         # ---- subjects ----
-        subjects = Card("Subjects")
+        subjects = Card(_("Subjects"))
         self.subjects = QListWidget()
         self.subjects.setItemDelegate(SubjectDelegate(self.subjects))
         self.subjects.setMouseTracking(True)
         self.subjects.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.subjects.itemClicked.connect(self._subject_clicked)
-        self.grades_empty = label("No grades yet. They'll appear here after a sync.", "hint")
+        self.grades_empty = label(_("No grades yet. They'll appear here after a sync."), "hint")
         subjects.add(self.subjects, 1)
         subjects.add(self.grades_empty)
         self._expanded: set[str] = set()
 
         # ---- side ----
-        coming = Card("Homework & tests")
-        self.show_done = QPushButton("Show done", objectName="segment", checkable=True)
+        coming = Card(_("Homework & tests"))
+        self.show_done = QPushButton(_("Show done"), objectName="segment", checkable=True)
         self.show_done.setCursor(Qt.PointingHandCursor)
         self.show_done.toggled.connect(lambda _on: self._fill_agenda())
         coming.title_row.addWidget(self.show_done)
@@ -207,15 +216,15 @@ class SchoolView(Page):
         self.coming.itemChanged.connect(self._agenda_ticked)
         coming.add(self.coming, 1)
 
-        lessons = Card("Lesson topics")
+        lessons = Card(_("Lesson topics"))
         self.lessons = QListWidget()
         self.lessons.setItemDelegate(TwoLineDelegate(self.lessons))
         self.lessons.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.lessons.itemDoubleClicked.connect(self._open_lesson_note)
-        self.lessons.setToolTip("Double-click a lesson to open its class notes")
+        self.lessons.setToolTip(_("Double-click a lesson to open its class notes"))
         lessons.add(self.lessons, 1)
 
-        self.news_card = Card("What's new")
+        self.news_card = Card(_("What's new"))
         self.news = QListWidget()
         self.news.setWordWrap(True)
         self.news.setResizeMode(QListView.Adjust)
@@ -254,23 +263,26 @@ class SchoolView(Page):
     def _update_subtitle(self):
         status = self.school.status()
         if not status.connected:
-            self.subtitle.setText(f"Not connected to {status.register}")
+            self.subtitle.setText(_("Not connected to {register}").format(register=status.register))
             return
         if self._job is not None:
-            when = "syncing…"
+            when = _("syncing…")
         elif self._error:
-            when = self._error
+            when = _(self._error)
         elif status.last_sync and self.school.last_report and self.school.last_report.problems:
-            when = "synced, but some parts failed (see What's new)"
+            when = _("synced, but some parts failed (see What's new)")
         elif status.last_sync:
             delta = datetime.now() - status.last_sync
             minutes = int(delta.total_seconds() // 60)
-            when = ("synced just now" if minutes < 1 else
-                    f"synced {plural(minutes, 'minute')} ago" if minutes < 60 else
-                    "synced " + relative_timestamp(status.last_sync,
-                                                   self.services.planner.today()).lower())
+            if minutes < 1:
+                when = _("synced just now")
+            elif minutes < 60:
+                when = _("synced {minutes} ago").format(minutes=plural(minutes, "minute"))
+            else:
+                when = _("synced {when}").format(when=relative_timestamp(
+                    status.last_sync, self.services.planner.today()).lower())
         else:
-            when = "not synced yet"
+            when = _("not synced yet")
         who = status.student_name or status.username
         self.subtitle.setText(f"{status.register} · {who} · {when}")
 
@@ -303,7 +315,7 @@ class SchoolView(Page):
         for button in self._period_buttons.buttons():
             self._period_buttons.removeButton(button)
             button.deleteLater()
-        for text, value in [("All year", None), *[(p, p) for p in periods]]:
+        for text, value in [(_("All year"), None), *[(p, p) for p in periods]]:
             button = QPushButton(text, objectName="segment", checkable=True)
             button.setCursor(Qt.PointingHandCursor)
             button.setChecked(value == self._period)
@@ -331,18 +343,19 @@ class SchoolView(Page):
             self.tile_test.show(relative_date(test.task.due, today),
                                 (f"{test.course.name}: " if test.course else "") + test.task.title)
         else:
-            self.tile_test.show("None", "No tests on the agenda")
-        caption = "Nothing due"
+            self.tile_test.show(_("None"), _("No tests on the agenda"))
+        caption = _("Nothing due")
         if o.next_homework:
-            caption = (f"Next: {relative_date(o.next_homework.task.due, today)} · "
-                       + (o.next_homework.course.name if o.next_homework.course
-                          else o.next_homework.task.title))
+            caption = _("Next: {when} · {what}").format(
+                when=relative_date(o.next_homework.task.due, today),
+                what=(o.next_homework.course.name if o.next_homework.course
+                      else o.next_homework.task.title))
         self.tile_homework.show(str(o.homework_due_this_week), caption)
         if o.below_pass:
             self.tile_attention.show(str(len(o.below_pass)),
                                      ", ".join(s.subject for s in o.below_pass), t.danger)
         else:
-            self.tile_attention.show("0", "Every subject is at 6 or above",
+            self.tile_attention.show("0", _("Every subject is at 6 or above"),
                                      t.success if o.grade_count else None)
 
     def _fill_subjects(self):
@@ -364,13 +377,13 @@ class SchoolView(Page):
             teachers = entry.course.teacher if entry.course and entry.course.teacher else ""
             row.setData(SubjectDelegate.META, " · ".join(filter(None, [
                 plural(len(counted), "grade"), teachers])))
-            row.setToolTip("Click to show every grade")
+            row.setToolTip(_("Click to show every grade"))
             self.subjects.addItem(row)
             if expanded:
                 for g in entry.grades:
-                    what = " · ".join(filter(None, [g.component, g.notes])) or "Grade"
+                    what = " · ".join(filter(None, [g.component, g.notes])) or _("Grade")
                     if g.cancelled:
-                        what += " (cancelled)"
+                        what += " " + _("(cancelled)")
                     child = QListWidgetItem(what)
                     child.setData(SubjectDelegate.KIND, "grade")
                     child.setData(SubjectDelegate.CHIPS, [(g.display, g.value, g.cancelled)])
@@ -397,7 +410,7 @@ class SchoolView(Page):
         last_heading = None
         for entry in self.school.agenda(include_done=self.show_done.isChecked()):
             task = entry.task
-            heading = "Overdue" if entry.overdue else relative_date(task.due, today)
+            heading = _("Overdue") if entry.overdue else relative_date(task.due, today)
             if heading != last_heading:
                 last_heading = heading
                 header = QListWidgetItem(heading)
@@ -405,11 +418,13 @@ class SchoolView(Page):
                 header.setFlags(Qt.ItemIsEnabled)
                 self.coming.addItem(header)
             item = QListWidgetItem(task.title)
-            kind = "Test" if task.kind is TaskKind.EXAM else KIND_LABELS[task.kind]
+            kind = _("Test") if task.kind is TaskKind.EXAM else KIND_LABELS[task.kind]
             meta = [entry.course.name if entry.course else "", kind]
             if entry.overdue:
                 when = relative_date(task.due, today)
-                meta.insert(0, "was due " + (when.lower() if when == "Yesterday" else when))
+                if when == _("Yesterday"):
+                    when = when.lower()
+                meta.insert(0, _("was due {when}").format(when=when))
             item.setData(TwoLineDelegate.META, " · ".join(filter(None, meta)))
             item.setData(TwoLineDelegate.COLOR, entry.course.color if entry.course else None)
             item.setData(TwoLineDelegate.ALERT, entry.overdue)
@@ -419,7 +434,7 @@ class SchoolView(Page):
             item.setToolTip(task.details)
             self.coming.addItem(item)
         if not self.coming.count():
-            empty = QListWidgetItem("No homework or tests on the agenda")
+            empty = QListWidgetItem(_("No homework or tests on the agenda"))
             empty.setFlags(Qt.NoItemFlags)
             self.coming.addItem(empty)
         self.coming.blockSignals(False)
@@ -443,8 +458,8 @@ class SchoolView(Page):
                 header.setData(TwoLineDelegate.HEADER, 2)
                 header.setFlags(Qt.ItemIsEnabled)
                 self.lessons.addItem(header)
-            item = QListWidgetItem(lesson.topic or "(no topic recorded)")
-            hour = f"hour {lesson.hour}" if lesson.hour else ""
+            item = QListWidgetItem(lesson.topic or _("(no topic recorded)"))
+            hour = _("hour {number}").format(number=lesson.hour) if lesson.hour else ""
             item.setData(TwoLineDelegate.META, " · ".join(filter(None, [
                 lesson.subject, hour, lesson.teacher])))
             course = courses.get(lesson.course_id)
@@ -453,7 +468,7 @@ class SchoolView(Page):
             item.setToolTip(lesson.topic)
             self.lessons.addItem(item)
         if not self.lessons.count():
-            empty = QListWidgetItem("No lessons in the last two weeks")
+            empty = QListWidgetItem(_("No lessons in the last two weeks"))
             empty.setFlags(Qt.NoItemFlags)
             self.lessons.addItem(empty)
 
@@ -463,19 +478,20 @@ class SchoolView(Page):
         report = self.school.last_report
         lines = describe(report) if report else []
         if report and report.first_sync:
-            lines = [f"Imported {plural(len(report.new_tasks), 'assignment')}, "
-                     f"{plural(len(report.new_grades), 'grade')} and "
-                     f"{plural(report.lessons, 'lesson')}."]
+            lines = [_("Imported {assignments}, {grades} and {lessons}.").format(
+                assignments=plural(len(report.new_tasks), "assignment"),
+                grades=plural(len(report.new_grades), "grade"),
+                lessons=plural(report.lessons, "lesson"))]
             if report.courses_created:
-                lines.append(
-                    f"Added {plural(report.courses_created, 'course')} for your subjects. "
-                    "If you already had one under another name, open it in Week → Timetable "
-                    "and pick its subject to merge them.")
+                lines.append(_(
+                    "Added {courses} for your subjects. If you already had one under another "
+                    "name, open it in Week → Timetable and pick its subject to merge them."
+                ).format(courses=plural(report.courses_created, "course")))
         for problem in (report.problems if report else ()):
-            item = QListWidgetItem(f"Couldn't sync {problem[0].lower()}{problem[1:]}")
+            item = QListWidgetItem(problem_text(problem))
             item.setForeground(QColor(t.danger))
             self.news.addItem(item)
-        for line in lines or ["Nothing new since the last sync."]:
+        for line in lines or [_("Nothing new since the last sync.")]:
             item = QListWidgetItem(line)
             if not lines:
                 item.setForeground(QColor(t.faint))
@@ -495,9 +511,9 @@ class SchoolView(Page):
     def _connect(self):
         username, password = self.username.text().strip(), self.password.text()
         if not username or not password:
-            self.connect_error.setText("Enter your username and password.")
+            self.connect_error.setText(_("Enter your username and password."))
             return
-        self.connect_error.setText("Connecting…")
+        self.connect_error.setText(_("Connecting…"))
         QGuiApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
         QGuiApplication.processEvents()
         try:

@@ -586,3 +586,39 @@ def test_settings_currency_changes_the_work_page(window, services, app):
     assert theme.current().dark
     dialog.currency.setCurrentIndex(0)  # back to the system default
     assert preferences().currency() == ""
+
+
+def test_everything_renders_in_russian(app, services, register):
+    """Build every page and dialog in Russian: catches bad placeholders at runtime."""
+    from quire.presentation import i18n
+    from quire.presentation.formatting import long_date, plural, relative_date
+    from quire.presentation.settings import SettingsDialog
+
+    from .conftest import TODAY
+
+    i18n.install("ru", app)
+    try:
+        seed(services)
+        w = MainWindow(services)
+        w.show()
+        for index in range(w.stack.count()):
+            w.show_page(index)
+            app.processEvents()
+            assert not w.grab().isNull()
+        assert w.today.title.text() == "Среда, 23 сентября"
+        assert w.week.title.text() == "Сентябрь 2026"
+        assert w.focus.start_btn.text() == "Начать"
+        assert relative_date(TODAY, TODAY) == "Сегодня"
+        assert plural(3, "class", "es") == "3 урока" and plural(5, "class", "es") == "5 уроков"
+        assert long_date(TODAY).startswith("Среда")
+        task_id = services.tasks.groups()[0].items[0].task.id
+        for dialog in [CourseDialog(services, services.timetable.courses()[0].id, w),
+                       TaskDialog(services, task_id, parent=w), EventDialog(services, parent=w),
+                       JobDialog(services, parent=w), JobsDialog(services, w),
+                       ShiftDialog(services, parent=w), SettingsDialog(services, lambda: None, w)]:
+            dialog.show()
+            dialog.reject()
+        w.close()
+        w.deleteLater()
+    finally:
+        i18n.install("en", app)

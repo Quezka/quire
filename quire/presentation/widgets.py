@@ -15,6 +15,7 @@ from PySide6.QtWidgets import (
 
 from ..domain import COURSE_COLORS
 from . import icons, theme
+from .i18n import _, weekday_names
 
 PALETTE = list(COURSE_COLORS)
 NO_COLOR = "#00000000"
@@ -96,7 +97,6 @@ class DaysPicker(QWidget):
     """Seven round toggles (M T W T F S S) for picking weekdays."""
 
     changed = Signal()
-    NAMES = ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday", "Sunday"]
 
     def __init__(self, days=(), parent=None):
         super().__init__(parent)
@@ -106,7 +106,7 @@ class DaysPicker(QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(3)
         self.buttons = []
-        for i, name in enumerate(self.NAMES):
+        for i, name in enumerate(weekday_names()):
             button = QToolButton(objectName="day", text=name[0], checkable=True, toolTip=name)
             button.setCursor(Qt.PointingHandCursor)
             button.toggled.connect(lambda _on: self.changed.emit())
@@ -150,7 +150,7 @@ class ColorButton(QPushButton):
     def _pick(self):
         for i, c in enumerate(PALETTE):
             QColorDialog.setCustomColor(i, QColor(c))
-        color = QColorDialog.getColor(QColor(self._color), self, "Pick a colour")
+        color = QColorDialog.getColor(QColor(self._color), self, _("Pick a colour"))
         if color.isValid():
             self.setColor(color.name())
             self.colorChanged.emit(self._color)

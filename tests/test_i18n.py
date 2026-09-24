@@ -1,0 +1,101 @@
+"""Every on-screen text needs a Russian translation, with the same placeholders."""
+import ast
+import re
+import string
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parent.parent / "quire"
+ERROR_CLASSES = re.compile(r"(Error|NotFound|NotConnected)$")
+
+
+def _literal(node):
+    return node.value if isinstance(node, ast.Constant) and isinstance(node.value, str) else None
+
+
+def ui_strings() -> set[str]:
+    found = set()
+    for path in (ROOT / "presentation").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+                    and node.func.id in ("_", "N_") and node.args):
+                text = _literal(node.args[0])
+                if text:
+                    found.add(text)
+            if (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "C_"
+                    and len(node.args) == 2):
+                context, text = _literal(node.args[0]), _literal(node.args[1])
+                if context and text:
+                    found.add(f"{context}|{text}")
+    return found
+
+
+def core_messages() -> set[str]:
+    """Fixed error messages and sync-part names that the UI shows via _(str(e))."""
+    found = set()
+    for layer in ("domain", "application", "infrastructure"):
+        for path in (ROOT / layer).rglob("*.py"):
+            for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+                if isinstance(node, ast.Call) and node.args:
+                    name = getattr(node.func, "id", getattr(node.func, "attr", ""))
+                    text = _literal(node.args[0])
+                    if text and (ERROR_CLASSES.search(name) or name == "part"):
+                        found.add(text)
+    return found
+
+
+def plural_words() -> set[str]:
+    found = set()
+    for path in (ROOT / "presentation").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if (isinstance(node, ast.Call) and getattr(node.func, "id", "") == "plural"
+                    and len(node.args) >= 2):
+                word = _literal(node.args[1])
+                if word:
+                    found.add(word)
+    return found
+
+
+def placeholders(text: str) -> set[str]:
+    return {name for _, name, _, _ in string.Formatter().parse(text) if name}
+
+
+@pytest.fixture(scope="module")
+def ru():
+    from quire.presentation.locales import ru
+    return ru
+
+
+def test_every_ui_string_is_translated(ru):
+    missing = sorted(ui_strings() - ru.MESSAGES.keys())
+    assert not missing, "Missing Russian for:\n" + "\n".join(missing)
+
+
+def test_every_core_message_is_translated(ru):
+    missing = sorted(core_messages() - ru.MESSAGES.keys())
+    assert not missing, "Missing Russian for:\n" + "\n".join(missing)
+
+
+def test_every_plural_word_has_three_forms(ru):
+    missing = sorted(plural_words() - ru.PLURALS.keys())
+    assert not missing, "Missing Russian plural forms for: " + ", ".join(missing)
+    assert all(len(forms) == 3 for forms in ru.PLURALS.values())
+
+
+def test_translations_keep_their_placeholders(ru):
+    wrong = [k for k, v in ru.MESSAGES.items() if placeholders(k) != placeholders(v)]
+    assert not wrong, "Placeholders differ in: " + "; ".join(wrong)
+
+
+def test_names_tables_are_complete(ru):
+    assert len(ru.NAMES["weekdays"]) == len(ru.NAMES["weekdays_short"]) == 7
+    for kind in ("months", "months_genitive", "months_short"):
+        assert len(ru.NAMES[kind]) == 12
+
+
+@pytest.mark.parametrize("n, form", [(1, 0), (21, 0), (2, 1), (4, 1), (22, 1), (5, 2), (11, 2),
+                                     (12, 2), (14, 2), (25, 2), (0, 2), (111, 2), (101, 0)])
+def test_russian_plural_rule(n, form):
+    from quire.presentation.i18n import plural_form
+    assert plural_form(n) == form
