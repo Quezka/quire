@@ -17,11 +17,12 @@ from ...domain import Task, TaskKind
 from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import (
-    EventDialog, ShiftDialog, TaskDialog, add_menu, class_menu, new_item_menu, to_qdate,
+    EventDialog, ShiftDialog, add_menu, class_menu, new_item_menu, to_qdate,
     weekly_shift_menu,
 )
-from ..formatting import KIND_LABELS, long_date, plural, relative_date
-from ..widgets import NO_COLOR, TimeGrid, TimelineZoom, color_icon
+from ..formatting import KIND_LABELS, long_date, plural, relative_date, was_due
+from ..task_view import TaskView
+from ..widgets import TimeGrid, TimelineZoom, TwoLineDelegate
 from .common import (
     Card, Page, agenda_block, badge, button, icon_button, menu_button, zoom_controls,
 )
@@ -77,6 +78,9 @@ class TodayView(Page):
         self.due_count = badge()
         due.title_row.insertWidget(1, self.due_count)
         self.tasks = QListWidget()
+        self.tasks.setItemDelegate(TwoLineDelegate(self.tasks))
+        self.tasks.setMouseTracking(True)
+        self.tasks.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.tasks.itemChanged.connect(self._task_toggled)
         self.tasks.itemDoubleClicked.connect(self._task_open)
         self.quick = QLineEdit(placeholderText=_("Add a task for this day"), clearButtonEnabled=True)
@@ -102,7 +106,7 @@ class TodayView(Page):
         side = QVBoxLayout()
         side.setSpacing(16)
         side.addWidget(due, 3)
-        side.addWidget(notes, 2)
+        side.addWidget(notes, 1)
         body = QHBoxLayout()
         body.setSpacing(16)
         body.addWidget(timeline, 5)
@@ -199,28 +203,35 @@ class TodayView(Page):
         return agenda
 
     def _fill_tasks(self, agenda: DayAgenda, today: date):
+        """Viewing today: everything to do, grouped Overdue / Today / Tomorrow / …;
+        another day: just what's due that day."""
         t = theme.current()
         self.tasks.blockSignals(True)
         self.tasks.clear()
+        last_heading = None
         for entry in agenda.tasks:
             task = entry.task
+            if agenda.is_today:
+                heading = _("Overdue") if entry.overdue else relative_date(task.due, today)
+                if heading != last_heading:
+                    last_heading = heading
+                    header = QListWidgetItem(heading)
+                    header.setData(TwoLineDelegate.HEADER, 2)
+                    header.setFlags(Qt.ItemIsEnabled)
+                    self.tasks.addItem(header)
             meta = [KIND_LABELS[task.kind]] if task.kind is not TaskKind.TASK else []
             if entry.course:
-                meta.append(entry.course.name)
+                meta.insert(0, entry.course.name)
             if entry.overdue:
-                meta.append(_("overdue · {when}").format(when=relative_date(task.due, today)))
-            item = QListWidgetItem(task.title + ("\n" + " · ".join(meta) if meta else ""))
+                meta.insert(0, was_due(task.due, today))
+            item = QListWidgetItem(task.title)
             item.setData(Qt.UserRole, task.id)
+            item.setData(TwoLineDelegate.META, " · ".join(meta))
+            item.setData(TwoLineDelegate.COLOR, entry.course.color if entry.course else None)
+            item.setData(TwoLineDelegate.ALERT, entry.overdue)
             item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
             item.setCheckState(Qt.Checked if task.done else Qt.Unchecked)
-            item.setIcon(color_icon(entry.course.color if entry.course else NO_COLOR, 10))
-            if task.done:
-                font = item.font()
-                font.setStrikeOut(True)
-                item.setFont(font)
-                item.setForeground(QColor(t.faint))
-            elif entry.overdue:
-                item.setForeground(QColor(t.danger))
+            item.setToolTip(_("Double-click to open"))
             self.tasks.addItem(item)
         if not agenda.tasks:
             empty = QListWidgetItem(_("Nothing due. Nice."))
@@ -254,7 +265,7 @@ class TodayView(Page):
     def _task_open(self, item: QListWidgetItem):
         task_id = item.data(Qt.UserRole)
         if task_id is not None:
-            TaskDialog(self.services, task_id, parent=self).exec()
+            TaskView(self.services, task_id, parent=self).exec()
 
     def _quick_add(self):
         title = self.quick.text().strip()

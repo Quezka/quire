@@ -1,7 +1,7 @@
 """Pomodoro focus timer, in the spirit of KDE's Francis."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QVBoxLayout
 
 from ...application.bus import Topic
@@ -13,7 +13,7 @@ from ..bridge import ChangeRelay
 from ..formatting import fmt_duration, plural
 from ..notify import notify
 from ..widgets import ProgressRing, SpinBox, color_icon
-from .common import Card, Page, button, icon_button, label, primary_button
+from .common import Card, Page, icon_button, label, primary_button
 from ..i18n import C_, N_, Translated, _
 
 PHASE_LABELS = Translated({Phase.WORK: N_("Focus"), Phase.SHORT_BREAK: N_("Short break"),

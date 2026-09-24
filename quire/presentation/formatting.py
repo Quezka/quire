@@ -5,7 +5,7 @@ from datetime import date, datetime
 
 from ..domain import DueBucket, TaskKind, TimeRange
 from .i18n import (
-    N_, Translated, _, month_of, month_short, weekday_name, weekday_names, weekday_short,
+    N_, Translated, _, month_of, month_short, weekday_name, weekday_short,
 )
 from .i18n import plural as i18n_plural
 
@@ -57,6 +57,14 @@ def relative_date(d: date, today: date) -> str:
         return _capitalised(weekday_name(d))
     text = f"{weekday_short(d)} {d.day} {month_short(d)}"
     return text if d.year == today.year else f"{text} {d.year}"
+
+
+def was_due(d: date, today: date) -> str:
+    """"was due yesterday" / "was due Mon 21 Sep"."""
+    when = relative_date(d, today)
+    if when == _("Yesterday"):
+        when = when.lower()
+    return _("was due {when}").format(when=when)
 
 
 def relative_timestamp(ts: datetime | None, today: date) -> str:

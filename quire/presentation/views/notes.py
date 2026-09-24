@@ -255,7 +255,7 @@ class NotesView(Page):
         key = item.data(Qt.UserRole + 20)
         menu = QMenu(self)
         if key and key[0] == "topic":
-            _, course_id, topic = key
+            _kind, course_id, topic = key
             new = menu.addAction(_("New note in this topic"))
             rename = menu.addAction(_("Rename topic…")) if topic else None
             chosen = menu.exec(self.list.viewport().mapToGlobal(pos))

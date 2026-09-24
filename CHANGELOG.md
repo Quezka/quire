@@ -4,6 +4,31 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.8.0] - 2026-09-24
+
+### Added
+- **Task view**: double-clicking a task (Today, Coursework, School) opens it to check it,
+  not to edit it.
+  - It shows the title, chips for subject, type and due date (red when overdue), and the
+    full details.
+  - Tasks from Classeviva say so.
+  - **Mark as done** (Space) or **Edit…** (E).
+- **Today shows everything still to do**: overdue work, today's, and the next 14 days,
+  grouped under Overdue / Today / Tomorrow / … with round checkboxes. Other days still
+  show just that day.
+
+### Changed
+- **Redesigned task editor**: a large title, type and subject side by side, quick due
+  dates (Today, Tomorrow, Next week, **Next class** for the chosen subject), a bigger
+  details box, and a note on tasks that came from Classeviva.
+
+### Fixed
+- Saving a task from the editor crashed: Qt handed the task type back as plain text.
+- Editing a homework imported from Classeviva dropped its link, so the next sync would
+  have imported it again as a duplicate.
+- "Back up data…" and right-clicking a note topic crashed since 0.7.0 (a variable named
+  `_` hid the translation function). A test now forbids that.
+
 ## [0.7.0] - 2026-09-24
 
 ### Added

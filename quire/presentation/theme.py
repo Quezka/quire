@@ -174,6 +174,13 @@ def stylesheet(t: Theme) -> str:
     #hint {{ color: {t.faint}; }}
     QLabel#danger {{ color: {t.danger}; }}
     #stat {{ font-size: 22pt; font-weight: 700; color: {t.text}; }}
+    #sheetTitle {{ font-size: 16pt; font-weight: 700; color: {t.text}; }}
+    QTextBrowser#sheetBody {{ background: {t.raised}; border: none; border-radius: 10px;
+        padding: 10px 12px; }}
+    QLabel#chip, QLabel#chipDanger {{ background: {t.raised}; color: {t.text};
+        border-radius: 10px; padding: 3px 10px; font-size: 9pt; font-weight: 600; }}
+    QLabel#chipDanger {{ background: {t.accent_soft}; color: {t.danger}; }}
+    QLineEdit#titleEdit {{ font-size: 14pt; font-weight: 600; padding: 8px 10px; }}
     #tileCaption {{ color: {t.muted}; font-size: 8.5pt; font-weight: 600;
         letter-spacing: 0.5px; }}
     #tileValue {{ font-size: 20pt; font-weight: 700; color: {t.text}; }}

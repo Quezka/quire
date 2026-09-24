@@ -622,3 +622,88 @@ def test_everything_renders_in_russian(app, services, register):
         w.deleteLater()
     finally:
         i18n.install("en", app)
+
+
+def test_task_view_checks_and_edits_without_losing_the_sync_link(window, services, app):
+    from quire.domain import Task
+    from quire.presentation.task_view import TaskView
+
+    from .conftest import TODAY
+
+    task_id = services.tasks.save(Task("Esercizi pag. 34", due=TODAY, details="1-5 e 8",
+                                       external_id="classeviva:homework:77"))
+    view = TaskView(services, task_id, window)
+    view.show()
+    assert view.title.text() == "Esercizi pag. 34"
+    assert view.done_btn.text() == "Mark as done" and view.source.isVisibleTo(view)
+    assert view.body.toPlainText() == "1-5 e 8"
+
+    view._toggle_done()
+    assert services.tasks.task(task_id).done and view.done_btn.text() == "Mark as not done"
+    view._toggle_done()
+    assert not services.tasks.task(task_id).done
+
+    # Editing an imported task keeps its link to Classeviva (no duplicate at next sync).
+    editor = TaskDialog(services, task_id, parent=view)
+    editor.title.setText("Esercizi pag. 34-35")
+    editor._save()
+    saved = services.tasks.task(task_id)
+    assert saved.title == "Esercizi pag. 34-35"
+    assert saved.external_id == "classeviva:homework:77"
+    view.refresh()
+    assert view.title.text() == "Esercizi pag. 34-35"
+    view.reject()  # closing works: nothing shadows QDialog.done()
+
+
+def test_task_editor_quick_due_dates(window, services):
+    from datetime import timedelta
+
+    from .conftest import TODAY
+
+    maths = next(c for c in services.timetable.courses() if c.name == "Mathematics")
+    editor = TaskDialog(services, parent=window)
+    assert not editor.next_class.isEnabled()  # no course picked yet
+    editor.course.setCurrentIndex(editor.course.findData(maths.id))
+    assert editor.next_class.isEnabled()
+    editor.next_class.click()
+    assert editor.has_due.isChecked()
+    assert editor.due.date().toPython() == services.timetable.next_meeting(maths.id, TODAY)
+    editor.findChildren(type(editor.next_class))[1].click()  # "Tomorrow"
+    assert editor.due.date().toPython() == TODAY + timedelta(days=1)
+    editor.reject()
+
+
+def test_today_lists_everything_to_do_grouped_by_day(window, services, app):
+    from datetime import timedelta
+
+    from quire.domain import Task
+    from quire.presentation.widgets import TwoLineDelegate
+
+    from .conftest import TODAY
+
+    services.tasks.save(Task("Far away essay", due=TODAY + timedelta(days=30)))
+    services.tasks.save(Task("Next week reading", due=TODAY + timedelta(days=6)))
+    window.show_page(0)
+    window.today.set_day(TODAY)
+    rows = [window.today.tasks.item(i) for i in range(window.today.tasks.count())]
+    headings = [r.text() for r in rows if r.data(TwoLineDelegate.HEADER)]
+    titles = [r.text() for r in rows if not r.data(TwoLineDelegate.HEADER)]
+    assert headings[:2] == ["Overdue", "Today"] and "Tomorrow" in headings
+    assert "Next week reading" in titles and "Far away essay" not in titles  # 14-day window
+
+    window.today.set_day(TODAY + timedelta(days=1))  # another day: just that day
+    rows = [window.today.tasks.item(i) for i in range(window.today.tasks.count())]
+    assert not any(r.data(TwoLineDelegate.HEADER) for r in rows)
+
+
+def test_saving_a_new_task_from_the_editor(window, services):
+    """Regression: Qt returned the Type as a plain string and saving crashed."""
+    from quire.domain import TaskKind
+
+    editor = TaskDialog(services, parent=window)
+    editor.title.setText("Revise for the history test")
+    editor.kind.setCurrentIndex(editor.kind.findData(TaskKind.EXAM))
+    editor._save()
+    saved = next(i.task for g in services.tasks.groups(include_done=True) for i in g.items
+                 if i.task.title == "Revise for the history test")
+    assert saved.kind is TaskKind.EXAM

@@ -99,3 +99,16 @@ def test_names_tables_are_complete(ru):
 def test_russian_plural_rule(n, form):
     from quire.presentation.i18n import plural_form
     assert plural_form(n) == form
+
+
+def test_nothing_in_the_ui_assigns_to_underscore():
+    """`_` is the translation function. Using it as a throwaway variable anywhere in a
+    function makes every `_("…")` call in that function crash (UnboundLocalError)."""
+    offenders = []
+    for path in (ROOT / "presentation").rglob("*.py"):
+        for node in ast.walk(ast.parse(path.read_text(encoding="utf-8"))):
+            if isinstance(node, ast.Name) and node.id == "_" and isinstance(node.ctx, ast.Store):
+                offenders.append(f"{path.name}:{node.lineno}")
+            if isinstance(node, ast.arg) and node.arg == "_":
+                offenders.append(f"{path.name}:{node.lineno}")
+    assert not offenders, "Don't use _ as a variable: " + ", ".join(offenders)

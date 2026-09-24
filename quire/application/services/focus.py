@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, replace
-from datetime import date, datetime, timedelta
+from dataclasses import dataclass
+from datetime import datetime, timedelta
 
 from ...domain import (
-    FocusSession, FocusSettings, Phase, PhaseEnded, PomodoroTimer, Task, ValidationError,
+    FocusSession, FocusSettings, Phase, PhaseEnded, PomodoroTimer, Task,
 )
 from ..bus import ChangeBus, Topic
 from ..dto import TaskItem

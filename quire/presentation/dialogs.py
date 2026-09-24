@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 from typing import Callable
 
-from PySide6.QtCore import QDate, QLocale, Qt
+from PySide6.QtCore import QDate, Qt
 from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDateEdit, QDialog, QDialogButtonBox,
     QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
@@ -18,7 +18,7 @@ from ..domain import (
     TaskKind, TimeRange, net_pay,
 )
 from .formatting import (
-    KIND_LABELS, fmt_days, fmt_duration, fmt_min, fmt_range, money, pay_text,
+    KIND_LABELS, fmt_days, long_date, fmt_duration, fmt_min, fmt_range, money, pay_text,
 )
 from .preferences import preferences
 from .widgets import (
@@ -174,7 +174,7 @@ class CourseDialog(QDialog):
         row = self.table.rowCount()
         if weekday is None:
             if row:  # Same times as the previous row, on the next day.
-                prev_day, start, end, _ = self._row_values(row - 1)
+                prev_day, start, end, _room = self._row_values(row - 1)
                 weekday = (prev_day + 1) % 7
             else:
                 weekday, start, end = 0, 9 * 60, 10 * 60
@@ -341,62 +341,121 @@ class EventDialog(QDialog):
 
 
 class TaskDialog(QDialog):
+    """Create or edit a task: title first, then what it is, when it's due, and details."""
+
     def __init__(self, services: Services, task_id=None, due: date | None = None,
                  course_id=None, kind: TaskKind = TaskKind.TASK, parent=None):
         super().__init__(parent)
+        self.services = services
         self.tasks = services.tasks
         self.task_id = task_id
         self.setWindowTitle(_("Edit task") if task_id else _("New task"))
-        self.setMinimumWidth(440)
+        self.setMinimumWidth(540)
 
-        self.title = QLineEdit(placeholderText=_("e.g. Chapter 4 questions"))
+        self.title = QLineEdit(placeholderText=_("What needs doing?"), objectName="titleEdit")
         self.kind = QComboBox()
         for k, label in KIND_LABELS.items():
             self.kind.addItem(label, k)
         self.course = QComboBox()
         fill_course_combo(self.course, services.timetable.courses(), _("No course"))
+        self.course.currentIndexChanged.connect(self._course_changed)
+
         self.has_due = QCheckBox(_("Due"))
         self.due = QDateEdit(calendarPopup=True)
         self.due.setDisplayFormat("ddd d MMM yyyy")
         self.has_due.toggled.connect(self.due.setEnabled)
-        self.completed = QCheckBox(_("Completed"))
-        self.details = QPlainTextEdit(placeholderText=_("Details (optional)"))
-        self.details.setFixedHeight(90)
+        today = services.planner.today()
+        quick = QHBoxLayout()
+        quick.setSpacing(4)
+        self.next_class = None
+        for text, pick in ((_("Today"), lambda: today),
+                           (_("Tomorrow"), lambda: today + timedelta(days=1)),
+                           (_("Next week"), lambda: today + timedelta(days=7)),
+                           (_("Next class"), self._next_class_day)):
+            button = QPushButton(text, objectName="segment")
+            button.setCursor(Qt.PointingHandCursor)
+            button.clicked.connect(lambda _on=False, pick=pick: self._set_due(pick()))
+            quick.addWidget(button)
+            if pick == self._next_class_day:
+                self.next_class = button
+        quick.addStretch()
 
+        self.details = QPlainTextEdit(placeholderText=_("Details, pages, links… (optional)"))
+        self.details.setMinimumHeight(120)
+        self.completed = QCheckBox(_("Completed"))
+        self.imported = QLabel(objectName="hint")
+        self.imported.setWordWrap(True)
+
+        what = QHBoxLayout()
+        what.setSpacing(8)
+        what.addWidget(self.kind, 1)
+        what.addWidget(self.course, 2)
         due_row = QHBoxLayout()
         due_row.addWidget(self.has_due)
         due_row.addWidget(self.due, 1)
 
-        form = QFormLayout()
-        form.addRow(_("Title"), self.title)
-        form.addRow(_("Type"), self.kind)
-        form.addRow(_("Course"), self.course)
-        form.addRow(_("Date"), due_row)
-        form.addRow(_("Details"), self.details)
-        form.addRow("", self.completed)
-
         layout = QVBoxLayout(self)
-        layout.addLayout(form)
+        layout.setContentsMargins(22, 20, 22, 18)
+        layout.setSpacing(10)
+        layout.addWidget(self.title)
+        layout.addLayout(what)
+        layout.addSpacing(4)
+        layout.addLayout(due_row)
+        layout.addLayout(quick)
+        layout.addSpacing(4)
+        layout.addWidget(self.details, 1)
+        layout.addWidget(self.completed)
+        layout.addWidget(self.imported)
         layout.addWidget(_buttons(self, self._save, self._delete if task_id else None))
 
+        external = None
         if task_id:
             t = self.tasks.task(task_id)
             self.title.setText(t.title)
             kind, course_id, due = t.kind, t.course_id, t.due
             self.details.setPlainText(t.details)
             self.completed.setChecked(t.done)
+            external = t.external_id
         else:
             self.completed.hide()
+        self._external_id = external
         select_data(self.kind, kind)
         select_data(self.course, course_id)
         self.has_due.setChecked(due is not None)
         self.due.setEnabled(due is not None)
-        self.due.setDate(to_qdate(due or services.planner.today()))
+        self.due.setDate(to_qdate(due or today))
+        register = services.school.status().register
+        self.imported.setText(_("This came from {register}. If the teacher changes it, the next "
+                                "sync updates the title, date and details again.").format(
+                                    register=register) if external else "")
+        self.imported.setVisible(bool(external))
+        self._course_changed()
+        self.title.setFocus()
+
+    def _next_class_day(self):
+        course_id = self.course.currentData()
+        if course_id is None:
+            return None
+        return self.services.timetable.next_meeting(course_id, self.services.planner.today())
+
+    def _course_changed(self):
+        if self.next_class is not None:
+            day = self._next_class_day()
+            self.next_class.setEnabled(day is not None)
+            self.next_class.setToolTip(long_date(day) if day else
+                                       _("Pick a course with class times first"))
+
+    def _set_due(self, day: date | None):
+        if day is not None:
+            self.has_due.setChecked(True)
+            self.due.setDate(to_qdate(day))
 
     def _save(self):
-        task = Task(self.title.text(), self.kind.currentData(), self.course.currentData(),
+        # Qt hands str-based enums back as plain strings; turn it back into a TaskKind.
+        task = Task(self.title.text(), TaskKind(self.kind.currentData()), self.course.currentData(),
                     self.due.date().toPython() if self.has_due.isChecked() else None,
-                    self.completed.isChecked(), self.details.toPlainText(), self.task_id)
+                    self.completed.isChecked(), self.details.toPlainText(), self.task_id,
+                    self._external_id)
         if attempt(self, lambda: self.tasks.save(task)):
             self.accept()
 
@@ -535,7 +594,7 @@ class JobDialog(QDialog):
             value = self.deductions.amount() or 0.0
         except ValueError:
             return
-        index = next((i for i, (_, v) in enumerate(DEDUCTION_PRESETS) if v == value),
+        index = next((i for i, (_text, v) in enumerate(DEDUCTION_PRESETS) if v == value),
                      len(DEDUCTION_PRESETS) - 1)
         self.preset.blockSignals(True)
         self.preset.setCurrentIndex(index)

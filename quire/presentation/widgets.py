@@ -8,7 +8,7 @@ from datetime import datetime
 from PySide6.QtCore import (
     QEvent, QObject, QPoint, QPointF, QRectF, QSettings, QSize, Qt, QTime, QTimer, Signal,
 )
-from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPalette, QPen, QPixmap
+from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QColorDialog, QLineEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate, QToolTip, QWidget,
 )

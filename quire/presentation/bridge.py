@@ -10,4 +10,4 @@ class ChangeRelay(QObject):
     def __init__(self, bus: ChangeBus, parent=None):
         super().__init__(parent)
         unsubscribe = bus.subscribe(self.changed.emit)
-        self.destroyed.connect(lambda *_: unsubscribe())
+        self.destroyed.connect(lambda *_args: unsubscribe())

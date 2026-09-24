@@ -12,6 +12,9 @@ from ..ports import (
 from .work import shift_agenda_items
 
 
+UPCOMING_TASK_DAYS = 14
+
+
 def monday_of(day: date) -> date:
     return day - timedelta(days=day.weekday())
 
@@ -75,8 +78,12 @@ class PlannerService:
 
         tasks = self._tasks.due_on(day)
         if day == today:
-            # Unfinished work from earlier days follows you to today.
-            tasks = self._tasks.open_due_before(day) + tasks
+            # Today shows everything still to do: unfinished work from earlier days,
+            # today's, and what's coming up in the next UPCOMING_TASK_DAYS days.
+            ahead = [t for t in self._tasks.list(include_done=False)
+                     if t.due is not None and 0 < (t.due - day).days <= UPCOMING_TASK_DAYS]
+            tasks = self._tasks.open_due_before(day) + tasks + sorted(
+                ahead, key=lambda t: (t.due, t.title.casefold()))
         by_id = {c.id: c for c in courses}
         task_items = tuple(
             TaskItem(t, by_id.get(t.course_id), t.is_overdue(day)) for t in tasks)

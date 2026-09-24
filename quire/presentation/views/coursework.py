@@ -12,6 +12,7 @@ from .. import theme
 from ..bridge import ChangeRelay
 from ..dialogs import TaskDialog, confirm, fill_course_combo
 from ..formatting import BUCKET_LABELS, KIND_LABELS, plural, relative_date
+from ..task_view import TaskView
 from ..widgets import color_icon
 from .common import Card, Page, button, primary_button
 from ..i18n import _
@@ -137,7 +138,7 @@ class CourseworkView(Page):
     def _open(self, item: QTreeWidgetItem, _column: int):
         task_id = item.data(0, Qt.UserRole)
         if task_id is not None:
-            TaskDialog(self.services, task_id, parent=self).exec()
+            TaskView(self.services, task_id, parent=self).exec()
 
     def _delete_selected(self):
         item = self.tree.currentItem()

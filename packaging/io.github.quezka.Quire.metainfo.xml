@@ -52,6 +52,12 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.8.0" date="2026-09-24">
+      <description>
+        <p>A task view to check tasks, all upcoming work on Today, a redesigned task editor,
+          and fixes for saving tasks, backups and imported homework.</p>
+      </description>
+    </release>
     <release version="0.7.0" date="2026-09-24">
       <description>
         <p>Russian translation of the whole interface, with a Language setting.</p>

@@ -9,7 +9,7 @@ from datetime import date, datetime
 from pathlib import Path
 from typing import Protocol
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
 from ..domain import (
     Course, Event, FocusSession, Grade, Job, Lesson, Note, Shift, Subject, Task, TaskKind,

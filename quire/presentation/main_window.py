@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date
 
 from PySide6.QtCore import QSettings, QSize, Qt, QUrl
-from PySide6.QtGui import QAction, QActionGroup, QDesktopServices, QIcon, QKeySequence
+from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox,
     QSizePolicy, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
@@ -162,7 +162,7 @@ class MainWindow(QMainWindow):
 
     def _shortcuts(self):
         for i in range(len(self.PAGES)):
-            self._shortcut(f"Ctrl+{i + 1}", lambda _=False, i=i: self.show_page(i))
+            self._shortcut(f"Ctrl+{i + 1}", lambda _checked=False, i=i: self.show_page(i))
         self._shortcut("Ctrl+N", self.new_note)
         self._shortcut("Ctrl+T", self.new_task)
         self._shortcut("Ctrl+Shift+E", self.new_event)
@@ -242,7 +242,7 @@ class MainWindow(QMainWindow):
 
     def backup(self):
         self._flush()
-        path, _ = QFileDialog.getSaveFileName(
+        path, _filter = QFileDialog.getSaveFileName(
             self, _("Back up data"), f"quire-backup-{date.today().isoformat()}.db",
             _("Quire database") + " (*.db)")
         if path:

@@ -17,9 +17,9 @@ from ...application.services.school import SyncReport
 from ...domain import TaskKind
 from .. import theme
 from ..bridge import ChangeRelay
-from ..formatting import KIND_LABELS, plural, relative_date, relative_timestamp
+from ..formatting import KIND_LABELS, plural, relative_date, relative_timestamp, was_due
 from ..notify import notify
-from ..dialogs import TaskDialog
+from ..task_view import TaskView
 from ..widgets import SubjectDelegate, TwoLineDelegate, mark_color
 from .common import Card, Page, button, icon_button, label, primary_button
 from ..i18n import _
@@ -312,16 +312,16 @@ class SchoolView(Page):
         periods = self.school.periods()
         if self._period not in periods:
             self._period = None
-        for button in self._period_buttons.buttons():
-            self._period_buttons.removeButton(button)
-            button.deleteLater()
+        for old in self._period_buttons.buttons():
+            self._period_buttons.removeButton(old)
+            old.deleteLater()
         for text, value in [(_("All year"), None), *[(p, p) for p in periods]]:
-            button = QPushButton(text, objectName="segment", checkable=True)
-            button.setCursor(Qt.PointingHandCursor)
-            button.setChecked(value == self._period)
-            button.clicked.connect(lambda _on=False, v=value: self._pick_period(v))
-            self._period_buttons.addButton(button)
-            self._periods_row.addWidget(button)
+            segment = QPushButton(text, objectName="segment", checkable=True)
+            segment.setCursor(Qt.PointingHandCursor)
+            segment.setChecked(value == self._period)
+            segment.clicked.connect(lambda _on=False, v=value: self._pick_period(v))
+            self._period_buttons.addButton(segment)
+            self._periods_row.addWidget(segment)
         self.periods.setVisible(len(periods) > 1)
 
     def _pick_period(self, period):
@@ -421,10 +421,7 @@ class SchoolView(Page):
             kind = _("Test") if task.kind is TaskKind.EXAM else KIND_LABELS[task.kind]
             meta = [entry.course.name if entry.course else "", kind]
             if entry.overdue:
-                when = relative_date(task.due, today)
-                if when == _("Yesterday"):
-                    when = when.lower()
-                meta.insert(0, _("was due {when}").format(when=when))
+                meta.insert(0, was_due(task.due, today))
             item.setData(TwoLineDelegate.META, " · ".join(filter(None, meta)))
             item.setData(TwoLineDelegate.COLOR, entry.course.color if entry.course else None)
             item.setData(TwoLineDelegate.ALERT, entry.overdue)
@@ -499,7 +496,7 @@ class SchoolView(Page):
 
     def _open_task(self, item: QListWidgetItem):
         if item.data(Qt.UserRole) is not None:
-            TaskDialog(self.services, item.data(Qt.UserRole), parent=self).exec()
+            TaskView(self.services, item.data(Qt.UserRole), parent=self).exec()
 
     def _open_lesson_note(self, item: QListWidgetItem):
         target = item.data(Qt.UserRole)

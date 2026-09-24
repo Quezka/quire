@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from ...domain import DueBucket, NotFound, Task
+from ...domain import DueBucket, NotFound, Task, TaskKind
 from ..bus import ChangeBus, Topic
 from ..dto import TaskGroup, TaskItem
 from ..ports import Clock, CourseRepository, TaskRepository
@@ -33,6 +33,7 @@ class TaskService:
 
     def save(self, task: Task) -> int:
         task.title = task.title.strip()
+        task.kind = TaskKind(task.kind)  # accept "homework" as well as TaskKind.HOMEWORK
         task.validate()
         if task.id is None:
             task.id = self._tasks.add(task)

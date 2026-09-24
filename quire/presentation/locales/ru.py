@@ -178,6 +178,23 @@ MESSAGES = {
     "Delete this task?": "Удалить эту задачу?",
     "Delete “{title}”?": "Удалить «{title}»?",
     "e.g. Chapter 4 questions": "например, вопросы к главе 4",
+    "What needs doing?": "Что нужно сделать?",
+    "Details, pages, links… (optional)": "Подробности, страницы, ссылки… (необязательно)",
+    "Next class": "К следующему уроку",
+    "Pick a course with class times first": "Сначала выберите предмет с расписанием уроков",
+    "This came from {register}. If the teacher changes it, the next sync updates the title, date and details again.":
+        "Это задание из {register}. Если учитель его изменит, при следующей синхронизации "
+        "название, срок и подробности обновятся.",
+    "Close": "Закрыть",
+    "Done": "Выполнено",
+    "Due {when}": "Срок: {when}",
+    "Edit this task (E)": "Изменить задачу (E)",
+    "From {register}": "Из {register}",
+    "Mark as done": "Отметить выполненным",
+    "Mark as not done": "Снять отметку",
+    "No details.": "Подробностей нет.",
+    "Space": "Пробел",
+    "Double-click to open": "Дважды щёлкните, чтобы открыть",
 
     # ---- Coursework ---------------------------------------------------------------
     "TASK": "ЗАДАЧА",
