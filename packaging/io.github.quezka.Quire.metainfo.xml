@@ -52,6 +52,12 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.9.0" date="2026-09-24">
+      <description>
+        <p>Reminders: a desktop notification before your next event, work shift or class
+          starts. Internal clean-up of the app's architecture.</p>
+      </description>
+    </release>
     <release version="0.8.0" date="2026-09-24">
       <description>
         <p>A task view to check tasks, all upcoming work on Today, a redesigned task editor,

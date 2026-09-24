@@ -456,4 +456,21 @@ MESSAGES = {
     "Couldn't save the password in your system keyring. On Linux, make sure GNOME Keyring or KWallet is running.":
         "Не удалось сохранить пароль в системной связке ключей. В Linux убедитесь, что "
         "запущен GNOME Keyring или KWallet.",
+    # Reminders
+    "Reminders": "Напоминания",
+    "Remind me": "Напоминать",
+    "For": "Для",
+    "Off": "Выкл.",
+    "When it starts": "В момент начала",
+    "{minutes} min before": "За {minutes} мин",
+    "Events": "События",
+    "Classes": "Уроки",
+    "Work shifts": "Рабочие смены",
+    "A desktop notification before things start, while Quire is open.": "Уведомление на рабочем столе перед началом, пока Quire открыт.",
+    "Class": "Урок",
+    "Event": "Событие",
+    "Work shift": "Рабочая смена",
+    "from {time}": "с {time}",
+    "{title} in {minutes} min": "{title} через {minutes} мин",
+    "{title} starts now": "{title} начинается",
 }

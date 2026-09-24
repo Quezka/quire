@@ -1,4 +1,13 @@
-"""Failures of outside systems, phrased for the user."""
+"""Errors callers of the application may see, phrased for the user.
+
+Domain rule violations are re-exported here so outer layers never import the
+domain to catch them.
+"""
+from ..domain.errors import DomainError, NotFound, ValidationError
+
+__all__ = ["ApplicationError", "AuthenticationError", "CredentialStorageError", "DomainError",
+           "NotConnected", "NotFound", "RegisterError", "ValidationError"]
+
 
 
 class ApplicationError(Exception):

@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
 from ...application.bus import Topic
 from ...application.dto import AgendaItem, DayAgenda, ItemKind
 from ...application.services import Services
-from ...domain import Task, TaskKind
+from ...application.inputs import TaskInput
+from ...application.types import TaskKind
 from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import (
@@ -270,5 +271,5 @@ class TodayView(Page):
     def _quick_add(self):
         title = self.quick.text().strip()
         if title:
-            self.services.tasks.save(Task(title, due=self.day))
+            self.services.tasks.save(None, TaskInput(title, due=self.day))
             self.quick.clear()

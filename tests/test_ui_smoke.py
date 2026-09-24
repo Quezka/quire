@@ -156,13 +156,13 @@ def test_notes_group_by_topic(window, services, app):
 
 def test_course_dialog_links_subject_and_keeps_link_on_save(window, services, register):
     from quire.application.ports import RemoteSubject
-    from quire.domain import ClassSlot, Course, TimeRange
+    from quire.application.inputs import CourseInput, SlotInput
 
     register.subjects_ = [RemoteSubject("7", "MATEMATICA", ("ROSSI MARIO",))]
-    services.school.connect("S1", "secret")
-    services.school.sync()
+    services.school_sync.connect("S1", "secret")
+    services.school_sync.sync()
     mine = services.timetable.save_course(
-        Course("Maths", slots=[ClassSlot(0, TimeRange(480, 540))]))
+        None, CourseInput("Maths", slots=(SlotInput(0, 480, 540),)))
 
     dialog = CourseDialog(services, mine, window)
     dialog.subject.setCurrentIndex(dialog.subject.findData("classeviva:subject:7"))
@@ -181,7 +181,7 @@ def test_course_dialog_links_subject_and_keeps_link_on_save(window, services, re
 def test_work_page_and_shift_dialog(window, services, app):
     from datetime import timedelta
 
-    from quire.domain import Job
+    from quire.application.inputs import JobInput
 
     from .conftest import TODAY
 
@@ -190,7 +190,7 @@ def test_work_page_and_shift_dialog(window, services, app):
     before = page.list.count()  # the demo data already has some shifts
     assert before and not page.empty.isVisible()
 
-    job_id = services.work.save_job(Job("Café", "#f76b15", 10.0, deductions=20.0))
+    job_id = services.work.save_job(None, JobInput("Café", "#f76b15", 10.0, 20.0))
     dialog = ShiftDialog(services, day=TODAY, start=18 * 60, parent=window)
     select = dialog.job.findData(job_id)
     dialog.job.setCurrentIndex(select)
@@ -296,11 +296,11 @@ def test_typing_into_the_shift_break_box_works(window, services, app):
 def test_repeat_every_work_day_from_the_shift_dialog(window, services, app):
     from datetime import timedelta
 
-    from quire.domain import Job
+    from quire.application.inputs import JobInput
 
     from .conftest import TODAY
 
-    job_id = services.work.save_job(Job("Library", "#12a594", 9.0))
+    job_id = services.work.save_job(None, JobInput("Library", "#12a594", 9.0))
     dialog = ShiftDialog(services, day=TODAY, start=8 * 60, parent=window, job_id=job_id,
                          end=10 * 60)
     dialog.show()
@@ -333,8 +333,7 @@ def test_job_dialog_weekly_schedule_and_tax_preset(window, services, app):
 
     job = next(j for j in services.work.jobs() if j.name == "Gelateria")
     assert (job.hourly_rate, job.deductions) == (9.5, 20.0)
-    schedule = job.active_schedule(services.planner.today())
-    assert sorted(p.weekday for p in schedule) == [0, 1, 2, 3, 4, 5]
+    assert sorted(p.weekday for p in job.weekly) == [0, 1, 2, 3, 4, 5]
 
     again = JobDialog(services, job.id, window)
     assert again.table.rowCount() == 2
@@ -350,13 +349,13 @@ def test_regular_shift_menu_skip_and_change(window, services, app, monkeypatch):
 
     from PySide6.QtWidgets import QMenu
 
-    from quire.domain import Job, ShiftPattern
+    from quire.application.inputs import JobInput, PatternInput
     from quire.presentation import dialogs
 
     from .conftest import TODAY
 
-    job_id = services.work.save_job(Job("Cinema"),
-                                    weekly=[ShiftPattern.between(4, 18 * 60, 22 * 60)])
+    job_id = services.work.save_job(None, JobInput("Cinema"),
+                                    weekly=[PatternInput(4, 18 * 60, 22 * 60)])
     friday = TODAY + timedelta(days=2)
     class ScriptedMenu(QMenu):
         choice = "Skip this week"
@@ -492,7 +491,7 @@ def test_school_agenda_lists_homework_and_ticks_it_off(window, services, registe
     from PySide6.QtTest import QTest
 
     from quire.application.ports import RemoteAssignment, RemoteSubject
-    from quire.domain import TaskKind
+    from quire.application.types import TaskKind
 
     from .conftest import TODAY
 
@@ -530,7 +529,7 @@ def test_school_agenda_lists_homework_and_ticks_it_off(window, services, registe
 
 
 def test_focus_page_start_pause_and_sidebar_countdown(window, services, app):
-    from quire.domain import Phase
+    from quire.application.types import Phase
 
     page = window.focus
     window.show_page(window.stack.indexOf(page))
@@ -547,9 +546,9 @@ def test_focus_page_start_pause_and_sidebar_countdown(window, services, app):
     assert window.windowTitle() == "Quire"
 
     page._skip()
-    assert services.focus.timer.phase is Phase.SHORT_BREAK
+    assert services.focus.state().phase is Phase.SHORT_BREAK
     page._reset()
-    assert services.focus.timer.phase is Phase.WORK and page.start_btn.text() == "Start"
+    assert services.focus.state().phase is Phase.WORK and page.start_btn.text() == "Start"
     assert not window.grab().isNull()
 
 
@@ -566,15 +565,15 @@ def test_focus_redraws_do_not_pile_up_theme_listeners(window, app):
 
 
 def test_settings_currency_changes_the_work_page(window, services, app):
-    from quire.domain import Job, Shift
+    from quire.application.inputs import JobInput, ShiftInput
     from quire.presentation.formatting import money
     from quire.presentation.preferences import preferences
     from quire.presentation.settings import SettingsDialog
 
     from .conftest import TODAY
 
-    job_id = services.work.save_job(Job("Café", hourly_rate=10.0))
-    services.work.save_shift(Shift.between(job_id, TODAY, 18 * 60, 20 * 60))
+    job_id = services.work.save_job(None, JobInput("Café", hourly_rate=10.0))
+    services.work.save_shift(None, ShiftInput(job_id, TODAY, 18 * 60, 20 * 60))
     dialog = SettingsDialog(services, lambda: None, window)
     dialog.currency.setCurrentIndex(dialog.currency.findData("EUR"))
     assert preferences().currency() == "EUR"
@@ -625,13 +624,16 @@ def test_everything_renders_in_russian(app, services, register):
 
 
 def test_task_view_checks_and_edits_without_losing_the_sync_link(window, services, app):
-    from quire.domain import Task
+    from quire.application.inputs import TaskInput
     from quire.presentation.task_view import TaskView
 
     from .conftest import TODAY
 
-    task_id = services.tasks.save(Task("Esercizi pag. 34", due=TODAY, details="1-5 e 8",
-                                       external_id="classeviva:homework:77"))
+    task_id = services.tasks.save(None, TaskInput("Esercizi pag. 34", due=TODAY,
+                                                  details="1-5 e 8"))
+    stored = services.tasks._tasks.get(task_id)  # as if the sync had imported it
+    stored.external_id = "classeviva:homework:77"
+    services.tasks._tasks.update(stored)
     view = TaskView(services, task_id, window)
     view.show()
     assert view.title.text() == "Esercizi pag. 34"
@@ -649,7 +651,7 @@ def test_task_view_checks_and_edits_without_losing_the_sync_link(window, service
     editor._save()
     saved = services.tasks.task(task_id)
     assert saved.title == "Esercizi pag. 34-35"
-    assert saved.external_id == "classeviva:homework:77"
+    assert services.tasks._tasks.get(task_id).external_id == "classeviva:homework:77"
     view.refresh()
     assert view.title.text() == "Esercizi pag. 34-35"
     view.reject()  # closing works: nothing shadows QDialog.done()
@@ -676,13 +678,13 @@ def test_task_editor_quick_due_dates(window, services):
 def test_today_lists_everything_to_do_grouped_by_day(window, services, app):
     from datetime import timedelta
 
-    from quire.domain import Task
+    from quire.application.inputs import TaskInput
     from quire.presentation.widgets import TwoLineDelegate
 
     from .conftest import TODAY
 
-    services.tasks.save(Task("Far away essay", due=TODAY + timedelta(days=30)))
-    services.tasks.save(Task("Next week reading", due=TODAY + timedelta(days=6)))
+    services.tasks.save(None, TaskInput("Far away essay", due=TODAY + timedelta(days=30)))
+    services.tasks.save(None, TaskInput("Next week reading", due=TODAY + timedelta(days=6)))
     window.show_page(0)
     window.today.set_day(TODAY)
     rows = [window.today.tasks.item(i) for i in range(window.today.tasks.count())]
@@ -698,7 +700,7 @@ def test_today_lists_everything_to_do_grouped_by_day(window, services, app):
 
 def test_saving_a_new_task_from_the_editor(window, services):
     """Regression: Qt returned the Type as a plain string and saving crashed."""
-    from quire.domain import TaskKind
+    from quire.application.types import TaskKind
 
     editor = TaskDialog(services, parent=window)
     editor.title.setText("Revise for the history test")
@@ -707,3 +709,33 @@ def test_saving_a_new_task_from_the_editor(window, services):
     saved = next(i.task for g in services.tasks.groups(include_done=True) for i in g.items
                  if i.task.title == "Revise for the history test")
     assert saved.kind is TaskKind.EXAM
+
+
+def test_reminder_settings_and_notification_text(window, services, monkeypatch):
+    from datetime import datetime
+
+    from quire.application.dto import AgendaItem, ItemKind
+    from quire.application.records import TimeSpan
+    from quire.application.services import Reminder
+    from quire.presentation import reminders
+    from quire.presentation.settings import SettingsDialog
+
+    from .conftest import TODAY
+
+    dialog = SettingsDialog(services, lambda: None, window)
+    dialog.remind.setCurrentIndex(dialog.remind.findData(15))
+    dialog.remind_classes.setChecked(True)
+    saved = services.reminders.settings()
+    assert (saved.minutes_before, saved.classes, saved.events) == (15, True, True)
+    dialog.remind.setCurrentIndex(dialog.remind.findData(None))
+    assert services.reminders.settings().minutes_before is None
+    assert not dialog.remind_events.isEnabled()
+
+    item = AgendaItem(ItemKind.EVENT, 1, TODAY, TimeSpan(14 * 60, 15 * 60), "Dentist", "#fff",
+                      room="Via Roma 3", details="Bring the card\nsecond line")
+    shown = []
+    monkeypatch.setattr(reminders, "notify", lambda title, body: shown.append((title, body)))
+    monkeypatch.setattr(services.reminders, "due", lambda: [
+        Reminder(item, datetime(2026, 9, 23, 14, 0), 10)])
+    window.reminders.check()
+    assert shown == [("Dentist in 10 min", "Event · 14:00–15:00 · Via Roma 3\nBring the card")]

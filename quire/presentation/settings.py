@@ -4,12 +4,12 @@ from __future__ import annotations
 from PySide6.QtCore import QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QPushButton,
+    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QPushButton,
     QVBoxLayout,
 )
 
 from .. import __version__
-from ..application.services import Services
+from ..application.services import ReminderSettings, Services
 from . import theme
 from .formatting import money
 from .i18n import LANGUAGES, chosen_language, language, resolve, set_chosen_language
@@ -72,6 +72,27 @@ class SettingsDialog(QDialog):
         language_row.addWidget(self.restart)
         self.restart.setVisible(False)
 
+        reminders = services.reminders.settings()
+        self.remind = QComboBox()
+        for minutes in services.reminders.CHOICES:
+            self.remind.addItem(_("Off") if minutes is None else _("When it starts") if minutes == 0
+                                else _("{minutes} min before").format(minutes=minutes), minutes)
+        self.remind.setCurrentIndex(max(self.remind.findData(reminders.minutes_before), 0))
+        self.remind_events = QCheckBox(_("Events"), checked=reminders.events)
+        self.remind_classes = QCheckBox(_("Classes"), checked=reminders.classes)
+        self.remind_shifts = QCheckBox(_("Work shifts"), checked=reminders.shifts)
+        remind_kinds = QHBoxLayout()
+        remind_kinds.setSpacing(18)
+        for box in (self.remind_events, self.remind_classes, self.remind_shifts):
+            remind_kinds.addWidget(box)
+            box.toggled.connect(lambda _on: self._reminders_changed())
+        remind_kinds.addStretch()
+        self.remind.currentIndexChanged.connect(lambda _row: self._reminders_changed())
+        remind_hint = QLabel(_("A desktop notification before things start, while Quire is open."),
+                             objectName="hint")
+        remind_hint.setWordWrap(True)
+        self._reminders_changed(save=False)
+
         backup_btn = QPushButton(_("Back up data…"))
         backup_btn.clicked.connect(backup)
         folder = QPushButton(_("Open data folder"))
@@ -91,6 +112,10 @@ class SettingsDialog(QDialog):
         form.addRow(self._section(_("Money")))
         form.addRow(_("Currency"), self.currency)
         form.addRow("", self.sample)
+        form.addRow(self._section(_("Reminders")))
+        form.addRow(_("Remind me"), self.remind)
+        form.addRow(_("For"), remind_kinds)
+        form.addRow("", remind_hint)
         form.addRow(self._section(_("Your data")))
         form.addRow("", data_row)
         location = QLabel(str(services.storage.location), objectName="hint")
@@ -115,6 +140,15 @@ class SettingsDialog(QDialog):
         self.language_hint.setText(_("Quire needs to restart to switch language.")
                                    if changed else "")
         self.restart.setVisible(changed)
+
+    def _reminders_changed(self, save: bool = True):
+        on = self.remind.currentData() is not None
+        for box in (self.remind_events, self.remind_classes, self.remind_shifts):
+            box.setEnabled(on)
+        if save:
+            self.services.reminders.save_settings(ReminderSettings(
+                self.remind.currentData(), self.remind_events.isChecked(),
+                self.remind_classes.isChecked(), self.remind_shifts.isChecked()))
 
     def _currency_picked(self):
         preferences().set_currency(self.currency.currentData())

@@ -7,7 +7,8 @@ from quire.application.errors import AuthenticationError, NotConnected
 from quire.application.ports import (
     RemoteAssignment, RemoteGrade, RemoteLesson, RemoteSubject,
 )
-from quire.domain import ClassSlot, Course, DueBucket, TaskKind, TimeRange
+from quire.application.inputs import CourseInput, SlotInput, TaskInput
+from quire.application.types import DueBucket, TaskKind
 
 from .conftest import TODAY
 
@@ -28,18 +29,18 @@ def grade(id="g1", value=7.5, display="7½", subject=MATHS, cancelled=False):
 @pytest.fixture
 def connected(services, register):
     register.subjects_ = [MATHS, HISTORY]
-    services.school.connect("S1234567X", "secret")
+    services.school_sync.connect("S1234567X", "secret")
     return services
 
 
 def test_connect_checks_password_before_saving(services, credentials):
     with pytest.raises(AuthenticationError):
-        services.school.connect("S1234567X", "nope")
+        services.school_sync.connect("S1234567X", "nope")
     assert credentials.load() is None
-    assert not services.school.status().connected
+    assert not services.school_sync.status().connected
 
-    services.school.connect(" S1234567X ", "secret")
-    status = services.school.status()
+    services.school_sync.connect(" S1234567X ", "secret")
+    status = services.school_sync.status()
     assert status.connected and status.username == "S1234567X"
     assert status.student_name == "Ada Lovelace"
     assert credentials.load().password == "secret"
@@ -47,12 +48,12 @@ def test_connect_checks_password_before_saving(services, credentials):
 
 def test_sync_without_account_raises(services):
     with pytest.raises(NotConnected):
-        services.school.sync()
+        services.school_sync.sync()
 
 
 def test_sync_creates_tidy_courses_and_imports_homework(connected, register):
     register.assignments_ = [homework()]
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
 
     names = {c.name: c for c in connected.timetable.courses()}
     assert set(names) == {"Matematica", "Storia"}
@@ -68,9 +69,9 @@ def test_sync_creates_tidy_courses_and_imports_homework(connected, register):
 
 def test_existing_course_is_adopted_by_name(connected, register, services):
     # A course the student made before connecting keeps its colour and timetable.
-    own = Course("Storia", color="#123456", slots=[ClassSlot(0, TimeRange(480, 540))])
-    services.timetable.save_course(own)
-    connected.school.sync()
+    own = CourseInput("Storia", color="#123456", slots=(SlotInput(0, 480, 540),))
+    services.timetable.save_course(None, own)
+    connected.school_sync.sync()
     storia = [c for c in connected.timetable.courses() if c.name == "Storia"]
     assert len(storia) == 1
     assert storia[0].color == "#123456" and storia[0].external_id == "classeviva:subject:2"
@@ -78,12 +79,12 @@ def test_existing_course_is_adopted_by_name(connected, register, services):
 
 def test_resync_updates_without_duplicating_and_keeps_done(connected, register):
     register.assignments_ = [homework()]
-    connected.school.sync()
+    connected.school_sync.sync()
     (task,) = connected.tasks.groups()[0].items
     connected.tasks.set_done(task.task.id, True)
 
     register.assignments_ = [homework(text="Pag. 35 es. 1-8")]
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
     assert not report.new_tasks and len(report.updated_tasks) == 1
     assert not report.first_sync
 
@@ -94,34 +95,33 @@ def test_resync_updates_without_duplicating_and_keeps_done(connected, register):
 
 def test_assignment_removed_by_teacher_disappears_unless_done(connected, register):
     register.assignments_ = [homework("1"), homework("2", text="Esercizi")]
-    connected.school.sync()
+    connected.school_sync.sync()
     done_id = next(i.task.id for g in connected.tasks.groups() for i in g.items
                    if i.task.title == "Esercizi")
     connected.tasks.set_done(done_id, True)
 
     register.assignments_ = []
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
     assert report.removed_tasks == 1
     remaining = [i.task.title for g in connected.tasks.groups(include_done=True) for i in g.items]
     assert remaining == ["Esercizi"]
 
 
 def test_manual_tasks_are_never_touched_by_sync(connected, register):
-    from quire.domain import Task
-    connected.tasks.save(Task("My own task", due=TODAY))
+    connected.tasks.save(None, TaskInput("My own task", due=TODAY))
     register.assignments_ = []
-    connected.school.sync()
+    connected.school_sync.sync()
     assert [i.task.title for i in connected.tasks.groups()[0].items] == ["My own task"]
 
 
 def test_new_grades_are_reported_and_averaged(connected, register):
     register.grades_ = [grade("g1", 7.5), grade("g2", None, "ass")]
-    first = connected.school.sync()
+    first = connected.school_sync.sync()
     assert len(first.new_grades) == 2
 
     register.grades_ = [grade("g1", 7.5), grade("g2", None, "ass"), grade("g3", 9.0, "9"),
                         grade("g4", 3.0, "3", cancelled=True)]
-    second = connected.school.sync()
+    second = connected.school_sync.sync()
     assert [g.display for g in second.new_grades] == ["9", "3"]
 
     (maths,) = connected.school.grades_by_subject()
@@ -135,7 +135,7 @@ def test_lessons_are_mirrored_for_recent_days(connected, register):
         RemoteLesson("l1", TODAY - timedelta(days=1), "1", "MATEMATICA", "Equazioni", "ROSSI", 2),
         RemoteLesson("l2", TODAY, "2", "STORIA", "Rivoluzione francese", "", 1),
     ]
-    connected.school.sync()
+    connected.school_sync.sync()
     lessons = connected.school.recent_lessons()
     assert [(l.subject, l.topic) for l in lessons] == [
         ("Storia", "Rivoluzione francese"), ("Matematica", "Equazioni")]
@@ -145,7 +145,7 @@ def test_lessons_are_mirrored_for_recent_days(connected, register):
 def test_exam_shows_up_in_coursework_and_today(connected, register):
     register.assignments_ = [homework("9", day=TODAY, text="Verifica capitolo 3",
                                       kind=TaskKind.EXAM)]
-    connected.school.sync()
+    connected.school_sync.sync()
     agenda = connected.planner.day_agenda(TODAY)
     assert [t.task.kind for t in agenda.tasks] == [TaskKind.EXAM]
     assert connected.tasks.groups()[0].bucket is DueBucket.TODAY
@@ -153,28 +153,28 @@ def test_exam_shows_up_in_coursework_and_today(connected, register):
 
 def test_disconnect_forgets_account_but_keeps_data(connected, register, credentials):
     register.assignments_ = [homework()]
-    connected.school.sync()
-    connected.school.disconnect()
+    connected.school_sync.sync()
+    connected.school_sync.disconnect()
     assert credentials.load() is None
-    assert not connected.school.status().connected
+    assert not connected.school_sync.status().connected
     assert connected.tasks.groups()
 
 
 def test_sync_publishes_changes(connected, register):
     seen = []
     connected.bus.subscribe(seen.append)
-    connected.school.sync()
+    connected.school_sync.sync()
     assert Topic.TASKS in seen and Topic.SCHOOL in seen
 
 
 def own_course(services, name, slots=((0, 480, 540),)):
     return services.timetable.save_course(
-        Course(name, color="#123456",
-               slots=[ClassSlot(wd, TimeRange(s, e)) for wd, s, e in slots]))
+        None, CourseInput(name, color="#123456",
+                          slots=tuple(SlotInput(wd, s, e) for wd, s, e in slots)))
 
 
 def test_subjects_from_sync_are_offered_for_linking(connected, register):
-    connected.school.sync()
+    connected.school_sync.sync()
     links = {l.subject.name: l for l in connected.school.subject_links()}
     assert set(links) == {"Matematica", "Storia"}
     assert links["Matematica"].course.name == "Matematica"
@@ -185,11 +185,11 @@ def test_linking_folds_the_auto_created_duplicate_into_your_course(connected, re
     maths = own_course(connected, "Maths")
     register.assignments_ = [homework()]
     register.grades_ = [grade("g1", 8.0)]
-    connected.school.sync()
+    connected.school_sync.sync()
     duplicate = next(c for c in connected.timetable.courses() if c.name == "Matematica")
     note = connected.notes.create("# Limits", duplicate.id, "Calculus")
 
-    connected.school.link_course(maths, "classeviva:subject:1")
+    connected.school_sync.link_course(maths, "classeviva:subject:1")
 
     names = [c.name for c in connected.timetable.courses()]
     assert "Matematica" not in names and "Maths" in names
@@ -204,53 +204,53 @@ def test_linking_folds_the_auto_created_duplicate_into_your_course(connected, re
 
 def test_after_linking_sync_uses_your_course_and_creates_no_duplicate(connected, register):
     maths = own_course(connected, "Maths")
-    connected.school.sync()
-    connected.school.link_course(maths, "classeviva:subject:1")
+    connected.school_sync.sync()
+    connected.school_sync.link_course(maths, "classeviva:subject:1")
 
     register.assignments_ = [homework("99", text="Nuovi esercizi")]
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
     assert report.courses_created == 0
     assert [c.name for c in connected.timetable.courses()].count("Matematica") == 0
     assert report.new_tasks[0].course_id == maths
 
 
 def test_linking_never_deletes_a_course_with_class_times(connected, register):
-    connected.school.sync()
+    connected.school_sync.sync()
     auto = next(c for c in connected.timetable.courses() if c.name == "Matematica")
-    auto.slots = [ClassSlot(1, TimeRange(600, 660))]
-    connected.timetable.save_course(auto)
+    connected.timetable.save_course(auto.id, CourseInput(auto.name, color=auto.color,
+                                                         slots=(SlotInput(1, 600, 660),)))
     maths = own_course(connected, "Maths")
 
-    connected.school.link_course(maths, "classeviva:subject:1")
+    connected.school_sync.link_course(maths, "classeviva:subject:1")
     kept = connected.timetable.course(auto.id)
     assert kept.external_id is None and kept.slots
 
 
 def test_unlinking(connected, register):
-    connected.school.sync()
+    connected.school_sync.sync()
     auto = next(c for c in connected.timetable.courses() if c.name == "Storia")
-    connected.school.link_course(auto.id, None)
+    connected.school_sync.link_course(auto.id, None)
     assert connected.timetable.course(auto.id).external_id is None
     links = {l.subject.name: l.course for l in connected.school.subject_links()}
     assert links["Storia"] is None
 
 
 def test_linking_to_unknown_subject_fails(connected, register):
-    from quire.domain import NotFound
+    from quire.application.errors import NotFound
     maths = own_course(connected, "Maths")
     with pytest.raises(NotFound):
-        connected.school.link_course(maths, "classeviva:subject:404")
+        connected.school_sync.link_course(maths, "classeviva:subject:404")
 
 
 
 def test_a_failing_part_does_not_stop_the_rest(connected, register):
     from quire.application.errors import RegisterError
     register.grades_ = [grade("g1", 7.0)]
-    connected.school.sync()
+    connected.school_sync.sync()
 
     register.failing["grades"] = RegisterError("endpoint moved")
     register.assignments_ = [homework("5")]
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
     assert [t.title for t in report.new_tasks] == ["Pag. 34 es. 1-5"]
     assert report.problems == ("Grades: endpoint moved",)
     # Existing grades are kept, not wiped, when grades couldn't be fetched.
@@ -260,9 +260,9 @@ def test_a_failing_part_does_not_stop_the_rest(connected, register):
 def test_failed_homework_fetch_does_not_delete_imported_tasks(connected, register):
     from quire.application.errors import RegisterError
     register.assignments_ = [homework("5")]
-    connected.school.sync()
+    connected.school_sync.sync()
     register.failing["assignments"] = RegisterError("timeout")
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
     assert report.removed_tasks == 0
     assert [i.task.title for g in connected.tasks.groups() for i in g.items] == ["Pag. 34 es. 1-5"]
 
@@ -272,14 +272,14 @@ def test_everything_failing_is_an_error_and_not_a_sync(connected, register):
     for name in ("subjects", "assignments", "homework", "grades", "lessons"):
         register.failing[name] = RegisterError("down")
     with pytest.raises(RegisterError, match="Couldn't sync anything"):
-        connected.school.sync()
-    assert connected.school.status().last_sync is None
+        connected.school_sync.sync()
+    assert connected.school_sync.status().last_sync is None
 
 
 def test_a_rejected_session_still_stops_the_sync(connected, register):
     register.failing["grades"] = AuthenticationError("session refused")
     with pytest.raises(AuthenticationError):
-        connected.school.sync()
+        connected.school_sync.sync()
 
 
 def test_periods_filter_grades_and_averages(connected, register):
@@ -289,7 +289,7 @@ def test_periods_filter_grades_and_averages(connected, register):
         RemoteGrade("t2", date(2026, 10, 9), "1", "MATEMATICA", "7", 7.0, period="Trimestre"),
         RemoteGrade("p1", date(2027, 2, 3), "1", "MATEMATICA", "9", 9.0, period="Pentamestre"),
     ]
-    connected.school.sync()
+    connected.school_sync.sync()
     assert connected.school.periods() == ["Trimestre", "Pentamestre"]
     assert connected.school.overall_average("Trimestre") == 6.0
     assert connected.school.overall_average("Pentamestre") == 9.0
@@ -299,14 +299,13 @@ def test_periods_filter_grades_and_averages(connected, register):
 
 
 def test_upcoming_lists_register_work_still_to_do(connected, register):
-    from quire.domain import Task
     register.assignments_ = [
         homework("h1", day=TODAY + timedelta(days=3), text="Esercizi"),
         homework("x1", day=TODAY + timedelta(days=3), text="Verifica cap. 2", kind=TaskKind.EXAM),
         homework("old", day=TODAY - timedelta(days=5), text="Vecchi compiti"),
     ]
-    connected.school.sync()
-    connected.tasks.save(Task("My own thing", due=TODAY))  # not from the register
+    connected.school_sync.sync()
+    connected.tasks.save(None, TaskInput("My own thing", due=TODAY))  # not from the register
     upcoming = connected.school.upcoming()
     assert [i.task.title for i in upcoming] == ["Verifica cap. 2", "Esercizi"]  # tests first
     assert upcoming[0].course.name == "Matematica"
@@ -320,7 +319,7 @@ def test_overview_numbers(connected, register):
     ]
     register.grades_ = [grade("g1", 5.0, "5"), grade("g2", 5.5, "5½"),
                         grade("s1", 8.0, "8", subject=HISTORY)]
-    connected.school.sync()
+    connected.school_sync.sync()
     o = connected.school.overview()
     assert o.average == 6.17 and o.grade_count == 3
     assert o.next_test.task.title == "Verifica"
@@ -338,34 +337,35 @@ def homework_item(id="n1", day=TODAY, text="Workbook p. 18", done=False):
 def test_homework_feed_is_imported_next_to_the_agenda(connected, register):
     register.assignments_ = [homework("1", text="Esercizi")]
     register.homework_ = [homework_item("1", text="Workbook p. 18")]  # same id, other feed
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
     titles = sorted(t.title for t in report.new_tasks)
     assert titles == ["Esercizi", "Workbook p. 18"]  # no clash between the two feeds
     hw = next(t for t in report.new_tasks if t.title == "Workbook p. 18")
-    assert hw.external_id == "classeviva:homework:1" and hw.kind is TaskKind.HOMEWORK
+    assert hw.imported and hw.kind is TaskKind.HOMEWORK
+    assert connected.tasks._tasks.get(hw.id).external_id == "classeviva:homework:1"
 
 
 def test_homework_that_leaves_the_feed_is_kept(connected, register):
     register.homework_ = [homework_item()]
-    connected.school.sync()
+    connected.school_sync.sync()
     register.homework_ = []  # expired from Classeviva's current list
-    report = connected.school.sync()
+    report = connected.school_sync.sync()
     assert report.removed_tasks == 0
     assert [i.task.title for i in connected.school.agenda()] == ["Workbook p. 18"]
 
 
 def test_done_on_the_register_is_carried_over_but_never_undone(connected, register):
     register.homework_ = [homework_item(done=True)]
-    connected.school.sync()
+    connected.school_sync.sync()
     (task,) = [i.task for g in connected.tasks.groups(include_done=True) for i in g.items]
     assert task.done
 
     register.homework_ = [homework_item("n2", text="Other")]
-    connected.school.sync()
+    connected.school_sync.sync()
     other = next(i.task for g in connected.tasks.groups() for i in g.items)
     connected.tasks.set_done(other.id, True)  # ticked in Quire
     register.homework_ = [homework_item("n2", text="Other", done=False)]
-    connected.school.sync()
+    connected.school_sync.sync()
     assert connected.tasks.task(other.id).done
 
 
@@ -376,7 +376,7 @@ def test_agenda_includes_overdue_today_and_ahead(connected, register):
         homework("soon", day=TODAY + timedelta(days=10), text="Ricerca"),
         homework("far", day=TODAY + timedelta(days=90), text="Lontano"),
     ]
-    connected.school.sync()
+    connected.school_sync.sync()
     agenda = connected.school.agenda()
     assert [(i.task.title, i.overdue) for i in agenda] == [
         ("Vecchi esercizi", True), ("Oggi", False), ("Ricerca", False)]

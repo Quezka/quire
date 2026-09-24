@@ -4,7 +4,10 @@ import pytest
 
 from quire.application.bus import Topic
 from quire.application.dto import ItemKind
-from quire.domain import ClassSlot, Course, Event, Job, Shift, TimeRange, ValidationError
+from quire.application.errors import ValidationError
+from quire.application.inputs import (
+    CourseInput, EventInput, JobInput, PatternInput, ShiftInput, SlotInput,
+)
 
 from .conftest import TODAY  # Wednesday 23 Sep 2026; the fixed clock says 12:00
 
@@ -12,12 +15,12 @@ MONDAY = TODAY - timedelta(days=2)
 
 
 def job(services, name="Pizzeria", rate=8.5, color="#f76b15"):
-    return services.work.save_job(Job(name, color, rate))
+    return services.work.save_job(None, JobInput(name, color, rate))
 
 
 def test_repeat_creates_weekly_copies(services):
     pizzeria = job(services)
-    ids = services.work.save_shift(Shift.between(pizzeria, TODAY, 18 * 60, 22 * 60),
+    ids = services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 18 * 60, 22 * 60),
                                    repeat_weeks=3)
     assert len(ids) == 4
     days = [i.shift.day for i in services.work.shifts_between(TODAY, TODAY + timedelta(weeks=4))]
@@ -26,21 +29,20 @@ def test_repeat_creates_weekly_copies(services):
 
 def test_shift_needs_an_existing_job_and_edits_cannot_repeat(services):
     with pytest.raises(ValidationError):
-        services.work.save_shift(Shift.between(999, TODAY, 600, 660))
+        services.work.save_shift(None, ShiftInput(999, TODAY, 600, 660))
     pizzeria = job(services)
-    (shift_id,) = services.work.save_shift(Shift.between(pizzeria, TODAY, 600, 660))
-    shift = services.work.shift(shift_id)
+    (shift_id,) = services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 600, 660))
     with pytest.raises(ValidationError):
-        services.work.save_shift(shift, repeat_weeks=2)
+        services.work.save_shift(shift_id, ShiftInput(pizzeria, TODAY, 600, 660), repeat_weeks=2)
 
 
 def test_week_summary_counts_paid_hours_and_pay_per_job(services):
     pizzeria = job(services, "Pizzeria", 8.5)
     babysit = job(services, "Babysitting", None)
-    services.work.save_shift(Shift.between(pizzeria, MONDAY, 18 * 60, 22 * 60, break_minutes=30))
-    services.work.save_shift(Shift.between(pizzeria, TODAY, 18 * 60, 1 * 60))
-    services.work.save_shift(Shift.between(babysit, TODAY + timedelta(days=2), 15 * 60, 18 * 60))
-    services.work.save_shift(Shift.between(pizzeria, MONDAY + timedelta(days=7), 18 * 60, 22 * 60))
+    services.work.save_shift(None, ShiftInput(pizzeria, MONDAY, 18 * 60, 22 * 60, 30))
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 18 * 60, 1 * 60))
+    services.work.save_shift(None, ShiftInput(babysit, TODAY + timedelta(days=2), 15 * 60, 18 * 60))
+    services.work.save_shift(None, ShiftInput(pizzeria, MONDAY + timedelta(days=7), 18 * 60, 22 * 60))
 
     week = services.work.week_summary()
     assert week.shifts == 3
@@ -53,18 +55,18 @@ def test_week_summary_counts_paid_hours_and_pay_per_job(services):
 
 def test_month_summary_covers_the_calendar_month(services):
     pizzeria = job(services)
-    services.work.save_shift(Shift.between(pizzeria, date(2026, 9, 1), 600, 660))
-    services.work.save_shift(Shift.between(pizzeria, date(2026, 9, 30), 600, 660))
-    services.work.save_shift(Shift.between(pizzeria, date(2026, 10, 1), 600, 660))
+    services.work.save_shift(None, ShiftInput(pizzeria, date(2026, 9, 1), 600, 660))
+    services.work.save_shift(None, ShiftInput(pizzeria, date(2026, 9, 30), 600, 660))
+    services.work.save_shift(None, ShiftInput(pizzeria, date(2026, 10, 1), 600, 660))
     assert services.work.month_summary().shifts == 2
 
 
 def test_upcoming_skips_finished_shifts(services):
     pizzeria = job(services)
-    services.work.save_shift(Shift.between(pizzeria, TODAY, 8 * 60, 11 * 60))  # ended at 11
-    services.work.save_shift(Shift.between(pizzeria, TODAY, 11 * 60, 14 * 60))  # running now
-    services.work.save_shift(Shift.between(pizzeria, TODAY - timedelta(days=1), 22 * 60, 13 * 60))
-    services.work.save_shift(Shift.between(pizzeria, TODAY + timedelta(days=1), 600, 660))
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 8 * 60, 11 * 60))  # ended at 11
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 11 * 60, 14 * 60))  # running now
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY - timedelta(days=1), 22 * 60, 13 * 60))
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY + timedelta(days=1), 600, 660))
     starts = [(i.shift.day, i.shift.start) for i in services.work.upcoming()]
     assert starts == [(TODAY - timedelta(days=1), 22 * 60), (TODAY, 11 * 60),
                       (TODAY + timedelta(days=1), 600)]
@@ -72,7 +74,7 @@ def test_upcoming_skips_finished_shifts(services):
 
 def test_overnight_shift_shows_on_both_days(services):
     pizzeria = job(services)
-    services.work.save_shift(Shift.between(pizzeria, TODAY, 20 * 60, 2 * 60))
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 20 * 60, 2 * 60))
     today = [i for i in services.planner.day_agenda(TODAY).items if i.kind is ItemKind.SHIFT]
     tomorrow = [i for i in services.planner.day_agenda(TODAY + timedelta(days=1)).items
                 if i.kind is ItemKind.SHIFT]
@@ -84,7 +86,7 @@ def test_overnight_shift_shows_on_both_days(services):
 def test_weekend_shift_widens_the_week(services):
     pizzeria = job(services)
     assert len(services.planner.week_agenda(TODAY).days) == 5
-    services.work.save_shift(Shift.between(pizzeria, date(2026, 9, 26), 600, 900))
+    services.work.save_shift(None, ShiftInput(pizzeria, date(2026, 9, 26), 600, 900))
     week = services.planner.week_agenda(TODAY)
     assert len(week.days) == 7
     assert any(i.kind is ItemKind.SHIFT for i in week.items)
@@ -92,22 +94,22 @@ def test_weekend_shift_widens_the_week(services):
 
 def test_clashes_with_classes_events_and_other_shifts(services):
     pizzeria = job(services)
-    services.timetable.save_course(Course("Maths", slots=[ClassSlot(2, TimeRange(600, 660))]))
-    services.planner.save_event(Event(TODAY, TimeRange(700, 760), "Dentist"))
-    (other,) = services.work.save_shift(Shift.between(pizzeria, TODAY, 750, 800))
+    services.timetable.save_course(None, CourseInput("Maths", slots=(SlotInput(2, 600, 660),)))
+    services.planner.save_event(None, EventInput(TODAY, 700, 760, "Dentist"))
+    (other,) = services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 750, 800))
 
-    new = Shift.between(pizzeria, TODAY, 630, 760)
+    new = ShiftInput(pizzeria, TODAY, 630, 760)
     items = services.planner.items_between(TODAY, TODAY + timedelta(days=1))
-    assert sorted(i.title for i in services.work.clashes(new, items)) == [
+    assert sorted(i.title for i in services.work.clashes(None, new, items)) == [
         "Dentist", "Maths", "Pizzeria"]
     # A saved shift doesn't clash with itself (only with the dentist it overlaps).
-    saved = services.work.shift(other)
-    assert [i.title for i in services.work.clashes(saved, items)] == ["Dentist"]
+    saved = ShiftInput(pizzeria, TODAY, 750, 800)
+    assert [i.title for i in services.work.clashes(other, saved, items)] == ["Dentist"]
 
 
 def test_deleting_a_job_deletes_its_shifts(services):
     pizzeria = job(services)
-    services.work.save_shift(Shift.between(pizzeria, TODAY, 600, 660), repeat_weeks=2)
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 600, 660), repeat_weeks=2)
     services.work.delete_job(pizzeria)
     assert services.work.shifts_between(TODAY, TODAY + timedelta(weeks=3)) == []
 
@@ -116,7 +118,7 @@ def test_work_changes_are_published(services):
     seen = []
     services.bus.subscribe(seen.append)
     pizzeria = job(services)
-    services.work.save_shift(Shift.between(pizzeria, TODAY, 600, 660))
+    services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 600, 660))
     assert seen == [Topic.WORK, Topic.WORK]
 
 
@@ -124,12 +126,13 @@ def test_work_changes_are_published(services):
 
 from quire.domain import ShiftPattern, reschedule  # noqa: E402
 
-TUESDAY_EVENINGS = ShiftPattern.between(1, 18 * 60, 22 * 60, 30)
-SATURDAY_LATE = ShiftPattern.between(5, 19 * 60, 1 * 60, 30)
+TUESDAY_EVENINGS = PatternInput(1, 18 * 60, 22 * 60, 30)
+SATURDAY_LATE = PatternInput(5, 19 * 60, 1 * 60, 30)
 
 
 def scheduled_job(services, *patterns, rate=10.0):
-    return services.work.save_job(Job("Pizzeria", "#f76b15", rate), weekly=list(patterns))
+    return services.work.save_job(None, JobInput("Pizzeria", "#f76b15", rate),
+                                  weekly=list(patterns))
 
 
 def test_weekly_shifts_show_every_week_from_this_week(services):
@@ -154,26 +157,26 @@ def test_weekly_shifts_count_towards_hours_and_pay(services):
 def test_changing_the_schedule_keeps_past_weeks(services, clock):
     job_id = scheduled_job(services, TUESDAY_EVENINGS)
     # Pretend the schedule was set up weeks ago.
-    job = services.work.job(job_id)
+    job = services.work._jobs.get(job_id)
     job.schedule[0].since = MONDAY - timedelta(weeks=4)
     services.work._jobs.update(job)
 
-    wednesday = ShiftPattern.between(2, 17 * 60, 21 * 60)
-    services.work.save_job(services.work.job(job_id), weekly=[wednesday])
+    wednesday = PatternInput(2, 17 * 60, 21 * 60)
+    services.work.save_job(job_id, JobInput("Pizzeria", "#f76b15", 10.0), weekly=[wednesday])
 
     past = services.work.shifts_between(MONDAY - timedelta(weeks=2), MONDAY - timedelta(days=1))
     assert {i.shift.day.weekday() for i in past} == {1}  # history still says Tuesdays
     now = services.work.shifts_between(MONDAY, MONDAY + timedelta(days=6))
     assert [i.shift.day.weekday() for i in now] == [2]
-    assert [p.weekday for p in services.work.job(job_id).active_schedule(TODAY)] == [2]
+    assert [p.weekday for p in services.work.job(job_id).weekly] == [2]
 
 
 def test_saving_a_job_without_a_schedule_keeps_it(services):
     job_id = scheduled_job(services, TUESDAY_EVENINGS)
     job = services.work.job(job_id)
-    job.hourly_rate = 12.0
-    services.work.save_job(Job(job.name, job.color, 12.0, job.id))  # e.g. a rename/rate edit
-    assert len(services.work.job(job_id).active_schedule(TODAY)) == 1
+    services.work.save_job(job_id, JobInput(job.name, job.color, 12.0))  # e.g. a rate edit
+    assert len(services.work.job(job_id).weekly) == 1
+    assert services.work.job(job_id).hourly_rate == 12.0
 
 
 def test_reschedule_drops_patterns_created_this_week():
@@ -187,7 +190,7 @@ def test_skip_and_replace_one_week(services):
     next_tuesday = tuesday + timedelta(weeks=1)
 
     services.work.skip_occurrence(job_id, tuesday, 18 * 60)
-    services.work.save_shift(Shift.between(job_id, next_tuesday, 16 * 60, 20 * 60),
+    services.work.save_shift(None, ShiftInput(job_id, next_tuesday, 16 * 60, 20 * 60),
                              replaces=(job_id, next_tuesday, 18 * 60))
 
     items = services.work.shifts_between(MONDAY, MONDAY + timedelta(weeks=3))
@@ -200,10 +203,10 @@ def test_skip_and_replace_one_week(services):
 def test_replacement_does_not_clash_with_the_occurrence_it_replaces(services):
     job_id = scheduled_job(services, TUESDAY_EVENINGS)
     tuesday = MONDAY + timedelta(days=1)
-    moved = Shift.between(job_id, tuesday, 17 * 60, 21 * 60)
+    moved = ShiftInput(job_id, tuesday, 17 * 60, 21 * 60)
     items = services.planner.items_between(tuesday, tuesday + timedelta(days=1))
-    assert [i.title for i in services.work.clashes(moved, items)] == ["Pizzeria"]
-    assert services.work.clashes(moved, items, replaces=(job_id, tuesday, 18 * 60)) == []
+    assert [i.title for i in services.work.clashes(None, moved, items)] == ["Pizzeria"]
+    assert services.work.clashes(None, moved, items, replaces=(job_id, tuesday, 18 * 60)) == []
 
 
 def test_overnight_weekly_shift_spans_saturday_and_sunday(services):
@@ -217,13 +220,13 @@ def test_overnight_weekly_shift_spans_saturday_and_sunday(services):
 
 def test_invalid_pattern_is_rejected(services):
     with pytest.raises(ValidationError):
-        services.work.save_job(Job("x"), weekly=[ShiftPattern(1, 600, 60, break_minutes=60)])
+        services.work.save_job(None, JobInput("x"), weekly=[PatternInput(1, 600, 660, 60)])
 
 
 
 def test_repeat_every_work_day(services):
-    from quire.domain import WORK_DAYS
-    job_id = services.work.save_job(Job("Café", "#f76b15", 9.0))
+    from quire.application.types import WORK_DAYS
+    job_id = services.work.save_job(None, JobInput("Café", "#f76b15", 9.0))
     added = services.work.add_weekly(job_id, WORK_DAYS, 7 * 60, 9 * 60, since=TODAY)
     assert added == 5
     items = services.work.shifts_between(MONDAY, MONDAY + timedelta(days=13))
@@ -236,7 +239,7 @@ def test_repeat_every_work_day(services):
 
 
 def test_repeat_until_a_date(services):
-    job_id = services.work.save_job(Job("Summer camp"))
+    job_id = services.work.save_job(None, JobInput("Summer camp"))
     last_day = TODAY + timedelta(days=9)
     services.work.add_weekly(job_id, [0, 2, 4], 9 * 60, 13 * 60, since=TODAY, until=last_day)
     items = services.work.shifts_between(TODAY, TODAY + timedelta(weeks=4))
@@ -249,14 +252,14 @@ def test_repeat_until_a_date(services):
 
 
 def test_ending_repeat_is_kept_when_editing_the_schedule(services):
-    job_id = services.work.save_job(Job("Summer camp"))
+    job_id = services.work.save_job(None, JobInput("Summer camp"))
     services.work.add_weekly(job_id, [2], 9 * 60, 13 * 60, since=TODAY,
                              until=TODAY + timedelta(weeks=2))
     job = services.work.job(job_id)
-    wanted = [ShiftPattern(p.weekday, p.start, p.duration, p.break_minutes)
-              for p in job.active_schedule(TODAY)]
-    services.work.save_job(job, weekly=wanted)  # re-saving the editor unchanged
-    (pattern,) = services.work.job(job_id).active_schedule(TODAY)
+    wanted = [PatternInput(p.weekday, p.start, p.end % (24 * 60), p.break_minutes)
+              for p in job.weekly]
+    services.work.save_job(job_id, JobInput(job.name), weekly=wanted)  # the editor, unchanged
+    (pattern,) = services.work.job(job_id).weekly
     assert pattern.until == TODAY + timedelta(weeks=2)
 
 
@@ -265,10 +268,12 @@ def test_net_pay_after_tax_and_deductions(services):
     from quire.domain import net_pay
     assert net_pay(100.0, 20) == 80.0 and net_pay(None, 20) is None and net_pay(50.0, 0) == 50.0
 
-    occasional = services.work.save_job(Job("Tutoring", hourly_rate=15.0, deductions=20.0))
-    employee = services.work.save_job(Job("Pizzeria", hourly_rate=10.0, deductions=9.19))
-    services.work.save_shift(Shift.between(occasional, TODAY, 16 * 60, 18 * 60))   # 30 gross
-    services.work.save_shift(Shift.between(employee, TODAY, 18 * 60, 22 * 60))     # 40 gross
+    occasional = services.work.save_job(None, JobInput("Tutoring", hourly_rate=15.0,
+                                                       deductions=20.0))
+    employee = services.work.save_job(None, JobInput("Pizzeria", hourly_rate=10.0,
+                                                     deductions=9.19))
+    services.work.save_shift(None, ShiftInput(occasional, TODAY, 16 * 60, 18 * 60))   # 30 gross
+    services.work.save_shift(None, ShiftInput(employee, TODAY, 18 * 60, 22 * 60))     # 40 gross
 
     week = services.work.week_summary()
     assert week.pay == 70.0
@@ -281,4 +286,20 @@ def test_net_pay_after_tax_and_deductions(services):
 def test_deductions_must_be_a_percentage(services):
     for bad in (-1, 100, 150):
         with pytest.raises(ValidationError):
-            services.work.save_job(Job("x", deductions=bad))
+            services.work.save_job(None, JobInput("x", deductions=bad))
+
+
+def test_preview_shows_paid_time_and_take_home_pay(services):
+    pizzeria = services.work.save_job(None, JobInput("Pizzeria", hourly_rate=10.0,
+                                                     deductions=20.0))
+    preview = services.work.preview(ShiftInput(pizzeria, TODAY, 22 * 60, 2 * 60, 30))
+    assert (preview.duration, preview.paid_minutes, preview.ends_next_day) == (240, 210, True)
+    assert (preview.pay, preview.net) == (35.0, 28.0)
+
+
+def test_editing_a_shift_keeps_its_id(services):
+    pizzeria = job(services)
+    (shift_id,) = services.work.save_shift(None, ShiftInput(pizzeria, TODAY, 600, 660))
+    services.work.save_shift(shift_id, ShiftInput(pizzeria, TODAY, 720, 800, notes="moved"))
+    shift = services.work.shift(shift_id)
+    assert (shift.id, shift.start, shift.end, shift.notes) == (shift_id, 720, 800, "moved")

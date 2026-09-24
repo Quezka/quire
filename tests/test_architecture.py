@@ -1,5 +1,9 @@
 """Enforce the dependency rule: source code dependencies only point inwards."""
 import ast
+import dataclasses
+import enum
+import inspect
+import typing
 from pathlib import Path
 
 import pytest
@@ -13,7 +17,9 @@ FORBIDDEN = {
     "application": ["quire.infrastructure", "quire.presentation", "quire.bootstrap",
                     "PySide6", "sqlite3"],
     "infrastructure": ["quire.presentation", "quire.bootstrap", "PySide6"],
-    "presentation": ["quire.infrastructure", "quire.bootstrap", "sqlite3"],
+    # The UI talks to use cases only; the enums and errors it needs are re-exported
+    # by quire.application.types and quire.application.errors.
+    "presentation": ["quire.domain", "quire.infrastructure", "quire.bootstrap", "sqlite3"],
 }
 
 
@@ -44,3 +50,55 @@ def test_layer_respects_dependency_rule(layer):
                 if imported == banned or imported.startswith(banned + "."):
                     violations.append(f"{path.relative_to(PACKAGE)} imports {imported}")
     assert not violations, "\n".join(violations)
+
+
+def test_demo_seeds_through_use_cases_only():
+    banned = [i for i in imports_of(PACKAGE / "demo.py")
+              if i == "quire.domain" or i.startswith("quire.domain.")]
+    assert not banned
+
+
+# ---- what crosses the application boundary --------------------------------------
+
+def domain_types_in(hint) -> set[str]:
+    """Domain classes (entities, value objects) named in a type hint; enums are allowed."""
+    found = set()
+    if inspect.isclass(hint):
+        if hint.__module__.startswith("quire.domain") and not issubclass(hint, enum.Enum) \
+                and not issubclass(hint, Exception):
+            found.add(hint.__qualname__)
+        return found
+    for arg in typing.get_args(hint):
+        found |= domain_types_in(arg)
+    return found
+
+
+def service_classes():
+    from quire.application.services import Services
+    return [hint for hint in typing.get_type_hints(Services).values()
+            if inspect.isclass(hint) and hint.__module__.startswith("quire.application")]
+
+
+def test_use_cases_neither_take_nor_return_domain_entities():
+    leaks = []
+    for cls in service_classes():
+        for name, method in inspect.getmembers(cls, inspect.isfunction):
+            if name.startswith("_"):
+                continue
+            for arg, hint in typing.get_type_hints(method).items():
+                for leaked in domain_types_in(hint):
+                    leaks.append(f"{cls.__name__}.{name} {arg}: {leaked}")
+    assert not leaks, "\n".join(leaks)
+
+
+def test_response_models_hold_no_domain_entities():
+    from quire.application import dto, records
+    leaks = []
+    for module in (dto, records):
+        for name, cls in inspect.getmembers(module, dataclasses.is_dataclass):
+            if cls.__module__ != module.__name__:
+                continue
+            for field, hint in typing.get_type_hints(cls).items():
+                for leaked in domain_types_in(hint):
+                    leaks.append(f"{module.__name__}.{name}.{field}: {leaked}")
+    assert not leaks, "\n".join(leaks)

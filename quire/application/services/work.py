@@ -3,11 +3,14 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from ...domain import (
-    Job, NotFound, Shift, ShiftPattern, ValidationError, reschedule, work_shifts,
+    Job, NotFound, Shift, ShiftPattern, TimeRange, ValidationError, net_pay, reschedule,
+    work_shifts,
 )
 from ..bus import ChangeBus, Topic
-from ..dto import AgendaItem, ItemKind, JobTotal, ShiftItem, WorkSummary
+from ..dto import AgendaItem, ItemKind, JobTotal, ShiftItem, ShiftPreview, WorkSummary
+from ..inputs import JobInput, PatternInput, ShiftInput
 from ..ports import Clock, JobRepository, ShiftRepository
+from ..records import JobRecord, ShiftRecord, job_record, shift_record, span
 
 MAX_REPEAT_WEEKS = 52
 
@@ -24,29 +27,36 @@ class WorkService:
 
     # ---- jobs -------------------------------------------------------------------
 
-    def jobs(self) -> list[Job]:
-        return self._jobs.list()
+    def jobs(self) -> list[JobRecord]:
+        today = self._clock.today()
+        return [job_record(j, today) for j in self._jobs.list()]
 
-    def job(self, job_id: int) -> Job:
+    def _job(self, job_id: int) -> Job:
         job = self._jobs.get(job_id)
         if job is None:
             raise NotFound(f"Job {job_id} does not exist.")
         return job
 
+    def job(self, job_id: int) -> JobRecord:
+        return job_record(self._job(job_id), self._clock.today())
+
     def _this_monday(self) -> date:
         today = self._clock.today()
         return today - timedelta(days=today.weekday())
 
-    def save_job(self, job: Job, weekly: list[ShiftPattern] | None = None) -> int:
-        """Save a job; `weekly` replaces its weekly schedule from this week on.
+    def save_job(self, job_id: int | None, data: JobInput,
+                 weekly: list[PatternInput] | None = None) -> int:
+        """Create or change a job; `weekly` replaces its weekly schedule from this week on.
 
         Leaving `weekly` out keeps the stored schedule untouched.
         """
-        job.name = job.name.strip()
-        stored = self._jobs.get(job.id) if job.id is not None else None
-        current = stored.schedule if stored else []
-        job.schedule = (current if weekly is None
-                        else reschedule(current, weekly, self._this_monday()))
+        job = Job(data.name) if job_id is None else self._job(job_id)
+        job.name, job.color = data.name.strip(), data.color
+        job.hourly_rate, job.deductions = data.hourly_rate, data.deductions
+        if weekly is not None:
+            wanted = [ShiftPattern.between(p.weekday, p.start, p.end, p.break_minutes)
+                      for p in weekly]
+            job.schedule = reschedule(job.schedule, wanted, self._this_monday())
         job.validate()
         if job.id is None:
             job.id = self._jobs.add(job)
@@ -62,19 +72,38 @@ class WorkService:
 
     # ---- shifts -----------------------------------------------------------------
 
-    def shift(self, shift_id: int) -> Shift:
+    def _shift(self, shift_id: int) -> Shift:
         shift = self._shifts.get(shift_id)
         if shift is None:
             raise NotFound(f"Shift {shift_id} does not exist.")
         return shift
 
-    def save_shift(self, shift: Shift, repeat_weeks: int = 0,
+    def shift(self, shift_id: int) -> ShiftRecord:
+        return shift_record(self._shift(shift_id))
+
+    @staticmethod
+    def _from_input(data: ShiftInput, shift_id: int | None = None) -> Shift:
+        return Shift.between(data.job_id, data.day, data.start, data.end,
+                             break_minutes=data.break_minutes, notes=data.notes, id=shift_id)
+
+    def preview(self, data: ShiftInput) -> ShiftPreview:
+        """Paid time and pay of a shift being edited (nothing is saved or validated)."""
+        shift = self._from_input(data)
+        job = self._jobs.get(data.job_id)
+        gross = shift.pay(job.hourly_rate if job else None)
+        return ShiftPreview(shift.duration, shift.paid_minutes, shift.ends_next_day, gross,
+                            net_pay(gross, job.deductions if job else 0.0))
+
+    def save_shift(self, shift_id: int | None, data: ShiftInput, repeat_weeks: int = 0,
                    replaces: tuple[int, date, int] | None = None) -> list[int]:
         """Save a shift; for a new one, optionally copy it to the following weeks.
 
         `replaces` names a weekly-schedule occurrence (job id, day, start) that this
         shift stands in for, e.g. a different time just this week.
         """
+        if shift_id is not None:
+            self._shift(shift_id)  # must exist
+        shift = self._from_input(data, shift_id)
         shift.validate()
         if self._jobs.get(shift.job_id) is None:
             raise ValidationError("Pick the job this shift is for.")
@@ -104,7 +133,7 @@ class WorkService:
         Returns how many weekly patterns were added; days already scheduled at the same
         time are left alone.
         """
-        job = self.job(job_id)
+        job = self._job(job_id)
         weekdays = sorted(set(weekdays))
         if not weekdays:
             raise ValidationError("Pick at least one day for the shift to repeat on.")
@@ -136,10 +165,18 @@ class WorkService:
     def shifts_between(self, first: date, last: date) -> list[ShiftItem]:
         """One-off shifts and weekly-schedule occurrences starting on first..last."""
         jobs = self._jobs.list()
+        today = self._clock.today()
         by_id = {j.id: j for j in jobs}
+        records = {j.id: job_record(j, today) for j in jobs}
         shifts = work_shifts(jobs, self._shifts.starting_between(first, last),
                              self._shifts.skipped(first, last), first, last)
-        return [ShiftItem(s, by_id.get(s.job_id)) for s in shifts]
+        items = []
+        for s in shifts:
+            job = by_id.get(s.job_id)
+            gross = s.pay(job.hourly_rate if job else None)
+            items.append(ShiftItem(shift_record(s), records.get(s.job_id), gross,
+                                   net_pay(gross, job.deductions if job else 0.0)))
+        return items
 
     def upcoming(self, days: int = 28) -> list[ShiftItem]:
         """Shifts that haven't ended yet, soonest first."""
@@ -183,12 +220,13 @@ class WorkService:
         next_month = (first + timedelta(days=32)).replace(day=1)
         return self.summary(first, next_month - timedelta(days=1))
 
-    def clashes(self, shift: Shift, agenda_items: list[AgendaItem],
+    def clashes(self, shift_id: int | None, data: ShiftInput, agenda_items: list[AgendaItem],
                 replaces: tuple[int, date, int] | None = None) -> list[AgendaItem]:
-        """Items (classes, events, other shifts) that overlap the given shift.
+        """Items (classes, events, other shifts) that overlap a shift being edited.
 
         The shift itself, and the weekly occurrence it `replaces`, don't count.
         """
+        shift = self._from_input(data, shift_id)
         def is_self(i: AgendaItem) -> bool:
             if i.kind is ItemKind.SHIFT:
                 return shift.id is not None and i.ref_id == shift.id
@@ -196,18 +234,18 @@ class WorkService:
                 return (i.ref_id, *i.origin) == replaces
             return False
 
-        return [i for i in agenda_items if not is_self(i) and shift.overlaps(i.day, i.time)]
+        return [i for i in agenda_items
+                if not is_self(i) and shift.overlaps(i.day, TimeRange(i.time.start, i.time.end))]
 
 
-def shift_agenda_items(items: list[ShiftItem]) -> list[AgendaItem]:
+def shift_agenda_items(pairs: list[tuple[Shift, Job | None]]) -> list[AgendaItem]:
     """One AgendaItem per calendar day each shift touches."""
     result = []
-    for item in items:
-        shift, job = item.shift, item.job
+    for shift, job in pairs:
         kind = ItemKind.WEEKLY_SHIFT if shift.recurring else ItemKind.SHIFT
         ref = shift.job_id if shift.recurring else shift.id
         for day, time in shift.segments():
-            result.append(AgendaItem(kind, ref, day, time, job.name if job else "Shift",
+            result.append(AgendaItem(kind, ref, day, span(time), job.name if job else "Shift",
                                      job.color if job else "#0090ff", details=shift.notes,
                                      origin=(shift.day, shift.start)))
     return result

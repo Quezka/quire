@@ -6,8 +6,8 @@ from pathlib import Path
 from .application.bus import ChangeBus
 from .application.ports import Clock, CredentialStore, SchoolRegister
 from .application.services import (
-    FocusService, NoteService, PlannerService, SchoolSyncService, Services, TaskService,
-    TimetableService, WorkService,
+    FocusService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
+    SchoolSyncService, Services, TaskService, TimetableService, WorkService,
 )
 from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
@@ -36,16 +36,20 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     jobs = SqliteJobRepository(db)
     shifts = SqliteShiftRepository(db)
     settings = SqliteKeyValueStore(db)
+    records = SqliteSchoolRecordRepository(db)
+    register = register or ClassevivaRegister()
+    planner = PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts)
     services = Services(
         timetable=TimetableService(courses, bus),
-        planner=PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts),
+        planner=planner,
         tasks=TaskService(tasks, courses, clock, bus),
         notes=NoteService(notes, courses, clock, bus),
-        school=SchoolSyncService(
-            register or ClassevivaRegister(), credentials or KeyringCredentialStore(),
-            courses, tasks, SqliteSchoolRecordRepository(db), settings, clock, bus),
+        school=SchoolRecordsService(courses, tasks, records, clock, register.name.lower()),
+        school_sync=SchoolSyncService(register, credentials or KeyringCredentialStore(),
+                                      courses, tasks, records, settings, clock, bus),
         work=WorkService(jobs, shifts, clock, bus),
         focus=FocusService(SqliteFocusLogRepository(db), settings, tasks, courses, clock, bus),
+        reminders=ReminderService(planner, settings, clock),
         storage=db,
         bus=bus,
     )

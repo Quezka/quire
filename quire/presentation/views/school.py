@@ -14,7 +14,7 @@ from ...application.bus import Topic
 from ...application.errors import ApplicationError
 from ...application.services import Services
 from ...application.services.school import SyncReport
-from ...domain import TaskKind
+from ...application.types import TaskKind
 from .. import theme
 from ..bridge import ChangeRelay
 from ..formatting import KIND_LABELS, plural, relative_date, relative_timestamp, was_due
@@ -62,7 +62,7 @@ class _FetchJob(QRunnable):
 
     def run(self):
         try:
-            self.signals.done.emit(self.services.school.fetch())
+            self.signals.done.emit(self.services.school_sync.fetch())
         except ApplicationError as e:
             self.signals.failed.emit(str(e))
         except Exception as e:  # never let a worker crash the app
@@ -98,6 +98,7 @@ class SchoolView(Page):
         super().__init__(parent)
         self.services = services
         self.school = services.school
+        self.syncer = services.school_sync
         self.title.setText(_("School"))
         self._job: _FetchJob | None = None
         self._error = ""
@@ -130,13 +131,13 @@ class SchoolView(Page):
         self._ticker = QTimer(self, interval=60_000, timeout=self._update_subtitle)
         self._ticker.start()
         self.refresh()
-        if self.school.status().connected:
+        if self.syncer.status().connected:
             QTimer.singleShot(2500, self._auto_sync)
 
     # ---- layout ---------------------------------------------------------------
 
     def _build_connect(self) -> QWidget:
-        name = self.school.status().register
+        name = self.syncer.status().register
         card = Card(_("Connect {name}").format(name=name), padding=22)
         card.setFixedWidth(460)
         card.body.setSpacing(14)
@@ -261,7 +262,7 @@ class SchoolView(Page):
             self.refresh()
 
     def _update_subtitle(self):
-        status = self.school.status()
+        status = self.syncer.status()
         if not status.connected:
             self.subtitle.setText(_("Not connected to {register}").format(register=status.register))
             return
@@ -269,7 +270,7 @@ class SchoolView(Page):
             when = _("syncing…")
         elif self._error:
             when = _(self._error)
-        elif status.last_sync and self.school.last_report and self.school.last_report.problems:
+        elif status.last_sync and self.syncer.last_report and self.syncer.last_report.problems:
             when = _("synced, but some parts failed (see What's new)")
         elif status.last_sync:
             delta = datetime.now() - status.last_sync
@@ -290,7 +291,7 @@ class SchoolView(Page):
         self.refresh()
 
     def refresh(self):
-        status = self.school.status()
+        status = self.syncer.status()
         self.pages.setCurrentIndex(1 if status.connected else 0)
         for widget in (self.sync_btn, self.account_btn):
             widget.setVisible(status.connected)
@@ -472,7 +473,7 @@ class SchoolView(Page):
     def _fill_news(self):
         t = theme.current()
         self.news.clear()
-        report = self.school.last_report
+        report = self.syncer.last_report
         lines = describe(report) if report else []
         if report and report.first_sync:
             lines = [_("Imported {assignments}, {grades} and {lessons}.").format(
@@ -514,7 +515,7 @@ class SchoolView(Page):
         QGuiApplication.setOverrideCursor(QCursor(Qt.WaitCursor))
         QGuiApplication.processEvents()
         try:
-            self.school.connect(username, password)
+            self.syncer.connect(username, password)
         except ApplicationError as e:
             self.connect_error.setText(str(e))
             return
@@ -525,15 +526,15 @@ class SchoolView(Page):
         self.sync()
 
     def _disconnect(self):
-        self.school.disconnect()
+        self.syncer.disconnect()
         self.newsChanged.emit(0)
 
     def _auto_sync(self):
-        if self.school.status().connected:
+        if self.syncer.status().connected:
             self.sync(quiet=True)
 
     def sync(self, quiet: bool = False):
-        if self._job is not None or not self.school.status().connected:
+        if self._job is not None or not self.syncer.status().connected:
             return
         self._error = ""
         self._quiet = quiet
@@ -547,7 +548,7 @@ class SchoolView(Page):
     def _fetched(self, snapshot):
         self._job = None
         try:
-            report = self.school.apply(snapshot)
+            report = self.syncer.apply(snapshot)
         except ApplicationError as e:
             self._failed(str(e))
             return
@@ -555,7 +556,7 @@ class SchoolView(Page):
         lines = describe(report)
         if lines and not report.first_sync:
             self.newsChanged.emit(len(lines))
-            title = f"{self.school.status().register}: {plural(len(lines), 'update')}"
+            title = f"{self.syncer.status().register}: {plural(len(lines), 'update')}"
             notify(title, "\n".join(lines[:4]) + ("\n…" if len(lines) > 4 else ""))
 
     def _failed(self, message: str):

@@ -8,7 +8,8 @@ from PySide6.QtWidgets import (
 )
 
 from ..application.services import Services
-from ..domain import NotFound, TaskKind
+from ..application.errors import NotFound
+from ..application.types import TaskKind
 from . import theme
 from .dialogs import TaskDialog
 from .formatting import KIND_LABELS, long_date, relative_date
@@ -108,10 +109,10 @@ class TaskView(QDialog):
         font.setStrikeOut(task.done)
         self.title.setFont(font)
 
-        register = self.services.school.status().register
+        register = self.services.school_sync.status().register
         self.source.setText(_("From {register}").format(register=register)
-                            if task.external_id else "")
-        self.source.setVisible(bool(task.external_id))
+                            if task.imported else "")
+        self.source.setVisible(task.imported)
         self.body.setPlainText(task.details)
         self.body.setVisible(bool(task.details.strip()))
         self.empty.setVisible(not task.details.strip())

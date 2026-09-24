@@ -13,7 +13,8 @@ from PySide6.QtWidgets import (
 from ...application.bus import Topic
 from ...application.dto import NoteSummary
 from ...application.services import Services
-from ...domain import Note
+from ...application.inputs import NoteInput
+from ...application.records import NoteRecord
 from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import confirm, fill_course_combo, select_data
@@ -34,7 +35,7 @@ class NotesView(Page):
         super().__init__(parent)
         self.services = services
         self.notes = services.notes
-        self.note: Note | None = None
+        self.note: NoteRecord | None = None
         self._dirty = False
         self._loading = False
         self.title.setText(_("Notes"))
@@ -303,7 +304,7 @@ class NotesView(Page):
 
     # ---- editing --------------------------------------------------------
 
-    def _show(self, note: Note | None):
+    def _show(self, note: NoteRecord | None):
         self._loading = True
         self.note = note
         self.editor.setPlainText(note.body if note else "")
@@ -319,7 +320,7 @@ class NotesView(Page):
         if self.preview_btn.isChecked():
             self.viewer.setMarkdown(self.editor.toPlainText())
 
-    def _fill_topics(self, note: Note | None, course_id=None):
+    def _fill_topics(self, note: NoteRecord | None, course_id=None):
         """Offer the topics already used in the note's class."""
         was_loading, self._loading = self._loading, True
         course = course_id if course_id is not None or note is None else note.course_id
@@ -358,11 +359,9 @@ class NotesView(Page):
         self._timer.stop()
         if not self._dirty or self.note is None:
             return
-        self.note.body = self.editor.toPlainText()
-        self.note.course_id = self.course.currentData()
-        self.note.pinned = self.pin.isChecked()
-        self.note.topic = self.topic.currentText()
-        self.notes.save(self.note)
+        self.note = self.notes.update(self.note.id, NoteInput(
+            self.editor.toPlainText(), self.course.currentData(), self.pin.isChecked(),
+            self.topic.currentText()))
         self._dirty = False
         self.status.setText(_("Saved"))
         item = self.list.currentItem()
@@ -377,7 +376,7 @@ class NotesView(Page):
         if not on:
             self.editor.setFocus()
 
-    def _open(self, note: Note):
+    def _open(self, note: NoteRecord):
         self.flush()
         for widget in (self.search, self.filter):
             widget.blockSignals(True)

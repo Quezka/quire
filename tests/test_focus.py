@@ -105,7 +105,8 @@ def test_settings_are_validated(settings):
 
 from quire.application.bus import Topic  # noqa: E402
 from quire.bootstrap import build_services  # noqa: E402
-from quire.domain import Task  # noqa: E402
+from quire.application.inputs import TaskInput  # noqa: E402
+from quire.application.records import FocusSettingsData  # noqa: E402
 from quire.infrastructure.credentials import MemoryCredentialStore  # noqa: E402
 
 from .fakes import FakeRegister  # noqa: E402
@@ -136,7 +137,7 @@ def focus_env(tmp_path):
 
 def test_finished_focus_sessions_are_logged_with_their_task(focus_env):
     services, clock, _ = focus_env
-    task_id = services.tasks.save(Task("Problem set 3", due=T0.date()))
+    task_id = services.tasks.save(None, TaskInput("Problem set 3", due=T0.date()))
     focus = services.focus
     focus.set_focus_task(task_id)
     seen = []
@@ -167,11 +168,12 @@ def test_catching_up_after_sleep_logs_every_missed_session(focus_env):
 
 def test_settings_survive_a_restart(focus_env):
     services, clock, path = focus_env
-    services.focus.save_settings(FocusSettings(50, 10, 20, 3, False))
+    services.focus.save_settings(FocusSettingsData(50, 10, 20, 3, False))
     again, db = build_services(path, clock, FakeRegister(), MemoryCredentialStore())
     try:
-        assert again.focus.settings() == FocusSettings(50, 10, 20, 3, False)
-        assert again.focus.timer.remaining(T0) == minutes(50)
+        assert again.focus.settings() == FocusSettingsData(50, 10, 20, 3, False)
+        state = again.focus.state()
+        assert state.remaining_seconds == 50 * 60 and state.rounds == 3 and not state.started
     finally:
         db.close()
 
@@ -179,23 +181,32 @@ def test_settings_survive_a_restart(focus_env):
 def test_invalid_settings_are_rejected(focus_env):
     services, _, _ = focus_env
     with pytest.raises(ValidationError):
-        services.focus.save_settings(FocusSettings(work_minutes=0))
+        services.focus.save_settings(FocusSettingsData(work_minutes=0))
 
 
 def test_candidate_tasks_are_open_and_relevant(focus_env):
     services, _, _ = focus_env
     today = T0.date()
-    services.tasks.save(Task("Due soon", due=today + timedelta(days=2)))
-    services.tasks.save(Task("Far away", due=today + timedelta(days=40)))
-    services.tasks.save(Task("Undated"))
-    done = services.tasks.save(Task("Already done", due=today))
+    services.tasks.save(None, TaskInput("Due soon", due=today + timedelta(days=2)))
+    services.tasks.save(None, TaskInput("Far away", due=today + timedelta(days=40)))
+    services.tasks.save(None, TaskInput("Undated"))
+    done = services.tasks.save(None, TaskInput("Already done", due=today))
     services.tasks.set_done(done, True)
     assert [i.task.title for i in services.focus.candidate_tasks()] == ["Due soon", "Undated"]
 
 
 def test_a_finished_task_stops_being_the_focus(focus_env):
     services, _, _ = focus_env
-    task_id = services.tasks.save(Task("Essay"))
+    task_id = services.tasks.save(None, TaskInput("Essay"))
     services.focus.set_focus_task(task_id)
     services.tasks.set_done(task_id, True)
     assert services.focus.focus_task() is None
+
+
+def test_state_follows_the_running_timer(focus_env):
+    services, clock, _ = focus_env
+    services.focus.toggle()
+    clock.advance(minutes=10)
+    state = services.focus.state()
+    assert state.running and state.started and state.phase is Phase.WORK
+    assert state.remaining_seconds == 15 * 60 and round(state.progress, 2) == 0.4

@@ -6,19 +6,16 @@ from datetime import timedelta
 from .application.ports import (
     Credentials, RegisterAccount, RemoteAssignment, RemoteGrade, RemoteLesson, RemoteSubject,
 )
-from .application.services import Services
-from .domain import (
-    ClassSlot, Course, Event, Job, Shift, ShiftPattern, Task, TaskKind, TimeRange,
+from .application.inputs import (
+    CourseInput, EventInput, JobInput, NoteInput, PatternInput, ShiftInput, SlotInput, TaskInput,
 )
+from .application.services import Services
+from .application.types import TaskKind
 
 
 def _t(hhmm: str) -> int:
     h, m = hhmm.split(":")
     return int(h) * 60 + int(m)
-
-
-def _range(start: str, end: str) -> TimeRange:
-    return TimeRange(_t(start), _t(end))
 
 
 def seed(services: Services):
@@ -39,16 +36,17 @@ def seed(services: Services):
     ]
     ids = {}
     for name, teacher, room, color, slots in timetable:
-        course = Course(name, teacher, room, color,
-                        [ClassSlot(wd, _range(s, e)) for wd, s, e in slots])
-        ids[name] = services.timetable.save_course(course)
+        course = CourseInput(name, teacher, room, color,
+                             tuple(SlotInput(wd, _t(s), _t(e)) for wd, s, e in slots))
+        ids[name] = services.timetable.save_course(None, course)
 
     planner = services.planner
-    planner.save_event(Event(today, _range("12:00", "12:45"), "Lunch with Sam", color="#978365"))
-    planner.save_event(Event(today, _range("16:00", "17:30"), "Study group",
-                             "Library, 2nd floor", "#0090ff"))
-    planner.save_event(Event(monday + timedelta(days=4), _range("17:00", "19:00"),
-                             "Football practice", color="#12a594"))
+    planner.save_event(None, EventInput(today, _t("12:00"), _t("12:45"), "Lunch with Sam",
+                                        color="#978365"))
+    planner.save_event(None, EventInput(today, _t("16:00"), _t("17:30"), "Study group",
+                                        "Library, 2nd floor", "#0090ff"))
+    planner.save_event(None, EventInput(monday + timedelta(days=4), _t("17:00"), _t("19:00"),
+                                        "Football practice", color="#12a594"))
 
     tasks = [
         ("Problem set 3 (q1–12)", TaskKind.HOMEWORK, "Mathematics", 1),
@@ -61,9 +59,10 @@ def seed(services: Services):
     ]
     for title, kind, course, offset in tasks:
         due = today + timedelta(days=offset) if offset is not None else None
-        services.tasks.save(Task(title, kind, ids.get(course), due))
-    services.tasks.save(Task("Vocabulary list 4", TaskKind.HOMEWORK, ids["English Literature"],
-                             today - timedelta(days=2), done=True))
+        services.tasks.save(None, TaskInput(title, kind, ids.get(course), due))
+    services.tasks.save(None, TaskInput("Vocabulary list 4", TaskKind.HOMEWORK,
+                                        ids["English Literature"], today - timedelta(days=2),
+                                        done=True))
 
     notes = services.notes
     notes.create(
@@ -88,18 +87,17 @@ def seed(services: Services):
         ids["English Literature"], "Frankenstein")
     ideas = notes.create("# Ideas\n\nThings I want to try this term:\n\n"
                          "- Pomodoro for maths homework\n- Join the robotics club\n")
-    ideas.pinned = True
-    notes.save(ideas)
+    notes.update(ideas.id, NoteInput(ideas.body, pinned=True))
     planner.save_journal(today, "Remember to bring the permission slip for the museum trip.")
 
     work = services.work
-    work.save_job(Job("Pizzeria Da Mario", "#f76b15", 8.5, deductions=9.19), weekly=[
-        ShiftPattern.between(1, _t("18:00"), _t("22:30"), 30),
-        ShiftPattern.between(5, _t("19:00"), _t("01:00"), 30),
+    work.save_job(None, JobInput("Pizzeria Da Mario", "#f76b15", 8.5, 9.19), weekly=[
+        PatternInput(1, _t("18:00"), _t("22:30"), 30),
+        PatternInput(5, _t("19:00"), _t("01:00"), 30),
     ])
-    tutoring = work.save_job(Job("Maths tutoring", "#12a594", 15.0, deductions=20.0))
-    work.save_shift(Shift.between(tutoring, monday + timedelta(days=3), _t("16:00"),
-                                  _t("17:30")), repeat_weeks=3)
+    tutoring = work.save_job(None, JobInput("Maths tutoring", "#12a594", 15.0, 20.0))
+    work.save_shift(None, ShiftInput(tutoring, monday + timedelta(days=3), _t("16:00"),
+                                     _t("17:30")), repeat_weeks=3)
 
 
 class DemoRegister:
@@ -170,5 +168,5 @@ class DemoRegister:
 
 
 def seed_school(services: Services):
-    services.school.connect("demo", "demo")
-    services.school.sync()
+    services.school_sync.connect("demo", "demo")
+    services.school_sync.sync()

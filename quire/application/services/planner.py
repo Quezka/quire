@@ -2,9 +2,11 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from ...domain import Course, Event, NotFound, work_shifts
+from ...domain import Course, Event, NotFound, TimeRange, work_shifts
 from ..bus import ChangeBus, Topic
-from ..dto import AgendaItem, DayAgenda, ItemKind, ShiftItem, TaskItem, WeekAgenda
+from ..dto import AgendaItem, DayAgenda, ItemKind, TaskItem, WeekAgenda
+from ..inputs import EventInput
+from ..records import EventRecord, course_record, event_record, span, task_record
 from ..ports import (
     Clock, CourseRepository, EventRepository, JobRepository, JournalRepository, ShiftRepository,
     TaskRepository,
@@ -21,7 +23,7 @@ def monday_of(day: date) -> date:
 
 def _class_items(courses: list[Course], day: date) -> list[AgendaItem]:
     return [
-        AgendaItem(ItemKind.CLASS, c.id, day, slot.time, c.name, c.color,
+        AgendaItem(ItemKind.CLASS, c.id, day, span(slot.time), c.name, c.color,
                    room=c.room_for(slot), teacher=c.teacher)
         for c in courses
         for slot in c.slots_on(day.weekday())
@@ -29,7 +31,8 @@ def _class_items(courses: list[Course], day: date) -> list[AgendaItem]:
 
 
 def _event_item(e: Event) -> AgendaItem:
-    return AgendaItem(ItemKind.EVENT, e.id, e.day, e.time, e.title, e.color, details=e.details)
+    return AgendaItem(ItemKind.EVENT, e.id, e.day, span(e.time), e.title, e.color,
+                      details=e.details)
 
 
 class PlannerService:
@@ -57,7 +60,7 @@ class PlannerService:
         start = first - timedelta(days=1)
         shifts = work_shifts(jobs, self._shifts.starting_between(start, last),
                              self._shifts.skipped(start, last), start, last)
-        items = shift_agenda_items([ShiftItem(s, by_id.get(s.job_id)) for s in shifts])
+        items = shift_agenda_items([(s, by_id.get(s.job_id)) for s in shifts])
         return [i for i in items if first <= i.day <= last]
 
     def items_between(self, first: date, last: date) -> list[AgendaItem]:
@@ -86,7 +89,9 @@ class PlannerService:
                 ahead, key=lambda t: (t.due, t.title.casefold()))
         by_id = {c.id: c for c in courses}
         task_items = tuple(
-            TaskItem(t, by_id.get(t.course_id), t.is_overdue(day)) for t in tasks)
+            TaskItem(task_record(t), course_record(by_id[t.course_id]) if t.course_id in by_id
+                     else None, t.is_overdue(day))
+            for t in tasks)
 
         return DayAgenda(day, day == today, tuple(items), task_items,
                          self._journal.get(day), bool(courses))
@@ -109,13 +114,23 @@ class PlannerService:
         today_index = days.index(today) if today in days else None
         return WeekAgenda(days, tuple(items), today_index, bool(courses))
 
-    def event(self, event_id: int) -> Event:
+    def _event(self, event_id: int) -> Event:
         event = self._events.get(event_id)
         if event is None:
             raise NotFound(f"Event {event_id} does not exist.")
         return event
 
-    def save_event(self, event: Event) -> int:
+    def event(self, event_id: int) -> EventRecord:
+        return event_record(self._event(event_id))
+
+    def save_event(self, event_id: int | None, data: EventInput) -> int:
+        time = TimeRange(data.start, data.end)
+        if event_id is None:
+            event = Event(data.day, time, data.title.strip(), data.details, data.color)
+        else:
+            event = self._event(event_id)
+            event.day, event.time, event.title = data.day, time, data.title.strip()
+            event.details, event.color = data.details, data.color
         event.validate()
         if event.id is None:
             event.id = self._events.add(event)

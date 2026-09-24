@@ -1,11 +1,15 @@
-"""Read models the use cases hand to the presentation layer."""
+"""Read models the use cases hand to the presentation layer.
+
+Built from records (see records.py), never from domain entities.
+"""
 from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 
-from ..domain import Course, DueBucket, Job, Shift, Task, TimeRange, net_pay
+from .records import CourseRecord, JobRecord, ShiftRecord, TaskRecord, TimeSpan
+from .types import DueBucket
 
 
 class ItemKind(Enum):
@@ -20,7 +24,7 @@ class AgendaItem:
     kind: ItemKind
     ref_id: int  # course id for classes, event id for events, shift id for shifts
     day: date
-    time: TimeRange
+    time: TimeSpan
     title: str
     color: str
     room: str = ""
@@ -33,8 +37,8 @@ class AgendaItem:
 
 @dataclass(frozen=True)
 class TaskItem:
-    task: Task
-    course: Course | None
+    task: TaskRecord
+    course: CourseRecord | None
     overdue: bool
 
 
@@ -89,7 +93,7 @@ class NoteSummary:
     title: str
     pinned: bool
     updated: datetime | None
-    course: Course | None
+    course: CourseRecord | None
     topic: str = ""
 
 
@@ -97,29 +101,22 @@ class NoteSummary:
 class NoteGroup:
     """Notes sharing a course and topic, for the grouped notes list."""
 
-    course: Course | None
+    course: CourseRecord | None
     topic: str  # "" for notes without a topic
     notes: tuple[NoteSummary, ...]
 
 
 @dataclass(frozen=True)
 class ShiftItem:
-    shift: Shift
-    job: Job | None
-
-    @property
-    def pay(self) -> float | None:
-        """Gross pay."""
-        return self.shift.pay(self.job.hourly_rate if self.job else None)
-
-    @property
-    def net(self) -> float | None:
-        return net_pay(self.pay, self.job.deductions if self.job else 0.0)
+    shift: ShiftRecord
+    job: JobRecord | None
+    pay: float | None  # gross; None if the job has no rate
+    net: float | None  # after the job's tax and deductions
 
 
 @dataclass(frozen=True)
 class JobTotal:
-    job: Job | None
+    job: JobRecord | None
     minutes: int
     pay: float | None  # gross
     net: float | None = None
@@ -134,3 +131,14 @@ class WorkSummary:
     shifts: int
     per_job: tuple[JobTotal, ...]
     net: float | None = None  # after each job's tax and deductions
+
+
+@dataclass(frozen=True)
+class ShiftPreview:
+    """What a shift being edited adds up to, before it's saved."""
+
+    duration: int
+    paid_minutes: int
+    ends_next_day: bool
+    pay: float | None
+    net: float | None

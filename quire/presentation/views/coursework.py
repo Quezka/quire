@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QComboBox, QHeaderView, QLabel, QTreeWidget, QTree
 
 from ...application.bus import Topic
 from ...application.services import Services
-from ...domain import DueBucket
+from ...application.types import DueBucket
 from .. import theme
 from ..bridge import ChangeRelay
 from ..dialogs import TaskDialog, confirm, fill_course_combo

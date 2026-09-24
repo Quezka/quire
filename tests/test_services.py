@@ -4,9 +4,9 @@ import pytest
 
 from quire.application.bus import Topic
 from quire.application.dto import ItemKind
-from quire.domain import (
-    ClassSlot, Course, DueBucket, Event, NotFound, Task, TaskKind, TimeRange, ValidationError,
-)
+from quire.application.errors import NotFound, ValidationError
+from quire.application.inputs import CourseInput, EventInput, NoteInput, SlotInput, TaskInput
+from quire.application.types import DueBucket, TaskKind
 
 from .conftest import TODAY
 
@@ -15,9 +15,9 @@ TOMORROW = TODAY + timedelta(days=1)
 
 
 def add_course(services, name="Maths", slots=((2, 540, 600),), color="#4f7cff"):
-    course = Course(name, color=color,
-                    slots=[ClassSlot(wd, TimeRange(s, e)) for wd, s, e in slots])
-    return services.timetable.save_course(course)
+    course = CourseInput(name, color=color,
+                         slots=tuple(SlotInput(wd, s, e) for wd, s, e in slots))
+    return services.timetable.save_course(None, course)
 
 
 def test_course_round_trip_keeps_slots(services):
@@ -25,14 +25,14 @@ def test_course_round_trip_keeps_slots(services):
     course = services.timetable.course(course_id)
     assert [(s.weekday, s.time.start) for s in course.slots] == [(0, 540), (2, 600)]
 
-    course.slots = course.slots[:1]
-    services.timetable.save_course(course)
+    services.timetable.save_course(course_id, CourseInput(course.name, slots=(
+        SlotInput(0, 540, 600),)))
     assert len(services.timetable.course(course_id).slots) == 1
 
 
 def test_invalid_course_is_not_stored(services):
     with pytest.raises(ValidationError):
-        services.timetable.save_course(Course(""))
+        services.timetable.save_course(None, CourseInput(""))
     assert services.timetable.courses() == []
 
 
@@ -45,8 +45,8 @@ def test_missing_entities_raise_not_found(services):
 
 def test_day_agenda_merges_classes_and_events_in_time_order(services):
     add_course(services, "Maths", ((2, 600, 660),))
-    services.planner.save_event(Event(TODAY, TimeRange(480, 510), "Breakfast"))
-    services.planner.save_event(Event(TOMORROW, TimeRange(480, 510), "Not today"))
+    services.planner.save_event(None, EventInput(TODAY, 480, 510, "Breakfast"))
+    services.planner.save_event(None, EventInput(TOMORROW, 480, 510, "Not today"))
 
     agenda = services.planner.day_agenda(TODAY)
     assert [(i.kind, i.title) for i in agenda.items] == [
@@ -55,9 +55,9 @@ def test_day_agenda_merges_classes_and_events_in_time_order(services):
 
 
 def test_overdue_tasks_only_follow_you_to_today(services):
-    services.tasks.save(Task("late", due=YESTERDAY))
-    services.tasks.save(Task("late but done", due=YESTERDAY, done=True))
-    services.tasks.save(Task("now", due=TODAY))
+    services.tasks.save(None, TaskInput("late", due=YESTERDAY))
+    services.tasks.save(None, TaskInput("late but done", due=YESTERDAY, done=True))
+    services.tasks.save(None, TaskInput("now", due=TODAY))
 
     today = services.planner.day_agenda(TODAY)
     assert [(t.task.title, t.overdue) for t in today.tasks] == [("late", True), ("now", False)]
@@ -74,7 +74,7 @@ def test_week_shows_weekend_only_when_needed(services):
     assert week.monday == date(2026, 9, 21)
     assert week.today_index == 2
 
-    services.planner.save_event(Event(date(2026, 9, 26), TimeRange(600, 660), "Match"))
+    services.planner.save_event(None, EventInput(date(2026, 9, 26), 600, 660, "Match"))
     assert len(services.planner.week_agenda(TODAY).days) == 7
 
     next_week = services.planner.week_agenda(TODAY + timedelta(days=7))
@@ -83,10 +83,10 @@ def test_week_shows_weekend_only_when_needed(services):
 
 
 def test_task_groups_in_display_order(services):
-    services.tasks.save(Task("undated"))
-    services.tasks.save(Task("today", due=TODAY))
-    services.tasks.save(Task("late", due=YESTERDAY))
-    services.tasks.save(Task("done", due=TODAY, done=True))
+    services.tasks.save(None, TaskInput("undated"))
+    services.tasks.save(None, TaskInput("today", due=TODAY))
+    services.tasks.save(None, TaskInput("late", due=YESTERDAY))
+    services.tasks.save(None, TaskInput("done", due=TODAY, done=True))
 
     buckets = [g.bucket for g in services.tasks.groups(include_done=True)]
     assert buckets == [DueBucket.OVERDUE, DueBucket.TODAY, DueBucket.UNDATED, DueBucket.DONE]
@@ -95,8 +95,8 @@ def test_task_groups_in_display_order(services):
 
 def test_task_groups_filter_by_course_and_attach_course(services):
     course_id = add_course(services)
-    services.tasks.save(Task("hw", TaskKind.HOMEWORK, course_id, TODAY))
-    services.tasks.save(Task("other", due=TODAY))
+    services.tasks.save(None, TaskInput("hw", TaskKind.HOMEWORK, course_id, TODAY))
+    services.tasks.save(None, TaskInput("other", due=TODAY))
 
     (group,) = services.tasks.groups(course_id=course_id)
     (item,) = group.items
@@ -104,14 +104,14 @@ def test_task_groups_filter_by_course_and_attach_course(services):
 
 
 def test_set_done(services):
-    task_id = services.tasks.save(Task("x", due=TODAY))
+    task_id = services.tasks.save(None, TaskInput("x", due=TODAY))
     services.tasks.set_done(task_id, True)
     assert services.tasks.task(task_id).done
 
 
 def test_deleting_course_unlinks_but_keeps_tasks_and_notes(services):
     course_id = add_course(services)
-    task_id = services.tasks.save(Task("hw", course_id=course_id))
+    task_id = services.tasks.save(None, TaskInput("hw", course_id=course_id))
     note = services.notes.create("# n", course_id)
 
     services.timetable.delete_course(course_id)
@@ -130,8 +130,7 @@ def test_class_note_is_created_once(services):
 def test_notes_search_pins_first_and_escapes_wildcards(services):
     services.notes.create("# plain")
     pinned = services.notes.create("# pinned 100%")
-    pinned.pinned = True
-    services.notes.save(pinned)
+    services.notes.update(pinned.id, NoteInput(pinned.body, pinned=True))
 
     assert [n.title for n in services.notes.search()][0] == "pinned 100%"
     assert [n.title for n in services.notes.search("100%")] == ["pinned 100%"]
@@ -149,8 +148,8 @@ def test_writes_publish_change_topics(services):
     seen = []
     services.bus.subscribe(seen.append)
     course_id = add_course(services)
-    services.tasks.save(Task("x"))
-    services.planner.save_event(Event(TODAY, TimeRange(1, 2), "e"))
+    services.tasks.save(None, TaskInput("x"))
+    services.planner.save_event(None, EventInput(TODAY, 1, 2, "e"))
     services.notes.create()
     services.timetable.delete_course(course_id)
     assert seen == [Topic.COURSES, Topic.TASKS, Topic.EVENTS, Topic.NOTES, Topic.COURSES]
@@ -217,6 +216,35 @@ def test_rename_topic_moves_every_note_in_that_course_only(services):
 
 def test_saving_a_note_normalises_its_topic(services):
     note = services.notes.create("# n")
-    note.topic = "  Mixed   spacing "
-    services.notes.save(note)
+    saved = services.notes.update(note.id, NoteInput(note.body, topic="  Mixed   spacing "))
+    assert saved.topic == "Mixed spacing"
     assert services.notes.note(note.id).topic == "Mixed spacing"
+
+
+def test_editing_a_task_keeps_what_the_editor_does_not_show(services):
+    course_id = add_course(services)
+    task_id = services.tasks.save(None, TaskInput("hw", TaskKind.HOMEWORK, course_id, TODAY))
+    stored = services.tasks._tasks.get(task_id)
+    stored.external_id = "classeviva:agenda:1"
+    services.tasks._tasks.update(stored)
+
+    services.tasks.save(task_id, TaskInput("hw, pages 4-5", TaskKind.HOMEWORK, course_id, TODAY))
+    task = services.tasks.task(task_id)
+    assert task.title == "hw, pages 4-5" and task.imported
+
+
+def test_editing_a_course_keeps_its_register_link(services):
+    course_id = add_course(services)
+    stored = services.timetable._courses.get(course_id)
+    stored.external_id = "classeviva:subject:1"
+    services.timetable._courses.update(stored)
+
+    services.timetable.save_course(course_id, CourseInput("Mathematics"))
+    assert services.timetable.course(course_id).external_id == "classeviva:subject:1"
+
+
+def test_use_cases_hand_out_read_only_records(services):
+    task_id = services.tasks.save(None, TaskInput("x"))
+    task = services.tasks.task(task_id)
+    with pytest.raises(AttributeError):
+        task.title = "changed"

@@ -13,7 +13,7 @@ from PySide6.QtWidgets import (
     QColorDialog, QLineEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate, QToolTip, QWidget,
 )
 
-from ..domain import COURSE_COLORS
+from ..application.types import COURSE_COLORS
 from . import icons, theme
 from .i18n import _, weekday_names
 

@@ -3,7 +3,8 @@ from __future__ import annotations
 
 from datetime import date, datetime
 
-from ..domain import DueBucket, TaskKind, TimeRange
+from ..application.records import TimeSpan
+from ..application.types import DueBucket, TaskKind
 from .i18n import (
     N_, Translated, _, month_of, month_short, weekday_name, weekday_short,
 )
@@ -31,7 +32,7 @@ def fmt_min(minutes: int) -> str:
     return f"{minutes // 60:02d}:{minutes % 60:02d}"
 
 
-def fmt_range(t: TimeRange) -> str:
+def fmt_range(t: TimeSpan) -> str:
     return f"{fmt_min(t.start)}–{fmt_min(t.end)}"
 
 

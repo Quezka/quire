@@ -4,6 +4,29 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.9.0] - 2026-09-24
+
+### Added
+- **Reminders**: a desktop notification shortly before your next event or work shift
+  starts, e.g. "Dentist in 10 min", with the time, room and first line of the details.
+  - Set them in More → Settings → Reminders: off, when it starts, or 5 to 60 minutes
+    before.
+  - Choose what they're for: events and work shifts (on by default) and classes (off by
+    default).
+  - They fire while Quire is open. Each start is announced once, and something that
+    started while the laptop was asleep isn't announced late.
+
+### Changed
+- **Internals: stricter Clean Architecture.** The interface no longer touches the core
+  model directly.
+  - Screens send plain request models to the use cases and get read-only records back.
+  - The school service is split into sync and records.
+  - The Focus timer is only reachable through its use cases.
+  - Tests now fail if the interface imports the domain, or if a use case takes or
+    returns a domain entity.
+  - No visible change, except that saving can no longer silently drop fields the editor
+    doesn't show.
+
 ## [0.8.0] - 2026-09-24
 
 ### Added

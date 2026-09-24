@@ -5,6 +5,8 @@ from datetime import date
 from ...domain import NotFound, Note, normalize_topic
 from ..bus import ChangeBus, Topic
 from ..dto import NoteGroup, NoteSummary
+from ..inputs import NoteInput
+from ..records import NoteRecord, course_record, note_record
 from ..ports import Clock, CourseRepository, NoteRepository
 
 
@@ -24,7 +26,7 @@ class NoteService:
 
     def search(self, text: str = "", course_id: int | None = None) -> list[NoteSummary]:
         """Pinned notes first, then most recently edited."""
-        by_id = {c.id: c for c in self._courses.list()}
+        by_id = {c.id: course_record(c) for c in self._courses.list()}
         return [NoteSummary(n.id, n.title, n.pinned, n.updated, by_id.get(n.course_id), n.topic)
                 for n in self._notes.search(text.strip(), course_id)]
 
@@ -57,11 +59,14 @@ class NoteService:
         self._bus.publish(Topic.NOTES)
         return changed
 
-    def note(self, note_id: int) -> Note:
+    def _note(self, note_id: int) -> Note:
         note = self._notes.get(note_id)
         if note is None:
             raise NotFound(f"Note {note_id} does not exist.")
         return note
+
+    def note(self, note_id: int) -> NoteRecord:
+        return note_record(self._note(note_id))
 
     def _canonical_topic(self, course_id: int | None, topic: str) -> str:
         """Reuse an existing topic's spelling when only the letter case differs."""
@@ -69,27 +74,32 @@ class NoteService:
         existing = {t.casefold(): t for t in self._notes.topics(course_id)}
         return existing.get(topic.casefold(), topic)
 
-    def create(self, body: str = "", course_id: int | None = None, topic: str = "") -> Note:
+    def create(self, body: str = "", course_id: int | None = None, topic: str = "") -> NoteRecord:
         note = Note(body=body, course_id=course_id, updated=self._clock.now(),
                     topic=self._canonical_topic(course_id, topic))
         note.id = self._notes.add(note)
         self._bus.publish(Topic.NOTES)
-        return note
+        return note_record(note)
 
-    def save(self, note: Note):
-        note.topic = self._canonical_topic(note.course_id, note.topic)
+    def update(self, note_id: int, data: NoteInput) -> NoteRecord:
+        """Save an edit; returns the note as stored (e.g. with the topic's canonical spelling)."""
+        note = self._note(note_id)
+        note.body, note.course_id, note.pinned = data.body, data.course_id, data.pinned
+        note.topic = self._canonical_topic(data.course_id, data.topic)
         note.updated = self._clock.now()
         self._notes.update(note)
         self._bus.publish(Topic.NOTES)
+        return note_record(note)
 
     def delete(self, note_id: int):
         self._notes.delete(note_id)
         self._bus.publish(Topic.NOTES)
 
-    def class_note(self, course_id: int, day: date) -> Note:
+    def class_note(self, course_id: int, day: date) -> NoteRecord:
         """The note for one lesson of a course, created on first use."""
         course = self._courses.get(course_id)
         if course is None:
             raise NotFound(f"Course {course_id} does not exist.")
         title = class_note_title(course.name, day)
-        return self._notes.find_by_title(title, course_id) or self.create(f"# {title}\n\n", course_id)
+        existing = self._notes.find_by_title(title, course_id)
+        return note_record(existing) if existing else self.create(f"# {title}\n\n", course_id)

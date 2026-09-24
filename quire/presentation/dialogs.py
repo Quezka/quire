@@ -13,10 +13,12 @@ from PySide6.QtWidgets import (
 )
 
 from ..application.services import Services
-from ..domain import (
-    EVERY_DAY, WORK_DAYS, ClassSlot, Course, DomainError, Event, Job, Shift, ShiftPattern, Task,
-    TaskKind, TimeRange, net_pay,
+from ..application.errors import DomainError
+from ..application.inputs import (
+    CourseInput, EventInput, JobInput, PatternInput, ShiftInput, SlotInput, TaskInput,
 )
+from ..application.records import CourseRecord
+from ..application.types import EVERY_DAY, WORK_DAYS, TaskKind
 from .formatting import (
     KIND_LABELS, fmt_days, long_date, fmt_duration, fmt_min, fmt_range, money, pay_text,
 )
@@ -32,7 +34,7 @@ def to_qdate(d: date) -> QDate:
     return QDate(d.year, d.month, d.day)
 
 
-def fill_course_combo(combo: QComboBox, courses: list[Course], none_label: str):
+def fill_course_combo(combo: QComboBox, courses: list[CourseRecord], none_label: str):
     """(Re)populate a course picker, keeping the current selection if it still exists."""
     current = combo.currentData()
     combo.blockSignals(True)
@@ -86,6 +88,7 @@ class CourseDialog(QDialog):
         super().__init__(parent)
         self.timetable = services.timetable
         self.school = services.school
+        self.school_sync = services.school_sync
         self.course_id = course_id
         self._external_id = None
         self.setWindowTitle(_("Edit course") if course_id else _("New course"))
@@ -108,7 +111,7 @@ class CourseDialog(QDialog):
         self.subject = None
         links = self.school.subject_links()
         if links:
-            register = self.school.status().register
+            register = self.school_sync.status().register
             self.subject = QComboBox()
             self.subject.addItem(_("Not linked"), None)
             for link in links:
@@ -203,23 +206,23 @@ class CourseDialog(QDialog):
             self.table.removeRow(r)
 
     def _save(self):
-        slots = []
-        for r in range(self.table.rowCount()):
-            weekday, start, end, room = self._row_values(r)
-            try:
-                slots.append(ClassSlot(weekday, TimeRange(start, end), room))
-            except DomainError as e:
-                QMessageBox.warning(self, _("Check class times"), _("Class time {number}: {problem}").format(number=r + 1, problem=_(str(e))))
+        slots = tuple(SlotInput(*self._row_values(r)) for r in range(self.table.rowCount()))
+        for number, slot in enumerate(slots, 1):
+            if slot.end <= slot.start:
+                QMessageBox.warning(self, _("Check class times"), _("Class time {number}: {problem}").format(number=number, problem=_("The end time must be after the start time.")))
                 return
-        # Carry the existing link through the save; relinking is a separate use case.
-        course = Course(self.name.text().strip(), self.teacher.text().strip(),
-                        self.room.text().strip(), self.color.color(), slots, self.course_id,
-                        self._external_id)
-        if not attempt(self, lambda: self.timetable.save_course(course)):
+        data = CourseInput(self.name.text().strip(), self.teacher.text().strip(),
+                           self.room.text().strip(), self.color.color(), slots)
+
+        def save():
+            # The use case keeps the course's register link; relinking is a separate one.
+            self.course_id = self.timetable.save_course(self.course_id, data)
+
+        if not attempt(self, save):
             return
         chosen = self.subject.currentData() if self.subject is not None else self._external_id
         if chosen != self._external_id and not attempt(
-                self, lambda: self.school.link_course(course.id, chosen)):
+                self, lambda: self.school_sync.link_course(self.course_id, chosen)):
             return
         self.accept()
 
@@ -325,11 +328,10 @@ class EventDialog(QDialog):
 
     def _save(self):
         def save():
-            event = Event(self.date.date().toPython(),
-                          TimeRange(qtime_to_min(self.start.time()), qtime_to_min(self.end.time())),
-                          self.title.text().strip(), self.details.toPlainText(),
-                          self.color.color(), self.event_id)
-            self.planner.save_event(event)
+            data = EventInput(self.date.date().toPython(), qtime_to_min(self.start.time()),
+                              qtime_to_min(self.end.time()), self.title.text().strip(),
+                              self.details.toPlainText(), self.color.color())
+            self.planner.save_event(self.event_id, data)
 
         if attempt(self, save):
             self.accept()
@@ -415,16 +417,15 @@ class TaskDialog(QDialog):
             kind, course_id, due = t.kind, t.course_id, t.due
             self.details.setPlainText(t.details)
             self.completed.setChecked(t.done)
-            external = t.external_id
+            external = t.imported
         else:
             self.completed.hide()
-        self._external_id = external
         select_data(self.kind, kind)
         select_data(self.course, course_id)
         self.has_due.setChecked(due is not None)
         self.due.setEnabled(due is not None)
         self.due.setDate(to_qdate(due or today))
-        register = services.school.status().register
+        register = services.school_sync.status().register
         self.imported.setText(_("This came from {register}. If the teacher changes it, the next "
                                 "sync updates the title, date and details again.").format(
                                     register=register) if external else "")
@@ -452,11 +453,11 @@ class TaskDialog(QDialog):
 
     def _save(self):
         # Qt hands str-based enums back as plain strings; turn it back into a TaskKind.
-        task = Task(self.title.text(), TaskKind(self.kind.currentData()), self.course.currentData(),
-                    self.due.date().toPython() if self.has_due.isChecked() else None,
-                    self.completed.isChecked(), self.details.toPlainText(), self.task_id,
-                    self._external_id)
-        if attempt(self, lambda: self.tasks.save(task)):
+        data = TaskInput(self.title.text(), TaskKind(self.kind.currentData()),
+                         self.course.currentData(),
+                         self.due.date().toPython() if self.has_due.isChecked() else None,
+                         self.details.toPlainText(), self.completed.isChecked())
+        if attempt(self, lambda: self.tasks.save(self.task_id, data)):
             self.accept()
 
     def _delete(self):
@@ -568,7 +569,7 @@ class JobDialog(QDialog):
             self._set_deductions(job.deductions)
             # One row per time slot, with every day it repeats on.
             rows: dict[tuple, list[int]] = {}
-            for p in job.active_schedule(services.planner.today()):
+            for p in job.weekly:
                 rows.setdefault((p.start, p.duration, p.break_minutes), []).append(p.weekday)
             for (start, duration, pause), days in rows.items():
                 self._add_row(days, start, (start + duration) % (24 * 60), pause)
@@ -622,7 +623,7 @@ class JobDialog(QDialog):
         for r in rows:
             self.table.removeRow(r)
 
-    def _schedule(self) -> list[ShiftPattern] | None:
+    def _schedule(self) -> list[PatternInput] | None:
         patterns = []
         for r in range(self.table.rowCount()):
             days = self.table.cellWidget(r, 0).days()
@@ -633,7 +634,7 @@ class JobDialog(QDialog):
             start = qtime_to_min(self.table.cellWidget(r, 1).time())
             end = qtime_to_min(self.table.cellWidget(r, 2).time())
             pause = self.table.cellWidget(r, 3).value()
-            patterns += [ShiftPattern.between(d, start, end, pause) for d in days]
+            patterns += [PatternInput(d, start, end, pause) for d in days]
         return patterns
 
     # ---- save -------------------------------------------------------------------------
@@ -649,10 +650,12 @@ class JobDialog(QDialog):
         weekly = self._schedule()
         if weekly is None:
             return
-        job = Job(self.name.text(), self.color.color(), rate, self.job_id,
-                  deductions=deductions)
-        if attempt(self, lambda: self.work.save_job(job, weekly=weekly)):
-            self.job_id = job.id
+        data = JobInput(self.name.text(), self.color.color(), rate, deductions)
+
+        def save():
+            self.job_id = self.work.save_job(self.job_id, data, weekly=weekly)
+
+        if attempt(self, save):
             self.accept()
 
     def _delete(self):
@@ -689,7 +692,6 @@ class JobsDialog(QDialog):
 
     def _reload(self):
         self.list.clear()
-        today = self.services.planner.today()
         for job in self.services.work.jobs():
             details = []
             if job.hourly_rate:
@@ -698,7 +700,7 @@ class JobsDialog(QDialog):
                     rate += f" (−{job.deductions:g}%)"
                 details.append(rate)
             slots: dict[tuple, list[int]] = {}
-            for p in job.active_schedule(today):
+            for p in job.weekly:
                 slots.setdefault((p.start, p.duration), []).append(p.weekday)
             details += [f"{fmt_days(days)} {fmt_min(start)}–{fmt_min((start + dur) % 1440)}"
                         for (start, dur), days in slots.items()]
@@ -873,21 +875,18 @@ class ShiftDialog(QDialog):
 
     # ---- preview ----------------------------------------------------------------
 
-    def _shift(self) -> Shift:
-        return Shift.between(self.job.currentData() or 0, self.date.date().toPython(),
-                             qtime_to_min(self.start.time()), qtime_to_min(self.end.time()),
-                             break_minutes=self.break_min.value(),
-                             notes=self.notes.toPlainText().strip(), id=self.shift_id)
+    def _shift(self) -> ShiftInput:
+        return ShiftInput(self.job.currentData() or 0, self.date.date().toPython(),
+                          qtime_to_min(self.start.time()), qtime_to_min(self.end.time()),
+                          self.break_min.value(), self.notes.toPlainText().strip())
 
     def _update_preview(self):
         shift = self._shift()
-        self.next_day.setText(_("ends next day") if shift.ends_next_day else "")
-        job = next((j for j in self.work.jobs() if j.id == shift.job_id), None)
-        gross = shift.pay(job.hourly_rate if job else None)
-        net = net_pay(gross, job.deductions if job else 0.0)
-        text = _("{duration} paid").format(duration=fmt_duration(max(shift.paid_minutes, 0)))
-        if gross is not None and shift.paid_minutes > 0:
-            text += "  ·  ≈ " + pay_text(gross, net)
+        preview = self.work.preview(shift)
+        self.next_day.setText(_("ends next day") if preview.ends_next_day else "")
+        text = _("{duration} paid").format(duration=fmt_duration(max(preview.paid_minutes, 0)))
+        if preview.pay is not None and preview.paid_minutes > 0:
+            text += "  ·  ≈ " + pay_text(preview.pay, preview.net)
         if self._repeating():
             days = self._repeat_days()
             text += "  ·  " + (_("each {days}").format(days=fmt_days(days)) if days
@@ -895,7 +894,7 @@ class ShiftDialog(QDialog):
         self.summary.setText(text)
         try:
             items = self.services.planner.items_between(shift.day, shift.day + timedelta(days=1))
-            clashes = self.work.clashes(shift, items, self.replaces)
+            clashes = self.work.clashes(self.shift_id, shift, items, self.replaces)
         except DomainError:
             clashes = []
         self.clash.setText(_("Overlaps {items}").format(items=", ".join(
@@ -913,10 +912,11 @@ class ShiftDialog(QDialog):
         if self._repeating():
             until = self.until.date().toPython() if self.has_until.isChecked() else None
             action = lambda: self.work.add_weekly(  # noqa: E731
-                shift.job_id, self._repeat_days(), shift.start, shift.end % (24 * 60),
+                shift.job_id, self._repeat_days(), shift.start, shift.end,
                 shift.break_minutes, since=shift.day, until=until)
         else:
-            action = lambda: self.work.save_shift(shift, replaces=self.replaces)  # noqa: E731
+            action = lambda: self.work.save_shift(  # noqa: E731
+                self.shift_id, shift, replaces=self.replaces)
         if attempt(self, action):
             self.accept()
 
@@ -930,7 +930,8 @@ def weekly_shift_menu(parent, services: Services, job_id: int, origin: tuple[dat
     """Menu for one week's occurrence of a regular shift."""
     day, start = origin
     job = services.work.job(job_id)
-    pattern = next((p for p in job.schedule if p.occurs_on(day) and p.start == start), None)
+    pattern = next((p for p in job.weekly if p.weekday == day.weekday() and p.start == start),
+                   None)
     menu = QMenu(parent)
     change = menu.addAction(_("Change just this week…"))
     skip = menu.addAction(_("Skip this week"))

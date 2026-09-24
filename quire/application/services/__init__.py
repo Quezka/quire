@@ -7,7 +7,9 @@ from ..ports import Storage
 from .focus import FocusService, FocusStats
 from .notes import NoteService
 from .planner import PlannerService
+from .reminders import Reminder, ReminderService, ReminderSettings
 from .school import SchoolSyncService
+from .school_records import SchoolRecordsService
 from .tasks import TaskService
 from .timetable import TimetableService
 from .work import WorkService
@@ -21,12 +23,14 @@ class Services:
     planner: PlannerService
     tasks: TaskService
     notes: NoteService
-    school: SchoolSyncService
+    school: SchoolRecordsService  # grades, homework, lessons: what's been synced
+    school_sync: SchoolSyncService  # the register account and syncing
     work: WorkService
     focus: FocusService
+    reminders: ReminderService
     storage: Storage
     bus: ChangeBus
 
 
-__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "SchoolSyncService", "TaskService",
+__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "SchoolSyncService", "TaskService",
            "TimetableService", "WorkService"]

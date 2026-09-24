@@ -5,9 +5,10 @@ from PySide6.QtCore import QTimer, Signal
 from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QVBoxLayout
 
 from ...application.bus import Topic
-from ...application.errors import ApplicationError
+from ...application.errors import ApplicationError, DomainError
+from ...application.records import FocusSettingsData
+from ...application.types import Phase
 from ...application.services import Services
-from ...domain import DomainError, FocusSettings, Phase
 from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..formatting import fmt_duration, plural
@@ -154,14 +155,12 @@ class FocusView(Page):
 
     def _render(self):
         t = theme.current()
-        timer = self.focus.timer
-        now = self.focus.now()
-        remaining = timer.remaining(now).total_seconds()
+        timer = self.focus.state()
+        remaining = timer.remaining_seconds
         color = phase_color(timer.phase, t)
-        done = timer.completed if timer.phase is Phase.WORK else min(
-            timer.completed, timer.settings.rounds)
-        self.ring.set_state(timer.progress(now), clock_text(remaining),
-                            PHASE_LABELS[timer.phase], color, (done, timer.settings.rounds))
+        done = timer.completed if timer.phase is Phase.WORK else min(timer.completed, timer.rounds)
+        self.ring.set_state(timer.progress, clock_text(remaining),
+                            PHASE_LABELS[timer.phase], color, (done, timer.rounds))
         running = timer.running
         self.start_btn.setText(_("Pause") if running else _("Resume") if timer.started
                                else C_("button", "Start"))
@@ -172,7 +171,7 @@ class FocusView(Page):
         phase = PHASE_LABELS[timer.phase]
         self.subtitle.setText(
             _("{phase} · round {round} of {rounds}").format(
-                phase=phase, round=timer.round, rounds=timer.settings.rounds)
+                phase=phase, round=timer.round, rounds=timer.rounds)
             + ("" if running else " · " + _("paused") if timer.started else ""))
         status = clock_text(remaining) if running else ""
         if status != self._status:
@@ -232,14 +231,14 @@ class FocusView(Page):
         self.auto.blockSignals(False)
 
     def _save_settings(self):
-        settings = FocusSettings(self.work_min.value(), self.short_min.value(),
-                                 self.long_min.value(), self.rounds.value(),
-                                 self.auto.isChecked())
+        settings = FocusSettingsData(self.work_min.value(), self.short_min.value(),
+                                     self.long_min.value(), self.rounds.value(),
+                                     self.auto.isChecked())
         try:
             self.focus.save_settings(settings)
         except (DomainError, ApplicationError) as e:
             self.settings_hint.setText(_(str(e)))
             return
         self.settings_hint.setText(_("New durations apply from the next phase.")
-                                   if self.focus.timer.started else "")
+                                   if self.focus.state().started else "")
         self._render()
