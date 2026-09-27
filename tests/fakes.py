@@ -19,6 +19,13 @@ class FakeRegister:
     homework_: list[RemoteAssignment] = field(default_factory=list)
     grades_: list[RemoteGrade] = field(default_factory=list)
     lessons_: list[RemoteLesson] = field(default_factory=list)
+    absences_: list = field(default_factory=list)
+    notices_: list = field(default_factory=list)
+    books_: list = field(default_factory=list)
+    documents_: list = field(default_factory=list)
+    school_days_: list = field(default_factory=list)
+    files: dict = field(default_factory=dict)  # (notice id or document id, number) -> bytes
+    opened: list = field(default_factory=list)
     requested: list = field(default_factory=list)
     failing: dict = field(default_factory=dict)  # method name -> exception to raise
 
@@ -52,6 +59,35 @@ class FakeRegister:
         self._maybe_fail("lessons")
         self.requested.append(("lessons", first, last))
         return [l for l in self.lessons_ if first <= l.day <= last]
+
+    def absences(self):
+        self._maybe_fail("absences")
+        return list(self.absences_)
+
+    def notices(self):
+        self._maybe_fail("notices")
+        return list(self.notices_)
+
+    def open_notice(self, notice):
+        self.opened.append(f"{notice.code}:{notice.pub_id}")
+
+    def notice_attachment(self, notice, number):
+        return self.files[(f"{notice.code}:{notice.pub_id}", number)]
+
+    def books(self):
+        self._maybe_fail("books")
+        return list(self.books_)
+
+    def documents(self):
+        self._maybe_fail("documents")
+        return list(self.documents_)
+
+    def document_file(self, document):
+        return self.files[(document.external_id, 0)]
+
+    def school_days(self):
+        self._maybe_fail("school_days")
+        return list(self.school_days_)
 
 
 class FakeCloud:

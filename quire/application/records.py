@@ -10,6 +10,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 
 from ..domain import (
+    Absence, AbsenceKind, Book, DocumentKind, Notice, SchoolDocument,
     Course, Event, Grade, Job, Lesson, Note, Shift, ShiftPattern, Subject, Task, TaskKind,
     TimeRange,
 )
@@ -196,6 +197,57 @@ class FocusEvent:
     next_phase: Phase
 
 
+@dataclass(frozen=True)
+class AbsenceRecord:
+    day: date
+    kind: AbsenceKind
+    hour: int | None
+    justified: bool
+    reason: str
+    hours_missed: int
+
+
+@dataclass(frozen=True)
+class AttachmentRecord:
+    number: int
+    file_name: str
+
+
+@dataclass(frozen=True)
+class NoticeRecord:
+    id: str
+    code: str
+    pub_id: str
+    title: str
+    category: str
+    published: date
+    valid_until: date | None
+    read: bool
+    attachments: tuple[AttachmentRecord, ...]
+
+
+@dataclass(frozen=True)
+class BookRecord:
+    isbn: str
+    title: str
+    subject: str
+    author: str
+    publisher: str
+    volume: str
+    price: float | None
+    to_buy: bool
+    owned: bool
+    new_adoption: bool
+
+
+@dataclass(frozen=True)
+class DocumentRecord:
+    id: str
+    title: str
+    kind: DocumentKind
+    link: str
+
+
 # ---- mapping (used by the use cases) ------------------------------------------------
 
 def span(time: TimeRange) -> TimeSpan:
@@ -251,3 +303,23 @@ def subject_record(s: Subject) -> SubjectRecord:
 def focus_settings_data(s: FocusSettings) -> FocusSettingsData:
     return FocusSettingsData(s.work_minutes, s.short_break_minutes, s.long_break_minutes,
                              s.rounds, s.auto_continue)
+
+
+def absence_record(a: Absence, hours_that_day: int) -> AbsenceRecord:
+    return AbsenceRecord(a.day, a.kind, a.hour, a.justified, a.reason,
+                         a.hours_missed(hours_that_day))
+
+
+def notice_record(n: Notice) -> NoticeRecord:
+    return NoticeRecord(n.external_id, n.code, n.pub_id, n.title, n.category, n.published,
+                        n.valid_until, n.read,
+                        tuple(AttachmentRecord(a.number, a.file_name) for a in n.attachments))
+
+
+def book_record(b: Book) -> BookRecord:
+    return BookRecord(b.isbn, b.title, b.subject, b.author, b.publisher, b.volume, b.price,
+                      b.to_buy, b.owned, b.new_adoption)
+
+
+def document_record(d: SchoolDocument) -> DocumentRecord:
+    return DocumentRecord(d.external_id, d.title, d.kind, d.link)

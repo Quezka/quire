@@ -4,6 +4,29 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.13.0] - 2026-09-28
+
+### Added
+- **School → Absences.** Days absent, late entries and early exits, each marked justified or
+  not.
+  - A bar shows the lesson hours you've missed against the 25% limit that can mean
+    repeating the year.
+  - The year's hours are estimated from Classeviva's school calendar and your timetable.
+- **School → Noticeboard.** Circulars and announcements, with a count of unread ones on the
+  tab.
+  - Open a notice to read its attachments (PDFs open in your viewer). Classeviva is told
+    you've read it, as its own app does.
+  - New notices trigger a desktop notification.
+- **School → Books & documents.**
+  - Your textbook list per subject: title, author, ISBN (double-click to copy), price, and
+    whether to buy it. The header shows the total to buy.
+  - Report cards and documents appear there too, when the school publishes them.
+- **What do I need?** Double-click a subject on the School overview. Pick a target average
+  and a number of tests, and see the mark you need (in Italian notation: 7½, 6+, 7-), or
+  whether you're already safe.
+- **Grade trend.** The same dialog charts each mark and how the subject's average moved,
+  with the pass mark dashed.
+
 ## [0.12.0] - 2026-09-28
 
 ### Added

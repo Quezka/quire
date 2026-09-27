@@ -269,7 +269,8 @@ def test_failed_homework_fetch_does_not_delete_imported_tasks(connected, registe
 
 def test_everything_failing_is_an_error_and_not_a_sync(connected, register):
     from quire.application.errors import RegisterError
-    for name in ("subjects", "assignments", "homework", "grades", "lessons"):
+    for name in ("subjects", "assignments", "homework", "grades", "lessons", "absences",
+                 "notices", "books", "documents", "school_days"):
         register.failing[name] = RegisterError("down")
     with pytest.raises(RegisterError, match="Couldn't sync anything"):
         connected.school_sync.sync()

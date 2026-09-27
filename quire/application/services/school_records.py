@@ -3,13 +3,19 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import date, timedelta
 
-from ...domain import PASS_MARK, Grade, Task, TaskKind, average
+from ...domain import (
+    ABSENCE_LIMIT, GRADE_MAX, GRADE_MIN, PASS_MARK, AbsenceKind, Grade, Task, TaskKind, average,
+    lesson_hours, needed_grade, running_average,
+)
 from ..dto import TaskItem
 from ..ports import Clock, CourseRepository, SchoolRecordRepository, TaskRepository
 from ..records import (
-    CourseRecord, GradeRecord, LessonRecord, SubjectRecord, course_record, grade_record,
-    lesson_record, subject_record, task_record,
+    AbsenceRecord, BookRecord, CourseRecord, DocumentRecord, GradeRecord, LessonRecord,
+    NoticeRecord, SubjectRecord, absence_record, book_record, course_record, document_record,
+    grade_record, lesson_record, notice_record, subject_record, task_record,
 )
+
+SCHOOL_WEEKS = 33  # when the register has no calendar: a typical Italian school year
 
 
 @dataclass(frozen=True)
@@ -38,6 +44,47 @@ class SchoolOverview:
     homework_due_this_week: int
     next_homework: TaskItem | None
     below_pass: tuple[SubjectGrades, ...]  # subjects averaging under the pass mark
+
+
+@dataclass(frozen=True)
+class AbsenceSummary:
+    items: tuple[AbsenceRecord, ...]  # newest first
+    absent_days: int
+    late_entries: int
+    early_exits: int
+    unjustified: int
+    hours_missed: int
+    school_hours: int  # lesson hours in the year (estimated); 0 without a timetable
+    limit_hours: int  # the most that may be missed (a quarter of school_hours)
+
+    @property
+    def share(self) -> float | None:
+        """Part of the year's hours missed so far (0..1), None when unknown."""
+        return self.hours_missed / self.school_hours if self.school_hours else None
+
+    @property
+    def hours_left(self) -> int:
+        return max(self.limit_hours - self.hours_missed, 0)
+
+
+@dataclass(frozen=True)
+class NeededGrade:
+    """What the next test(s) must score for a subject's average to reach a target."""
+
+    subject: str
+    target: float
+    tests: int
+    mark: float  # needed on each of those tests
+    average: float | None
+    grade_count: int
+
+    @property
+    def already_safe(self) -> bool:  # even the lowest mark keeps the target
+        return self.mark <= GRADE_MIN
+
+    @property
+    def reachable(self) -> bool:
+        return self.mark <= GRADE_MAX
 
 
 class SchoolRecordsService:
@@ -146,3 +193,77 @@ class SchoolRecordsService:
         lessons = self._records.lessons_between(today - timedelta(days=days), today)
         return [lesson_record(l)
                 for l in sorted(lessons, key=lambda l: (l.day, l.hour), reverse=True)]
+
+    # ---- absences ------------------------------------------------------------------
+
+    def _hours_per_weekday(self) -> dict[int, int]:
+        """Lesson hours on each weekday, from the timetable in Quire."""
+        hours: dict[int, int] = {}
+        for course in self._courses.list():
+            for slot in course.slots:
+                hours[slot.weekday] = hours.get(slot.weekday, 0) + lesson_hours(
+                    slot.time.end - slot.time.start)
+        return hours
+
+    def absence_summary(self) -> AbsenceSummary:
+        """Absences so far and how close they are to the limit of a quarter of the year.
+
+        The year's hours are estimated from the register's calendar (days with lessons) and
+        your timetable (hours on each weekday); without a timetable they're unknown.
+        """
+        per_day = self._hours_per_weekday()
+        days = self._records.school_days()
+        if days:
+            school_hours = sum(per_day.get(d.weekday(), 0) for d in days)
+        else:
+            school_hours = sum(per_day.values()) * SCHOOL_WEEKS
+        absences = sorted(self._records.absences(), key=lambda a: a.day, reverse=True)
+        items = tuple(absence_record(a, per_day.get(a.day.weekday(), 0)) for a in absences)
+        return AbsenceSummary(
+            items,
+            absent_days=sum(1 for a in absences if a.kind is AbsenceKind.ABSENT),
+            late_entries=sum(1 for a in absences
+                             if a.kind in (AbsenceKind.LATE, AbsenceKind.SHORT_LATE)),
+            early_exits=sum(1 for a in absences if a.kind is AbsenceKind.EARLY_EXIT),
+            unjustified=sum(1 for a in absences if not a.justified),
+            hours_missed=sum(i.hours_missed for i in items),
+            school_hours=school_hours,
+            limit_hours=int(school_hours * ABSENCE_LIMIT),
+        )
+
+    # ---- noticeboard, textbooks, documents -----------------------------------------------
+
+    def notices(self) -> list[NoticeRecord]:
+        return [notice_record(n) for n in self._records.notices()]
+
+    def unread_notices(self) -> int:
+        return sum(1 for n in self._records.notices() if not n.read)
+
+    def books(self) -> list[BookRecord]:
+        """Textbooks, grouped by subject."""
+        return sorted((book_record(b) for b in self._records.books()),
+                      key=lambda b: (b.subject.casefold(), b.title.casefold()))
+
+    def documents(self) -> list[DocumentRecord]:
+        return [document_record(d) for d in self._records.documents()]
+
+    # ---- grade tools -----------------------------------------------------------------
+
+    def _marks(self, subject: str, period: str | None) -> list[Grade]:
+        return [g for g in self._grades(period) if g.subject == subject and g.counts]
+
+    def needed(self, subject: str, target: float = PASS_MARK, tests: int = 1,
+               period: str | None = None) -> NeededGrade:
+        """The mark needed on the next `tests` tests for the subject's average to reach
+        `target` (in one term, or the whole year)."""
+        marks = self._marks(subject, period)
+        values = [g.value for g in marks]
+        return NeededGrade(subject, target, tests, needed_grade(values, target, tests),
+                           average(marks), len(marks))
+
+    def trend(self, subject: str | None = None,
+              period: str | None = None) -> list[tuple[date, float]]:
+        """How the average moved, mark by mark: one subject, or every subject together."""
+        marks = [g for g in self._grades(period) if g.counts
+                 and (subject is None or g.subject == subject)]
+        return running_average([(g.day, g.value) for g in marks])

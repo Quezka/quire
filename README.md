@@ -71,6 +71,18 @@ your machine in a single SQLite file.
 - A modern sidebar layout with light and dark themes. It follows your system by default; change
   it in **More → Settings**, which also sets your currency and backs up your data.
 
+The School page has four sections:
+- **Overview:** grades, homework and tests, lesson topics. Double-click a subject to see how its
+  average moved (a small chart) and **what you need** on the next test, or the next few, to
+  reach an average you pick.
+- **Absences:** days absent, late entries and early exits, whether they're justified, and how
+  many lesson hours you've missed against the **25% limit**. The year's hours are estimated
+  from the school calendar and your timetable.
+- **Noticeboard:** school circulars with their attachments; opening one tells the school
+  you've read it, as the Classeviva app does. New notices trigger a desktop notification.
+- **Books & documents:** the textbook list per subject (ISBN, price, to buy or owned), plus
+  report cards and documents when the school publishes them.
+
 ### About the Classeviva connection
 
 Classeviva has no public API. Quire uses the same REST API as the official Classeviva mobile

@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 9
+SCHEMA_VERSION = 10
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -122,6 +122,14 @@ CREATE TABLE IF NOT EXISTS focus_sessions (
     label    TEXT NOT NULL DEFAULT ''
 );
 CREATE INDEX IF NOT EXISTS idx_focus_started ON focus_sessions(started);
+CREATE TABLE IF NOT EXISTS register_items (
+    kind        TEXT NOT NULL,      -- 'absence', 'notice', 'book', 'document'
+    external_id TEXT NOT NULL,
+    day         TEXT,
+    data        TEXT NOT NULL,      -- JSON
+    PRIMARY KEY (kind, external_id)
+);
+CREATE TABLE IF NOT EXISTS school_days (day TEXT PRIMARY KEY);
 CREATE TABLE IF NOT EXISTS settings (
     key   TEXT PRIMARY KEY,
     value TEXT NOT NULL
@@ -148,8 +156,9 @@ class SqliteDatabase:
         # v2: sync ids for records imported from a school register.
         self._add_column("courses", "external_id", "TEXT")
         self._add_column("tasks", "external_id", "TEXT")
-        # v4 (register_subjects), v5 (jobs, shifts), v6 (shift_patterns, shift_skips) and
-        # v7 (focus_sessions) add tables, which SCHEMA creates.
+        # v4 (register_subjects), v5 (jobs, shifts), v6 (shift_patterns, shift_skips),
+        # v7 (focus_sessions) and v10 (register_items, school_days) add tables, which
+        # SCHEMA creates.
         # v6: share of pay withheld for tax per job.
         self._add_column("jobs", "deductions", "REAL NOT NULL DEFAULT 0")
         # v8: what a focus session was spent on (task title or ad-hoc project).

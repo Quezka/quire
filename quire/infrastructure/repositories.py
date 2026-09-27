@@ -3,9 +3,12 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
+import json
+
 from ..domain import (
-    ClassSlot, Course, Event, FocusSession, Grade, Job, Lesson, Note, Shift, ShiftPattern,
-    Subject, Task, TaskKind, TimeRange,
+    Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
+    Lesson, Note, Notice, NoticeAttachment, SchoolDocument, Shift, ShiftPattern, Subject, Task,
+    TaskKind, TimeRange,
 )
 from .sqlite import SqliteDatabase
 
@@ -303,6 +306,86 @@ class SqliteSchoolRecordRepository(_Repo):
                 "INSERT OR REPLACE INTO register_subjects (external_id, name, teachers)"
                 " VALUES (?, ?, ?)",
                 [(s.external_id, s.name, "\n".join(s.teachers)) for s in subjects])
+
+    # ---- absences, notices, books, documents: JSON rows in register_items ------------
+
+    def _items(self, kind: str, order: str = "day DESC"):
+        return [json.loads(r["data"]) for r in self._all(
+            f"SELECT data FROM register_items WHERE kind = ? ORDER BY {order}", kind)]
+
+    def _replace(self, kind: str, rows: list[tuple[str, str | None, dict]]):
+        with self._conn:
+            self._conn.execute("DELETE FROM register_items WHERE kind = ?", (kind,))
+            self._conn.executemany(
+                "INSERT OR REPLACE INTO register_items (kind, external_id, day, data)"
+                " VALUES (?, ?, ?, ?)",
+                [(kind, key, day, json.dumps(data)) for key, day, data in rows])
+
+    def absences(self):
+        return [Absence(d["id"], date.fromisoformat(d["day"]), AbsenceKind(d["kind"]),
+                        d.get("hour"), d.get("justified", False), d.get("reason", ""),
+                        d.get("hours", 0)) for d in self._items("absence")]
+
+    def replace_absences(self, absences):
+        self._replace("absence", [(a.external_id, a.day.isoformat(), {
+            "id": a.external_id, "day": a.day.isoformat(), "kind": a.kind.value,
+            "hour": a.hour, "justified": a.justified, "reason": a.reason, "hours": a.hours})
+            for a in absences])
+
+    def notices(self):
+        return [Notice(d["id"], d["code"], d["pub_id"], d["title"], d.get("category", ""),
+                       date.fromisoformat(d["published"]),
+                       date.fromisoformat(d["valid_until"]) if d.get("valid_until") else None,
+                       d.get("read", False),
+                       tuple(NoticeAttachment(n, name) for n, name in d.get("attachments", [])))
+                for d in self._items("notice", "day DESC, external_id DESC")]
+
+    def _notice_row(self, n: Notice):
+        return (n.external_id, n.published.isoformat(), {
+            "id": n.external_id, "code": n.code, "pub_id": n.pub_id, "title": n.title,
+            "category": n.category, "published": n.published.isoformat(),
+            "valid_until": n.valid_until.isoformat() if n.valid_until else None,
+            "read": n.read, "attachments": [[a.number, a.file_name] for a in n.attachments]})
+
+    def replace_notices(self, notices):
+        self._replace("notice", [self._notice_row(n) for n in notices])
+
+    def set_notice_read(self, external_id):
+        found = [n for n in self.notices() if n.external_id == external_id]
+        if found:
+            found[0].read = True
+            key, day, data = self._notice_row(found[0])
+            self._write("UPDATE register_items SET data = ? WHERE kind = 'notice'"
+                        " AND external_id = ?", json.dumps(data), key)
+
+    def books(self):
+        return [Book(**d) for d in self._items("book", "external_id")]
+
+    def replace_books(self, books):
+        self._replace("book", [(f"{b.subject}|{b.isbn}|{b.title}", None, {
+            "isbn": b.isbn, "title": b.title, "subject": b.subject, "author": b.author,
+            "publisher": b.publisher, "volume": b.volume, "price": b.price,
+            "to_buy": b.to_buy, "owned": b.owned, "new_adoption": b.new_adoption})
+            for b in books])
+
+    def documents(self):
+        return [SchoolDocument(d["id"], d["title"], DocumentKind(d["kind"]), d.get("link", ""))
+                for d in self._items("document", "external_id")]
+
+    def replace_documents(self, documents):
+        self._replace("document", [(d.external_id, None, {
+            "id": d.external_id, "title": d.title, "kind": d.kind.value, "link": d.link})
+            for d in documents])
+
+    def school_days(self):
+        return [date.fromisoformat(r["day"]) for r in self._all(
+            "SELECT day FROM school_days ORDER BY day")]
+
+    def replace_school_days(self, days):
+        with self._conn:
+            self._conn.execute("DELETE FROM school_days")
+            self._conn.executemany("INSERT OR IGNORE INTO school_days (day) VALUES (?)",
+                                   [(d.isoformat(),) for d in days])
 
 
 class SqliteKeyValueStore(_Repo):

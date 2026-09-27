@@ -18,7 +18,9 @@ from ..application.errors import AuthenticationError, RegisterError
 from ..application.ports import (
     Credentials, RegisterAccount, RemoteAssignment, RemoteGrade, RemoteLesson, RemoteSubject,
 )
-from ..domain import TaskKind
+from ..domain import (
+    Absence, AbsenceKind, Book, DocumentKind, Notice, NoticeAttachment, SchoolDocument, TaskKind,
+)
 
 BASE_URL = "https://web.spaggiari.eu/rest/v1"
 HEADERS = {
@@ -27,6 +29,9 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 HOMEWORK_CODE = "AGHW"
+ABSENCE_CODES = {"ABA0": AbsenceKind.ABSENT, "ABR0": AbsenceKind.LATE,
+                 "ABR1": AbsenceKind.SHORT_LATE, "ABU0": AbsenceKind.EARLY_EXIT}
+SCHOOL_DAY = "SD"
 # Agenda notes ("AGNT") that are really homework.
 HOMEWORK_WORDS = re.compile(
     r"\b(compit\w*|eserciz\w*|es\.|pag\.|pagg?\b|pagin\w*|studi\w*|legger\w*|ripass\w*"
@@ -84,6 +89,13 @@ class ClassevivaRegister:
     # ---- transport ------------------------------------------------------------
 
     def _request(self, method: str, path: str, body: dict | None = None) -> dict:
+        payload = self._send(method, path, body)
+        try:
+            return json.loads(payload or b"{}")
+        except ValueError as e:
+            raise RegisterError("Classeviva sent a response Quire couldn't read.") from e
+
+    def _send(self, method: str, path: str, body: dict | None = None) -> bytes:
         headers = dict(HEADERS)
         if self._token:
             headers["Z-Auth-Token"] = self._token
@@ -117,10 +129,7 @@ class ClassevivaRegister:
             reason = getattr(e, "reason", e)
             raise RegisterError(f"Couldn't reach Classeviva ({reason}). "
                                 "Check your internet connection.") from e
-        try:
-            return json.loads(payload or b"{}")
-        except ValueError as e:
-            raise RegisterError("Classeviva sent a response Quire couldn't read.") from e
+        return payload
 
     def _ranged(self, path: str, first: date, last: date) -> dict:
         """GET a dated endpoint, keeping the range inside the school year."""
@@ -248,3 +257,81 @@ class ClassevivaRegister:
                 subject_name=l.get("subjectDesc") or "", topic=(l.get("lessonArg") or "").strip(),
                 teacher=l.get("authorName") or "", hour=int(l.get("evtHPos") or 0)))
         return result
+
+    # ---- absences, noticeboard, books, documents, calendar ------------------------
+
+    def absences(self) -> list[Absence]:
+        data = self._get("/absences/details")
+        result = []
+        for e in data.get("events", []):
+            kind = ABSENCE_CODES.get(e.get("evtCode") or "")
+            if kind is None:
+                continue
+            hour = e.get("evtHPos")
+            result.append(Absence(
+                str(e["evtId"]), _day(e["evtDate"]), kind,
+                int(hour) if isinstance(hour, int) else None, bool(e.get("isJustified")),
+                (e.get("justifReasonDesc") or "").strip(), len(e.get("hoursAbsence") or [])))
+        return result
+
+    def notices(self) -> list[Notice]:
+        data = self._get("/noticeboard")
+        result = []
+        for n in data.get("items", []):
+            if n.get("cntStatus") == "deleted":
+                continue
+            code, pub = str(n.get("evtCode") or ""), str(n.get("pubId") or "")
+            valid_to = n.get("cntValidTo")
+            result.append(Notice(
+                f"{code}:{pub}", code, pub, " ".join((n.get("cntTitle") or "").split()),
+                n.get("cntCategory") or "",
+                _day(n.get("pubDT") or n.get("cntValidFrom") or self._today().isoformat()),
+                _day(valid_to) if valid_to else None, bool(n.get("readStatus")),
+                tuple(NoticeAttachment(int(a.get("attachNum") or i + 1), a.get("fileName") or "")
+                      for i, a in enumerate(n.get("attachments") or []))))
+        return result
+
+    def open_notice(self, notice: Notice) -> None:
+        # 101 is the "read" action the official app sends.
+        self._request("POST", self._student_path(
+            f"/noticeboard/read/{notice.code}/{notice.pub_id}/101"))
+
+    def notice_attachment(self, notice: Notice, number: int) -> bytes:
+        return self._send("GET", self._student_path(
+            f"/noticeboard/attach/{notice.code}/{notice.pub_id}/{number}"))
+
+    def books(self) -> list[Book]:
+        data = self._get("/schoolbooks")
+        result = []
+        for course in data.get("schoolbooks", []):
+            for b in course.get("books") or []:
+                price = b.get("price")
+                result.append(Book(
+                    str(b.get("isbnCode") or b.get("bookId") or ""),
+                    " ".join((b.get("title") or "").split()), b.get("subjectDesc") or "",
+                    b.get("author") or "", b.get("publisher") or "",
+                    b.get("volume") or b.get("subheading") or "",
+                    float(price) if isinstance(price, (int, float)) else None,
+                    bool(b.get("toBuy")), bool(b.get("alreadyOwned")),
+                    bool(b.get("newAdoption"))))
+        return result
+
+    def documents(self) -> list[SchoolDocument]:
+        data = self._request("POST", self._student_path("/documents"))
+        result = [SchoolDocument(str(d.get("hash") or ""), (d.get("desc") or "").strip(),
+                                 DocumentKind.DOCUMENT)
+                  for d in data.get("documents", []) if d.get("hash")]
+        result += [SchoolDocument(r.get("viewLink") or r.get("confirmLink") or "",
+                                  (r.get("desc") or "").strip(), DocumentKind.REPORT,
+                                  r.get("viewLink") or r.get("confirmLink") or "")
+                   for r in data.get("schoolReports", [])
+                   if r.get("viewLink") or r.get("confirmLink")]
+        return result
+
+    def document_file(self, document: SchoolDocument) -> bytes:
+        return self._send("POST", self._student_path(f"/documents/read/{document.external_id}"))
+
+    def school_days(self) -> list[date]:
+        data = self._get("/calendar/all")
+        return [_day(d["dayDate"]) for d in data.get("calendar", [])
+                if d.get("dayStatus") == SCHOOL_DAY and d.get("dayDate")]

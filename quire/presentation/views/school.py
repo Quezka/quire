@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
+from PySide6.QtCore import QObject, QRunnable, QSettings, Qt, QThreadPool, QTimer, Signal
 from PySide6.QtGui import QColor, QCursor, QGuiApplication
 from PySide6.QtWidgets import (
-    QButtonGroup, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit, QListView, QListWidget,
+    QButtonGroup, QFormLayout, QFrame, QHBoxLayout, QLineEdit, QListView, QListWidget,
     QListWidgetItem, QMenu, QPushButton, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -21,7 +21,8 @@ from ..formatting import KIND_LABELS, plural, relative_date, relative_timestamp,
 from ..notify import notify
 from ..task_view import TaskView
 from ..widgets import SubjectDelegate, TwoLineDelegate, mark_color
-from .common import Card, Page, button, icon_button, label, primary_button
+from .common import Card, Page, StatTile, button, icon_button, label, primary_button
+from .school_panels import AbsencesPanel, BooksPanel, NoticesPanel, SubjectDialog
 from ..i18n import _
 
 AUTO_SYNC_MINUTES = 30
@@ -38,6 +39,10 @@ def describe(report: SyncReport) -> list[str]:
     for grade in report.new_grades:
         lines.append(_("New grade in {subject}: {mark}").format(subject=grade.subject,
                                                                 mark=grade.display))
+    for title in report.new_notices:
+        lines.append(_("New notice: {title}").format(title=title))
+    if report.new_absences:
+        lines.append(_("New on your absences: {count}").format(count=report.new_absences))
     return lines
 
 
@@ -69,27 +74,6 @@ class _FetchJob(QRunnable):
             self.signals.failed.emit(f"Sync failed unexpectedly: {e}")
 
 
-class StatTile(Card):
-    """A number at the top of the School page with a caption underneath."""
-
-    def __init__(self, caption: str):
-        super().__init__(padding=16)
-        self.body.setSpacing(4)
-        self.caption = QLabel(caption, objectName="tileCaption")
-        self.value = QLabel(objectName="tileValue")
-        self.detail = label()
-        self.detail.setWordWrap(True)
-        for widget in (self.caption, self.value, self.detail):
-            self.add(widget)
-        self.body.addStretch()
-
-    def show(self, value: str, detail: str = "", color: str | None = None):
-        self.value.setText(value)
-        self.value.setStyleSheet(f"color: {color};" if color else "")
-        self.detail.setText(detail)
-        self.detail.setToolTip(detail)
-
-
 class SchoolView(Page):
     newsChanged = Signal(int)  # number of unseen changes from the last sync
     openClassNote = Signal(int, object)  # course_id, date
@@ -117,7 +101,23 @@ class SchoolView(Page):
         self._periods_row.setSpacing(2)
         self._period_buttons = QButtonGroup(self)
         self._period_buttons.setExclusive(True)
-        self.add_actions(self.periods, self.sync_btn, self.account_btn)
+        # Overview, absences, noticeboard, books & documents.
+        self.sections_bar = QFrame(objectName="segmented")
+        sections_row = QHBoxLayout(self.sections_bar)
+        sections_row.setContentsMargins(3, 3, 3, 3)
+        sections_row.setSpacing(2)
+        self._section_buttons = QButtonGroup(self)
+        self._section_buttons.setExclusive(True)
+        for index, text in enumerate((_("Overview"), _("Absences"), _("Noticeboard"),
+                                      _("Books & documents"))):
+            choice = QPushButton(text.replace("&", "&&"), objectName="segment",
+                                 checkable=True)
+            choice.setCursor(Qt.PointingHandCursor)
+            self._fit_bold(choice)
+            self._section_buttons.addButton(choice, index)
+            sections_row.addWidget(choice)
+        self._section_buttons.idClicked.connect(self._show_section)
+        self.add_actions(self.sections_bar, self.periods, self.sync_btn, self.account_btn)
 
         self.pages = QStackedWidget()
         self.pages.addWidget(self._build_connect())
@@ -180,6 +180,32 @@ class SchoolView(Page):
         return holder
 
     def _build_dashboard(self) -> QWidget:
+        self.sections = QStackedWidget()
+        self.absences = AbsencesPanel(self.services)
+        self.noticeboard = NoticesPanel(self.services)
+        self.books = BooksPanel(self.services)
+        for widget in (self._build_overview(), self.absences, self.noticeboard, self.books):
+            self.sections.addWidget(widget)
+        section = int(QSettings().value("school/section", 0))
+        self._section_buttons.button(section).setChecked(True)
+        self.sections.setCurrentIndex(section)
+        return self.sections
+
+    @staticmethod
+    def _fit_bold(choice: QPushButton):
+        """The checked segment is bold: size it for that, so it isn't clipped."""
+        font = choice.font()
+        font.setBold(True)
+        from PySide6.QtGui import QFontMetrics
+        choice.setMinimumWidth(QFontMetrics(font).horizontalAdvance(
+            choice.text().replace("&&", "&")) + 28)
+
+    def _show_section(self, index: int):
+        self.sections.setCurrentIndex(index)
+        QSettings().setValue("school/section", index)
+        self.periods.setVisible(index == 0 and len(self.school.periods()) > 1)
+
+    def _build_overview(self) -> QWidget:
         # ---- summary tiles ----
         self.tile_average = StatTile(_("AVERAGE"))
         self.tile_test = StatTile(_("NEXT TEST"))
@@ -198,6 +224,9 @@ class SchoolView(Page):
         self.subjects.setMouseTracking(True)
         self.subjects.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.subjects.itemClicked.connect(self._subject_clicked)
+        self.subjects.itemDoubleClicked.connect(self._subject_details)
+        self.subjects.setToolTip(_("Double-click a subject for its trend and what you need on "
+                                   "the next test"))
         self.grades_empty = label(_("No grades yet. They'll appear here after a sync."), "hint")
         subjects.add(self.subjects, 1)
         subjects.add(self.grades_empty)
@@ -293,7 +322,7 @@ class SchoolView(Page):
     def refresh(self):
         status = self.syncer.status()
         self.pages.setCurrentIndex(1 if status.connected else 0)
-        for widget in (self.sync_btn, self.account_btn):
+        for widget in (self.sync_btn, self.account_btn, self.sections_bar):
             widget.setVisible(status.connected)
         self.sync_btn.setEnabled(self._job is None)
         self._update_subtitle()
@@ -304,6 +333,13 @@ class SchoolView(Page):
             self._fill_agenda()
             self._fill_lessons()
             self._fill_news()
+            self.absences.refresh()
+            self.noticeboard.refresh()
+            self.books.refresh()
+            unread = self.school.unread_notices()
+            notices = self._section_buttons.button(2)
+            notices.setText(_("Noticeboard") + (f" · {unread}" if unread else ""))
+            self._fit_bold(notices)
         else:
             self.periods.setVisible(False)
 
@@ -323,7 +359,7 @@ class SchoolView(Page):
             segment.clicked.connect(lambda _on=False, v=value: self._pick_period(v))
             self._period_buttons.addButton(segment)
             self._periods_row.addWidget(segment)
-        self.periods.setVisible(len(periods) > 1)
+        self.periods.setVisible(len(periods) > 1 and self.sections.currentIndex() == 0)
 
     def _pick_period(self, period):
         self._period = period
@@ -396,6 +432,10 @@ class SchoolView(Page):
         self.subjects.verticalScrollBar().setValue(scroll)
         self.subjects.setVisible(bool(subjects))
         self.grades_empty.setVisible(not subjects)
+
+    def _subject_details(self, item: QListWidgetItem):
+        if item.data(SubjectDelegate.KIND) == "subject":
+            SubjectDialog(self.services, item.text(), self._period, self).exec()
 
     def _subject_clicked(self, item: QListWidgetItem):
         if item.data(SubjectDelegate.KIND) != "subject":

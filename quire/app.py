@@ -27,7 +27,8 @@ def main(argv: list[str] | None = None) -> int:
     if args.demo:
         from datetime import date
 
-        from .demo import DemoRegister, seed, seed_school
+        from .demo import seed, seed_school
+        from .infrastructure.demo_register import DemoRegister
         from .infrastructure.credentials import MemoryCredentialStore
 
         services, db = build_services(path, register=DemoRegister(date.today()),

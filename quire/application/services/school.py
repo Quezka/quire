@@ -1,11 +1,16 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from datetime import datetime, timedelta
 
-from ...domain import COURSE_COLORS, Course, Grade, Lesson, NotFound, Subject, Task
+from ...domain import (
+    COURSE_COLORS, Course, Grade, Lesson, NotFound, Notice, NoticeAttachment, SchoolDocument,
+    Subject, Task,
+)
 from ..bus import ChangeBus, Topic
-from ..records import GradeRecord, TaskRecord, grade_record, task_record
+from ..records import (
+    DocumentRecord, GradeRecord, NoticeRecord, TaskRecord, grade_record, task_record,
+)
 from ..errors import AuthenticationError, NotConnected, RegisterError
 from ..ports import (
     Clock, CourseRepository, CredentialStore, Credentials, KeyValueStore, RegisterAccount,
@@ -16,6 +21,7 @@ ASSIGNMENTS_PAST_DAYS = 30
 ASSIGNMENTS_FUTURE_DAYS = 120
 LESSON_DAYS = 21
 TITLE_LENGTH = 90
+PARTS = 10  # separately fetched parts of the register (see fetch)
 
 
 def tidy_subject(name: str) -> str:
@@ -54,10 +60,13 @@ class SyncReport:
     lessons: int = 0
     courses_created: int = 0
     problems: tuple[str, ...] = ()  # parts of the register that couldn't be synced
+    new_notices: tuple[str, ...] = ()  # titles
+    new_absences: int = 0
 
     @property
     def has_news(self) -> bool:
-        return bool(self.new_tasks or self.updated_tasks or self.new_grades)
+        return bool(self.new_tasks or self.updated_tasks or self.new_grades or self.new_notices
+                    or self.new_absences)
 
 
 class SchoolSyncService:
@@ -155,9 +164,14 @@ class SchoolSyncService:
             lessons=part("Lesson topics", lambda: self._register.lessons(*lesson_window)),
             assignment_window=assignment_window,
             lesson_window=lesson_window,
-            problems=tuple(problems),
+            absences=part("Absences", self._register.absences),
+            notices=part("Noticeboard", self._register.notices),
+            books=part("Textbooks", self._register.books),
+            documents=part("Documents", self._register.documents),
+            school_days=part("School calendar", self._register.school_days),
         )
-        if len(problems) == 5:
+        snapshot = replace(snapshot, problems=tuple(problems))
+        if len(problems) == PARTS:
             raise RegisterError("Couldn't sync anything from "
                                 f"{self._register.name}. " + " ".join(problems))
         return snapshot
@@ -206,19 +220,77 @@ class SchoolSyncService:
             if snap.lesson_window:
                 self._records.replace_lessons(*snap.lesson_window, lessons)
 
+        new_notices, new_absences = self._apply_register_items(snap)
+
         self._settings.set(self._key("student"), snap.account.student_name)
         self._settings.set(self._key("last_sync"), self._clock.now().isoformat(timespec="seconds"))
 
         report = SyncReport(first_sync, tuple(task_record(t) for t in new_tasks),
                             tuple(task_record(t) for t in updated_tasks), removed,
                             tuple(grade_record(g) for g in new_grades), len(lessons), created,
-                            snap.problems)
+                            snap.problems, new_notices, new_absences)
         self.last_report = report
         if created:
             self._bus.publish(Topic.COURSES)
         self._bus.publish(Topic.TASKS)
         self._bus.publish(Topic.SCHOOL)
         return report
+
+    def _apply_register_items(self, snap: RegisterSnapshot) -> tuple[tuple[str, ...], int]:
+        """Absences, noticeboard, textbooks, documents and the calendar: stored as they are."""
+        new_notices: tuple[str, ...] = ()
+        new_absences = 0
+        if snap.absences is not None:
+            known = {a.external_id for a in self._records.absences()}
+            absences = [replace(a, external_id=self._external("absence", a.external_id))
+                        for a in snap.absences]
+            new_absences = sum(1 for a in absences if a.external_id not in known)
+            self._records.replace_absences(absences)
+        if snap.notices is not None:
+            local = {n.external_id: n for n in self._records.notices()}
+            notices = []
+            for n in snap.notices:
+                key = self._external("notice", n.external_id)
+                previous = local.get(key)
+                # Read here but not yet told to the register: stay read.
+                notices.append(replace(n, external_id=key,
+                                       read=n.read or bool(previous and previous.read)))
+            new_notices = tuple(n.title for n in notices if n.external_id not in local)
+            self._records.replace_notices(notices)
+        if snap.books is not None:
+            self._records.replace_books(list(snap.books))
+        if snap.documents is not None:
+            self._records.replace_documents(list(snap.documents))
+        if snap.school_days is not None:
+            self._records.replace_school_days(list(snap.school_days))
+        return new_notices, new_absences
+
+    # ---- noticeboard and documents (network: run on a worker thread) ---------------
+
+    def _signed_in(self):
+        credentials = self._credentials.load()
+        if credentials is None:
+            raise NotConnected(f"Connect your {self._register.name} account first.")
+        self._register.login(credentials)
+
+    def tell_notice_read(self, notice: NoticeRecord) -> None:
+        """Let the register know the notice was read, as its own app does."""
+        self._signed_in()
+        self._register.open_notice(_notice(notice))
+
+    def notice_attachment(self, notice: NoticeRecord, number: int) -> bytes:
+        self._signed_in()
+        return self._register.notice_attachment(_notice(notice), number)
+
+    def document_file(self, document: DocumentRecord) -> bytes:
+        self._signed_in()
+        return self._register.document_file(
+            SchoolDocument(document.id, document.title, document.kind, document.link))
+
+    def mark_notice_read(self, notice_id: str) -> None:
+        """Local half of opening a notice (UI thread)."""
+        self._records.set_notice_read(notice_id)
+        self._bus.publish(Topic.SCHOOL)
 
     def _sync_courses(self, snap: RegisterSnapshot):
         """Match register subjects to local courses, creating any that are missing."""
@@ -331,3 +403,9 @@ class SchoolSyncService:
         self._bus.publish(Topic.COURSES)
         self._bus.publish(Topic.TASKS)
         self._bus.publish(Topic.SCHOOL)
+
+
+def _notice(record: NoticeRecord) -> Notice:
+    return Notice(record.id, record.code, record.pub_id, record.title, record.category,
+                  record.published, record.valid_until, record.read,
+                  tuple(NoticeAttachment(a.number, a.file_name) for a in record.attachments))

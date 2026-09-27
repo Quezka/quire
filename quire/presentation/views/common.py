@@ -157,3 +157,24 @@ def agenda_block(item: AgendaItem, column: int) -> Block:
     carry_over = bool(item.origin and item.origin[0] != item.day)
     return Block(column, item.time.start, item.time.end, item.title, subtitle, item.color, item,
                  carry_over)
+
+
+class StatTile(Card):
+    """A number at the top of the School page with a caption underneath."""
+
+    def __init__(self, caption: str):
+        super().__init__(padding=16)
+        self.body.setSpacing(4)
+        self.caption = QLabel(caption, objectName="tileCaption")
+        self.value = QLabel(objectName="tileValue")
+        self.detail = label()
+        self.detail.setWordWrap(True)
+        for widget in (self.caption, self.value, self.detail):
+            self.add(widget)
+        self.body.addStretch()
+
+    def show(self, value: str, detail: str = "", color: str | None = None):
+        self.value.setText(value)
+        self.value.setStyleSheet(f"color: {color};" if color else "")
+        self.detail.setText(detail)
+        self.detail.setToolTip(detail)

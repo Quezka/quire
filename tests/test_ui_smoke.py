@@ -849,3 +849,65 @@ def test_update_dialog_without_self_update_links_to_github(window, services, rel
     assert dialog.go_btn.text() == "Open download page" and dialog.status.isVisibleTo(dialog)
     dialog._skip()
     assert services.updates.skipped("9.0.0")
+
+
+def test_school_sections_absences_notices_books_and_grade_tools(window, services, register,
+                                                                app, monkeypatch):
+    from datetime import timedelta
+
+    from PySide6.QtCore import QThreadPool
+
+    from quire.application.ports import RemoteGrade, RemoteSubject
+    from quire.application.types import AbsenceKind
+    from quire.domain import Absence, Book, Notice, NoticeAttachment
+    from quire.presentation.views import school_panels
+
+    from .conftest import TODAY
+
+    register.subjects_ = [RemoteSubject("1", "MATEMATICA")]
+    register.grades_ = [RemoteGrade(f"g{n}", TODAY - timedelta(days=20 - n * 5), "1",
+                                    "MATEMATICA", str(v), v, "Scritto", "Trimestre", "", False)
+                        for n, v in enumerate((5.0, 5.5, 6.0))]
+    register.absences_ = [Absence("1", TODAY - timedelta(days=1), AbsenceKind.ABSENT)]
+    register.notices_ = [Notice("CF:9", "CF", "9", "Uscita didattica", "Circolari", TODAY,
+                                None, False, (NoticeAttachment(1, "uscita.pdf"),))]
+    register.files[("CF:9", 1)] = b"%PDF"
+    register.books_ = [Book("978X", "Algebra", "MATEMATICA", price=20.0, to_buy=True)]
+    services.school_sync.connect("S1", "secret")
+    services.school_sync.sync()
+    page = window.school
+    window.show_page(window.stack.indexOf(page))
+    page.refresh()
+    assert page._section_buttons.button(2).text() == "Noticeboard · 1"
+
+    page._section_buttons.button(1).click()
+    assert page.sections.currentWidget() is page.absences and not page.periods.isVisible()
+    assert page.absences.list.count() == 1 and page.absences.tile_days.value.text() == "1"
+
+    opened = []
+    monkeypatch.setattr(school_panels, "open_file", lambda data, name: opened.append((data, name)))
+    notice = services.school.notices()[0]
+    dialog = school_panels.NoticeDialog(services, notice, page)
+    attachment_button = dialog.findChildren(school_panels.QPushButton)[0]
+    attachment_button.click()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    assert opened == [(b"%PDF", "uscita.pdf")] and register.opened == ["CF:9"]
+    page.refresh()
+    assert page._section_buttons.button(2).text() == "Noticeboard"
+
+    page._section_buttons.button(3).click()
+    assert page.books.tree.topLevelItemCount() == 1 and "to buy" in page.books.books_total.text()
+
+    subject = school_panels.SubjectDialog(services, "Matematica", None, page)
+    assert subject.answer.text() == "7½"  # (6*4 - 16.5) / 1 = 7.5
+    subject.tests.setValue(2)
+    assert subject.answer.text() == "7-"  # (6*5 - 16.5) / 2 = 6.75
+    subject.target.setValue(3.0)
+    assert subject.answer.text() == "You're safe"
+    assert len(subject.chart.average) == 3
+
+
+def test_fmt_mark():
+    from quire.presentation.views.school_panels import fmt_mark
+    assert [fmt_mark(v) for v in (6, 6.25, 6.5, 6.75, 10)] == ["6", "6+", "6½", "7-", "10"]
