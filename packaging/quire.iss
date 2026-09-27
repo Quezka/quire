@@ -62,3 +62,5 @@ Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopico
 
 [Run]
 Filename: "{app}\{#AppExe}"; Description: "{cm:LaunchProgram,{#AppName}}"; Flags: nowait postinstall skipifsilent
+; An update from inside Quire runs this setup silently: start Quire again when it's done.
+Filename: "{app}\{#AppExe}"; Flags: nowait skipifnotsilent

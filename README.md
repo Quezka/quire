@@ -107,6 +107,21 @@ your data sits in an account only you control.
 - **Sign-in:** a sign-in token is kept in the system keyring; your password isn't stored.
 - **Sign out** stops syncing that computer. Its data stays, and the cloud copy isn't deleted.
 
+### Updates
+
+Quire updates itself from its GitHub releases. It checks about once a day (switch that off
+in **More → Settings → Updates**), and **More → Check for updates…** checks right away. When
+there's a new version, you see what's new and can update, skip that version, or wait.
+
+- **Linux (.deb):** the new package is downloaded and installed through the system's password
+  dialog, then Quire restarts.
+- **Windows (installer):** the new setup runs silently. It closes Quire, upgrades it and
+  starts it again.
+- **Checks:** every download is checked against its size and the SHA-256 checksum GitHub
+  publishes before anything is installed.
+- **Other copies:** a copy that can't replace itself (running from source, the portable
+  build) gets a link to the release page instead.
+
 ### Keyboard shortcuts
 
 | Keys | Action |

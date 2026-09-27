@@ -32,10 +32,11 @@ def restart_app():
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, services: Services, backup, parent=None, sync_runner=None):
+    def __init__(self, services: Services, backup, parent=None, sync_runner=None, updater=None):
         super().__init__(parent)
         self.services = services
         self.sync_runner = sync_runner
+        self.updater = updater
         self.setWindowTitle(_("Settings"))
         self.setMinimumWidth(460)
 
@@ -110,6 +111,17 @@ class SettingsDialog(QDialog):
             sync_runner.changed.connect(self._show_sync)
         self._show_sync()
 
+        self.auto_update = QCheckBox(_("Check for updates automatically"),
+                                     checked=services.updates.auto_check())
+        self.auto_update.toggled.connect(services.updates.set_auto_check)
+        check_now = QPushButton(_("Check now"))
+        check_now.clicked.connect(lambda: updater.check_now() if updater else None)
+        check_now.setEnabled(updater is not None)
+        update_row = QHBoxLayout()
+        update_row.addWidget(self.auto_update)
+        update_row.addStretch()
+        update_row.addWidget(check_now)
+
         backup_btn = QPushButton(_("Back up data…"))
         backup_btn.clicked.connect(backup)
         folder = QPushButton(_("Open data folder"))
@@ -136,6 +148,8 @@ class SettingsDialog(QDialog):
         form.addRow(self._section(_("Sync")))
         form.addRow("", self.sync_status)
         form.addRow("", sync_row)
+        form.addRow(self._section(_("Updates")))
+        form.addRow("", update_row)
         form.addRow(self._section(_("Your data")))
         form.addRow("", data_row)
         location = QLabel(str(services.storage.location), objectName="hint")

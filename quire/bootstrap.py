@@ -4,10 +4,14 @@ from __future__ import annotations
 from pathlib import Path
 
 from .application.bus import ChangeBus
-from .application.ports import CloudBackend, Clock, CredentialStore, SchoolRegister
+from . import HOMEPAGE, __version__
+from .application.ports import (
+    CloudBackend, Clock, CredentialStore, ReleaseFeed, SchoolRegister, UpdateInstaller,
+)
 from .application.services import (
     FocusService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
-    SchoolSyncService, Services, SyncService, TaskService, TimetableService, WorkService,
+    SchoolSyncService, Services, SyncService, TaskService, TimetableService, UpdateService,
+    WorkService,
 )
 from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
@@ -21,6 +25,7 @@ from .infrastructure.repositories import (
 )
 from .infrastructure.sqlite import SqliteDatabase
 from .infrastructure.sync_store import SqliteSyncStore
+from .infrastructure.updates import GitHubReleaseFeed, platform_installer
 
 
 def build_services(db_path: str | Path, clock: Clock | None = None,
@@ -28,6 +33,8 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                    credentials: CredentialStore | None = None,
                    cloud: CloudBackend | None = None,
                    sync_secrets: CredentialStore | None = None,
+                   releases: ReleaseFeed | None = None,
+                   installer: UpdateInstaller | None = None,
                    ) -> tuple[Services, SqliteDatabase]:
     db = SqliteDatabase(db_path)
     clock = clock or SystemClock()
@@ -56,6 +63,10 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         reminders=ReminderService(planner, settings, clock),
         sync=SyncService(SqliteSyncStore(db), cloud or FirebaseCloud(),
                          sync_secrets or KeyringCredentialStore("sync"), settings, clock, bus),
+        updates=UpdateService(
+            releases or GitHubReleaseFeed(HOMEPAGE.removeprefix("https://github.com/"),
+                                          __version__),
+            installer or platform_installer(), settings, clock, __version__),
         storage=db,
         bus=bus,
     )

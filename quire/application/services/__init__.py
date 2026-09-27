@@ -13,6 +13,7 @@ from .school_records import SchoolRecordsService
 from .sync import SyncResult, SyncService, SyncStatus
 from .tasks import TaskService
 from .timetable import TimetableService
+from .updates import AvailableUpdate, UpdateService
 from .work import WorkService
 
 
@@ -30,9 +31,10 @@ class Services:
     focus: FocusService
     reminders: ReminderService
     sync: SyncService  # between your devices, through a cloud account
+    updates: UpdateService  # new versions of Quire itself
     storage: Storage
     bus: ChangeBus
 
 
 __all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "SchoolSyncService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
-           "TimetableService", "WorkService"]
+           "TimetableService", "AvailableUpdate", "UpdateService", "WorkService"]

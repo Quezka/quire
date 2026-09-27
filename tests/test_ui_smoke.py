@@ -808,3 +808,44 @@ def test_sync_setup_dialog_and_background_sync(window, services, cloud, app):
     settings._show_sync()
     assert "internet" in settings.sync_status.text()
     assert settings.sync_status.objectName() == "danger"
+
+
+def test_update_dialog_downloads_installs_and_restarts(window, services, releases, installer,
+                                                       app, monkeypatch):
+    from PySide6.QtCore import QThreadPool
+
+    from quire.application.ports import ReleaseAsset, ReleaseInfo
+    from quire.presentation import settings, updates_ui
+
+    releases.release = ReleaseInfo("9.0.0", "## New\n- Sync", "https://example.com/r", (
+        ReleaseAsset("quire_9.0.0_amd64.deb", "https://example.com/q.deb", 100),))
+    shown, restarted = [], []
+    monkeypatch.setattr(updates_ui.UpdateDialog, "exec", lambda self: shown.append(self))
+    monkeypatch.setattr(settings, "restart_app", lambda: restarted.append(True))
+
+    window.updater.check_now()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    (dialog,) = shown
+    assert "9.0.0" in dialog.findChild(updates_ui.QLabel, "sheetTitle").text()
+    assert dialog.go_btn.text() == "Update now"
+
+    dialog._download()
+    for _i in range(3):  # download, then install, each on a worker
+        QThreadPool.globalInstance().waitForDone(5000)
+        app.processEvents()
+    assert releases.downloads == ["quire_9.0.0_amd64.deb"]
+    assert installer.installed == ["/tmp/quire_9.0.0_amd64.deb"] and restarted == [True]
+    assert not services.updates.due()  # the check was recorded
+
+
+def test_update_dialog_without_self_update_links_to_github(window, services, releases,
+                                                           installer):
+    from quire.application.services import AvailableUpdate
+    from quire.presentation.updates_ui import UpdateDialog
+
+    update = AvailableUpdate("9.0.0", "0.11.0", "", "https://example.com/r", None, False)
+    dialog = UpdateDialog(services, update, window)
+    assert dialog.go_btn.text() == "Open download page" and dialog.status.isVisibleTo(dialog)
+    dialog._skip()
+    assert services.updates.skipped("9.0.0")

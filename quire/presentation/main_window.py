@@ -23,6 +23,7 @@ from .views.week import WeekView
 from .settings import SettingsDialog
 from .reminders import Reminders
 from .sync_ui import SyncRunner
+from .updates_ui import UpdateChecker
 from .views.focus import FocusView
 from .views.work import WorkView
 from .i18n import N_, _
@@ -110,6 +111,7 @@ class MainWindow(QMainWindow):
         self.focus.statusChanged.connect(self._focus_status)
         self.reminders = Reminders(services.reminders, self)
         self.sync = SyncRunner(services, relay, self)
+        self.updater = UpdateChecker(services, self)  # not `update`: that's QWidget's
 
         more = self.sidebar.nav_button("more", _("More"), checkable=False)
         more.setPopupMode(QToolButton.InstantPopup)
@@ -191,6 +193,7 @@ class MainWindow(QMainWindow):
             (_("Sync school register"), "Ctrl+R", lambda: self.school.sync()),
             None,
             (_("Settings…"), "Ctrl+,", self.open_settings),
+            (_("Check for updates…"), None, lambda: self.updater.check_now()),
             (_("Keyboard shortcuts"), None, self.show_shortcuts),
             (_("About Quire"), None, self.about),
         ]
@@ -219,7 +222,7 @@ class MainWindow(QMainWindow):
         EventDialog(self.services, day=self.today.day, parent=self).exec()
 
     def open_settings(self):
-        SettingsDialog(self.services, self.backup, self, self.sync).exec()
+        SettingsDialog(self.services, self.backup, self, self.sync, self.updater).exec()
 
     def new_shift(self):
         ShiftDialog(self.services, day=self.today.day, parent=self).exec()

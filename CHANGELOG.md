@@ -4,6 +4,26 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.12.0] - 2026-09-28
+
+### Added
+- **Update Quire from inside the app.** Quire checks GitHub for a new version about once a
+  day, and on request with More → Check for updates….
+  - You see what's new and choose **Update now**, **Later** or **Skip this version**.
+  - On Linux the new .deb installs through the system's password dialog, then Quire
+    restarts.
+  - On Windows the new setup runs silently and starts Quire again.
+  - Downloads are checked against GitHub's checksum before anything is installed.
+  - Switch off the daily check in Settings → Updates.
+  - This version still has to be installed by hand once; later versions arrive through the
+    app.
+
+- **Sync between your computers** (More → Settings → Sync), through your own free Firebase
+  project: timetable, tasks, notes, journal, work shifts and focus log.
+  - Grades stay on each computer.
+  - 0.11.0, which introduced sync, was tagged but never published, so it arrives here. See
+    its notes in CHANGELOG.md for details.
+
 ## [0.11.0] - 2026-09-28
 
 ### Added

@@ -7,7 +7,7 @@ from ..domain.errors import DomainError, NotFound, ValidationError
 
 __all__ = ["ApplicationError", "AuthenticationError", "CloudAuthError", "CredentialStorageError",
            "DomainError", "NotConnected", "NotFound", "RegisterError", "SyncError",
-           "SyncNotSetUp", "ValidationError"]
+           "SyncNotSetUp", "UpdateError", "ValidationError"]
 
 
 
@@ -41,3 +41,7 @@ class CloudAuthError(SyncError):
 
 class SyncNotSetUp(ApplicationError):
     """Sync hasn't been set up on this device."""
+
+
+class UpdateError(ApplicationError):
+    """Checking for, downloading or installing an update didn't work."""
