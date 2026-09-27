@@ -48,3 +48,29 @@ def test_v7_focus_sessions_gain_a_label(tmp_path):
     db = SqliteDatabase(path)
     assert db.conn.execute("SELECT label FROM focus_sessions").fetchone()["label"] == ""
     db.close()
+
+
+def test_v8_rows_get_sync_ids_and_are_sent_once(tmp_path):
+    path = tmp_path / "v8.db"
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            CREATE TABLE tasks (id INTEGER PRIMARY KEY, title TEXT NOT NULL,
+                kind TEXT NOT NULL DEFAULT 'task', course_id INTEGER, due TEXT,
+                done INTEGER NOT NULL DEFAULT 0, details TEXT NOT NULL DEFAULT '',
+                external_id TEXT);
+            INSERT INTO tasks (title) VALUES ('Mine');
+            INSERT INTO tasks (title, external_id) VALUES ('Imported', 'classeviva:homework:1');
+            CREATE TABLE journal (day TEXT PRIMARY KEY, body TEXT NOT NULL DEFAULT '');
+            INSERT INTO journal VALUES ('2026-09-01', 'First day');
+        """)
+    db = SqliteDatabase(path)
+    rows = {r["title"]: r for r in db.conn.execute("SELECT * FROM tasks")}
+    assert len(rows["Mine"]["uid"]) == 32 and rows["Mine"]["dirty"] == 1
+    assert rows["Imported"]["uid"] == "ext:classeviva:homework:1"
+    assert db.conn.execute("SELECT uid FROM journal").fetchone()[0] == "day:2026-09-01"
+    uid = rows["Mine"]["uid"]
+    db.close()
+
+    again = SqliteDatabase(path)  # upgrading twice changes nothing
+    assert again.conn.execute("SELECT uid FROM tasks WHERE title = 'Mine'").fetchone()[0] == uid
+    again.close()

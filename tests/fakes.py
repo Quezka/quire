@@ -52,3 +52,61 @@ class FakeRegister:
         self._maybe_fail("lessons")
         self.requested.append(("lessons", first, last))
         return [l for l in self.lessons_ if first <= l.day <= last]
+
+
+class FakeCloud:
+    """An in-memory Firebase: accounts, and records stamped with a server counter."""
+
+    def __init__(self):
+        from quire.application.ports import CloudSession
+        self._Session = CloudSession
+        self.accounts: dict[str, str] = {}  # email -> password
+        self.docs: dict[tuple[str, str, str], tuple[int, object]] = {}  # (user, kind, uid)
+        self.clock = 0
+        self.offline = False
+        self.pushes = 0
+
+    def _check(self):
+        if self.offline:
+            from quire.application.errors import SyncError
+            raise SyncError("Can't reach the sync server. Check your internet connection.")
+
+    def _session(self, email):
+        return self._Session(f"user-{email}", email, f"token-{email}", f"refresh-{email}")
+
+    def sign_up(self, config, email, password):
+        from quire.application.errors import CloudAuthError
+        self._check()
+        if email in self.accounts:
+            raise CloudAuthError("There's already an account with this email: sign in instead.")
+        self.accounts[email] = password
+        return self._session(email)
+
+    def sign_in(self, config, email, password):
+        from quire.application.errors import CloudAuthError
+        self._check()
+        if self.accounts.get(email) != password:
+            raise CloudAuthError("Wrong email or password.")
+        return self._session(email)
+
+    def refresh(self, config, refresh_token):
+        from quire.application.errors import CloudAuthError
+        self._check()
+        email = refresh_token.removeprefix("refresh-")
+        if email not in self.accounts:
+            raise CloudAuthError("Your sign-in has expired: set up sync again.")
+        return self._session(email)
+
+    def pull(self, config, session, cursor):
+        self._check()
+        since = int(cursor or 0)
+        mine = sorted((stamp, rec) for (user, _k, _u), (stamp, rec) in self.docs.items()
+                      if user == session.user_id and stamp > since)
+        return [rec for _s, rec in mine], str(max([since] + [s for s, _r in mine]))
+
+    def push(self, config, session, records):
+        self._check()
+        self.pushes += 1
+        for rec in records:
+            self.clock += 1
+            self.docs[(session.user_id, rec.kind, rec.uid)] = (self.clock, rec)

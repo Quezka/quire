@@ -4,6 +4,21 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.11.0] - 2026-09-28
+
+### Added
+- **Sync between your computers** (More → Settings → Sync). Your timetable, tasks, notes,
+  journal, work shifts and focus log stay the same everywhere.
+  - It runs through your own free Firebase project; the setup dialog walks you through
+    creating it.
+  - Quire still works offline. It syncs at start-up, every 5 minutes, and shortly after you
+    change something.
+  - When the same thing changed on two computers, the newer change wins. Deletions sync too.
+  - Grades and lesson topics stay on each computer; homework you tick off syncs.
+  - A second computer can take the cloud copy instead of merging, so nothing ends up
+    twice.
+  - The sign-in token is kept in the system keyring; your password isn't stored.
+
 ## [0.10.2] - 2026-09-27
 
 ### Changed

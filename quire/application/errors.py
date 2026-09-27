@@ -5,8 +5,9 @@ domain to catch them.
 """
 from ..domain.errors import DomainError, NotFound, ValidationError
 
-__all__ = ["ApplicationError", "AuthenticationError", "CredentialStorageError", "DomainError",
-           "NotConnected", "NotFound", "RegisterError", "ValidationError"]
+__all__ = ["ApplicationError", "AuthenticationError", "CloudAuthError", "CredentialStorageError",
+           "DomainError", "NotConnected", "NotFound", "RegisterError", "SyncError",
+           "SyncNotSetUp", "ValidationError"]
 
 
 
@@ -28,3 +29,15 @@ class NotConnected(ApplicationError):
 
 class CredentialStorageError(ApplicationError):
     """The password could not be stored safely."""
+
+
+class SyncError(ApplicationError):
+    """The sync server couldn't be reached or refused the request."""
+
+
+class CloudAuthError(SyncError):
+    """The cloud account rejected the email, password or saved sign-in."""
+
+
+class SyncNotSetUp(ApplicationError):
+    """Sync hasn't been set up on this device."""

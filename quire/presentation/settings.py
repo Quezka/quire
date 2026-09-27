@@ -32,9 +32,10 @@ def restart_app():
 
 
 class SettingsDialog(QDialog):
-    def __init__(self, services: Services, backup, parent=None):
+    def __init__(self, services: Services, backup, parent=None, sync_runner=None):
         super().__init__(parent)
         self.services = services
+        self.sync_runner = sync_runner
         self.setWindowTitle(_("Settings"))
         self.setMinimumWidth(460)
 
@@ -93,6 +94,22 @@ class SettingsDialog(QDialog):
         remind_hint.setWordWrap(True)
         self._reminders_changed(save=False)
 
+        self.sync_status = QLabel(objectName="hint")
+        self.sync_status.setWordWrap(True)
+        self.sync_setup = QPushButton()
+        self.sync_setup.clicked.connect(self._set_up_sync)
+        self.sync_now = QPushButton(_("Sync now"))
+        self.sync_now.clicked.connect(self._sync_now)
+        self.sync_off = QPushButton(_("Sign out"))
+        self.sync_off.clicked.connect(self._sign_out)
+        sync_row = QHBoxLayout()
+        for widget in (self.sync_setup, self.sync_now, self.sync_off):
+            sync_row.addWidget(widget)
+        sync_row.addStretch()
+        if sync_runner is not None:
+            sync_runner.changed.connect(self._show_sync)
+        self._show_sync()
+
         backup_btn = QPushButton(_("Back up data…"))
         backup_btn.clicked.connect(backup)
         folder = QPushButton(_("Open data folder"))
@@ -116,6 +133,9 @@ class SettingsDialog(QDialog):
         form.addRow(_("Remind me"), self.remind)
         form.addRow(_("For"), remind_kinds)
         form.addRow("", remind_hint)
+        form.addRow(self._section(_("Sync")))
+        form.addRow("", self.sync_status)
+        form.addRow("", sync_row)
         form.addRow(self._section(_("Your data")))
         form.addRow("", data_row)
         location = QLabel(str(services.storage.location), objectName="hint")
@@ -149,6 +169,40 @@ class SettingsDialog(QDialog):
             self.services.reminders.save_settings(ReminderSettings(
                 self.remind.currentData(), self.remind_events.isChecked(),
                 self.remind_classes.isChecked(), self.remind_shifts.isChecked()))
+
+    def _show_sync(self):
+        from .sync_ui import status_text
+
+        status = self.services.sync.status()
+        self.sync_status.setText(status_text(status, self.services.planner.today()))
+        self.sync_status.setObjectName("danger" if status.problem else "hint")
+        self.sync_status.style().polish(self.sync_status)
+        self.sync_setup.setText(_("Set up again…") if status.email else _("Set up sync…"))
+        busy = self.sync_runner is not None and self.sync_runner.running
+        self.sync_now.setVisible(status.set_up)
+        self.sync_now.setEnabled(not busy)
+        self.sync_now.setText(_("Syncing…") if busy else _("Sync now"))
+        self.sync_off.setVisible(bool(status.email))
+
+    def _set_up_sync(self):
+        from .sync_ui import SyncSetupDialog
+
+        if SyncSetupDialog(self.services, self).exec() and self.sync_runner is not None:
+            self.sync_runner.sync_now()
+        self._show_sync()
+
+    def _sync_now(self):
+        if self.sync_runner is not None:
+            self.sync_runner.sync_now()
+        self._show_sync()
+
+    def _sign_out(self):
+        from .dialogs import confirm
+
+        if confirm(self, _("Sign out of sync"), _("Stop syncing this computer? Its data stays "
+                                                    "here, and the cloud copy isn't deleted.")):
+            self.services.sync.disconnect()
+            self._show_sync()
 
     def _currency_picked(self):
         preferences().set_currency(self.currency.currentData())

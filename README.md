@@ -85,6 +85,28 @@ If Spaggiari changes that API, the sync may stop working until Quire is updated.
   disconnects the account. Imported items stay after you disconnect.
 - Accounts linked to several students (for example a parent account) sync the first one.
 
+### Sync between your computers
+
+**More → Settings → Sync** keeps your timetable, tasks, notes, journal, work shifts and focus
+log the same on all your computers. It goes through **your own free Firebase project**, so
+your data sits in an account only you control.
+
+- **Setup, once:** create a Firebase project and turn on Email/Password sign-in. Create a
+  Firestore database, then paste the security rules from the setup dialog (**Copy security
+  rules**). Add a Web app, and copy its *projectId* and *apiKey* into Quire. The setup
+  dialog lists these steps with a link to the console.
+- **On the next computer:** enter the same project and sign in with the same account. Tick
+  **Replace this computer's data with the cloud copy** if it already has its own copy of
+  things (for example the same timetable typed in twice), so nothing ends up doubled.
+- **Local-first:** Quire works offline as before. It syncs at start-up, every 5 minutes, and
+  about 15 seconds after you change something.
+- **Conflicts:** when the same thing changed on two computers, the newer change wins.
+- **Deletions:** deleting something on one computer deletes it everywhere.
+- **Kept local:** grades and lesson topics are never uploaded; each computer gets them from
+  Classeviva itself. Homework you tick off does sync.
+- **Sign-in:** a sign-in token is kept in the system keyring; your password isn't stored.
+- **Sign out** stops syncing that computer. Its data stays, and the cloud copy isn't deleted.
+
 ### Keyboard shortcuts
 
 | Keys | Action |
@@ -192,9 +214,16 @@ Quire follows **Clean Architecture**: source-code dependencies point only inward
 | --- | --- | --- |
 | `quire/domain` | `Course`, `ClassSlot`, `TimeRange`, `Event`, `Task`, `Note`, and rules such as due-date buckets, next class meeting, note titles and validation | nothing |
 | `quire/application` | Use-case services (`TimetableService`, `PlannerService`, `TaskService`, `NoteService`, `SchoolSyncService`, `WorkService`), **ports** (`Protocol`s) for repositories, the school register and credential storage, read-model DTOs, and a framework-free `ChangeBus` | domain |
-| `quire/infrastructure` | `SqliteDatabase` (with schema migrations), SQLite repositories, the `ClassevivaRegister` HTTP adapter, the keyring credential store, the system clock and platform data paths | application, domain |
+| `quire/infrastructure` | `SqliteDatabase` (with schema migrations), SQLite repositories, the `ClassevivaRegister` HTTP adapter, the `FirebaseCloud` adapter and `SqliteSyncStore` for sync, the keyring credential store, the system clock and platform data paths | application, domain |
 | `quire/presentation` | PySide6 UI. It talks only to the `Services` facade and adapts `ChangeBus` into a Qt signal (`bridge.py`) | application, domain |
 | `quire/bootstrap.py` | Composition root: builds repositories and injects them into services | everything |
+
+Sync is a use case like the others. `SyncService` works through two ports:
+- `SyncStore`, this device's changes, implemented by SQLite triggers that stamp every change
+  and leave tombstones for deletions, so the repositories don't know sync exists;
+- `CloudBackend`, the cloud, implemented by Firestore over REST.
+
+Records travel with stable ids instead of local row numbers, and the newer change wins.
 
 The rule is enforced by `tests/test_architecture.py`, which parses every module's imports.
 For example, if you import `sqlite3` or `PySide6` into the domain, the test suite fails.

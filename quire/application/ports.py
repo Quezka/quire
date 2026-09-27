@@ -224,3 +224,78 @@ class SchoolRegister(Protocol):
         ...
     def grades(self) -> list[RemoteGrade]: ...
     def lessons(self, first: date, last: date) -> list[RemoteLesson]: ...
+
+
+# ---- sync between devices -------------------------------------------------------
+
+@dataclass(frozen=True)
+class SyncRecord:
+    """One synced thing (a course with its class times, a task, a note, …) in a form every
+    device understands: stable ids instead of local row numbers.
+
+    `modified` is an ISO-8601 UTC time with milliseconds; the newer change wins.
+    """
+
+    kind: str  # "course", "event", "task", "note", "journal", "job", "shift", "focus"
+    uid: str
+    modified: str
+    deleted: bool = False
+    data: dict | None = None
+
+    @property
+    def key(self) -> tuple[str, str]:
+        return self.kind, self.uid
+
+
+class SyncStore(Protocol):
+    """This device's side of sync: what changed here, and applying what changed elsewhere."""
+
+    def outgoing(self) -> list[SyncRecord]:
+        """Every record changed (or deleted) here since it was last sent."""
+        ...
+
+    def apply(self, records: list[SyncRecord]) -> set[tuple[str, str]]:
+        """Take in records from other devices where they're newer than ours; returns the
+        (kind, uid) of those applied. Records whose parent hasn't arrived yet wait for the
+        next sync."""
+        ...
+
+    def mark_sent(self, records: list[SyncRecord]) -> None:
+        """They reached the cloud: stop sending them, unless they changed again since."""
+        ...
+
+    def pending(self) -> int: ...
+
+    def clear_all(self) -> None:
+        """Delete every synced record here without sending deletions (to take the cloud's copy)."""
+        ...
+
+
+@dataclass(frozen=True)
+class CloudConfig:
+    project_id: str
+    api_key: str
+
+
+@dataclass(frozen=True)
+class CloudSession:
+    user_id: str
+    email: str
+    token: str  # short-lived
+    refresh_token: str  # long-lived; kept in the keyring
+
+
+class CloudBackend(Protocol):
+    """A cloud database with accounts (e.g. Firebase). Network only: safe on a worker thread."""
+
+    def sign_up(self, config: CloudConfig, email: str, password: str) -> CloudSession: ...
+    def sign_in(self, config: CloudConfig, email: str, password: str) -> CloudSession: ...
+    def refresh(self, config: CloudConfig, refresh_token: str) -> CloudSession: ...
+
+    def pull(self, config: CloudConfig, session: CloudSession,
+             cursor: str | None) -> tuple[list[SyncRecord], str | None]:
+        """Records that reached the cloud after `cursor` (None: all), and the new cursor."""
+        ...
+
+    def push(self, config: CloudConfig, session: CloudSession,
+             records: list[SyncRecord]) -> None: ...

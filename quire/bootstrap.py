@@ -4,14 +4,15 @@ from __future__ import annotations
 from pathlib import Path
 
 from .application.bus import ChangeBus
-from .application.ports import Clock, CredentialStore, SchoolRegister
+from .application.ports import CloudBackend, Clock, CredentialStore, SchoolRegister
 from .application.services import (
     FocusService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
-    SchoolSyncService, Services, TaskService, TimetableService, WorkService,
+    SchoolSyncService, Services, SyncService, TaskService, TimetableService, WorkService,
 )
 from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
 from .infrastructure.credentials import KeyringCredentialStore
+from .infrastructure.firebase import FirebaseCloud
 from .infrastructure.repositories import (
     SqliteCourseRepository, SqliteEventRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
@@ -19,11 +20,14 @@ from .infrastructure.repositories import (
     SqliteShiftRepository, SqliteTaskRepository,
 )
 from .infrastructure.sqlite import SqliteDatabase
+from .infrastructure.sync_store import SqliteSyncStore
 
 
 def build_services(db_path: str | Path, clock: Clock | None = None,
                    register: SchoolRegister | None = None,
                    credentials: CredentialStore | None = None,
+                   cloud: CloudBackend | None = None,
+                   sync_secrets: CredentialStore | None = None,
                    ) -> tuple[Services, SqliteDatabase]:
     db = SqliteDatabase(db_path)
     clock = clock or SystemClock()
@@ -50,6 +54,8 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         work=WorkService(jobs, shifts, clock, bus),
         focus=FocusService(SqliteFocusLogRepository(db), settings, tasks, courses, clock, bus),
         reminders=ReminderService(planner, settings, clock),
+        sync=SyncService(SqliteSyncStore(db), cloud or FirebaseCloud(),
+                         sync_secrets or KeyringCredentialStore("sync"), settings, clock, bus),
         storage=db,
         bus=bus,
     )

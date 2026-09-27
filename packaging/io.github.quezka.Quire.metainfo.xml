@@ -52,6 +52,12 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.11.0" date="2026-09-28">
+      <description>
+        <p>Sync between your computers through your own free Firebase project: timetable,
+          tasks, notes, journal, work shifts and focus log. Grades stay on each computer.</p>
+      </description>
+    </release>
     <release version="0.10.2" date="2026-09-27">
       <description>
         <p>Windows: a proper installer with Start menu and uninstall entries.</p>

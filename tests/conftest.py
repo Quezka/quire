@@ -5,7 +5,7 @@ import pytest
 from quire.bootstrap import build_services
 from quire.infrastructure.credentials import MemoryCredentialStore
 
-from .fakes import FakeRegister
+from .fakes import FakeCloud, FakeRegister
 
 # A Wednesday.
 TODAY = date(2026, 9, 23)
@@ -38,7 +38,13 @@ def credentials():
 
 
 @pytest.fixture
-def services(clock, register, credentials):
-    services, db = build_services(":memory:", clock, register, credentials)
+def cloud():
+    return FakeCloud()
+
+
+@pytest.fixture
+def services(clock, register, credentials, cloud):
+    services, db = build_services(":memory:", clock, register, credentials, cloud,
+                                  MemoryCredentialStore())
     yield services
     db.close()

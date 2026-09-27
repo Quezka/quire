@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 8
+SCHEMA_VERSION = 9
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -158,6 +158,9 @@ class SqliteDatabase:
         self._add_column("notes", "topic", "TEXT NOT NULL DEFAULT ''")
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
                           " ON tasks(external_id) WHERE external_id IS NOT NULL")
+        # v9: change tracking for sync between devices (ids, timestamps, tombstones).
+        from .sync_store import install
+        install(self.conn)
         self.conn.execute(f"PRAGMA user_version = {SCHEMA_VERSION}")
         self.conn.commit()
 

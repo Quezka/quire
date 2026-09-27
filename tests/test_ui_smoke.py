@@ -764,3 +764,47 @@ def test_focus_page_takes_a_typed_project_or_a_task(window, services):
     services.focus.set_focus_project("Guitar")
     page._fill_tasks()
     assert page.task.currentText() == "Guitar"
+
+
+def test_sync_setup_dialog_and_background_sync(window, services, cloud, app):
+    from PySide6.QtCore import QThreadPool
+
+    from quire.presentation.settings import SettingsDialog
+    from PySide6.QtWidgets import QDialog
+
+    from quire.presentation.sync_ui import SyncSetupDialog
+
+    settings = SettingsDialog(services, lambda: None, window, window.sync)
+    assert settings.sync_setup.text() == "Set up sync…" and not settings.sync_now.isVisible()
+
+    dialog = SyncSetupDialog(services, settings)
+    assert dialog.create.isChecked() and not dialog.take_cloud.isVisibleTo(dialog)
+    dialog.project.setText("Not A Project")
+    dialog._connect()
+    assert "project ID" in dialog.error.text()
+
+    dialog.project.setText("quire-sync-test")
+    dialog.api_key.setText("AIzaSyTESTKEY-0123456789abcdef")
+    dialog.email.setText("me@example.com")
+    dialog.password.setText("secret123")
+    dialog._connect()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    assert dialog.result() == QDialog.Accepted and services.sync.status().set_up
+
+    window.sync.sync_now()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    status = services.sync.status()
+    assert status.pending == 0 and status.last_sync is not None and cloud.docs  # demo data sent
+    settings._show_sync()
+    assert "me@example.com" in settings.sync_status.text()
+    assert settings.sync_now.isVisibleTo(settings) and settings.sync_off.isVisibleTo(settings)
+
+    cloud.offline = True
+    window.sync.sync_now()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    settings._show_sync()
+    assert "internet" in settings.sync_status.text()
+    assert settings.sync_status.objectName() == "danger"

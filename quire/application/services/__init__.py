@@ -10,6 +10,7 @@ from .planner import PlannerService
 from .reminders import Reminder, ReminderService, ReminderSettings
 from .school import SchoolSyncService
 from .school_records import SchoolRecordsService
+from .sync import SyncResult, SyncService, SyncStatus
 from .tasks import TaskService
 from .timetable import TimetableService
 from .work import WorkService
@@ -28,9 +29,10 @@ class Services:
     work: WorkService
     focus: FocusService
     reminders: ReminderService
+    sync: SyncService  # between your devices, through a cloud account
     storage: Storage
     bus: ChangeBus
 
 
-__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "SchoolSyncService", "TaskService",
+__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "SchoolSyncService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
            "TimetableService", "WorkService"]

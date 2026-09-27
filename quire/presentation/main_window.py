@@ -22,6 +22,7 @@ from .views.today import TodayView
 from .views.week import WeekView
 from .settings import SettingsDialog
 from .reminders import Reminders
+from .sync_ui import SyncRunner
 from .views.focus import FocusView
 from .views.work import WorkView
 from .i18n import N_, _
@@ -108,6 +109,7 @@ class MainWindow(QMainWindow):
         self.school.newsChanged.connect(self._school_news)
         self.focus.statusChanged.connect(self._focus_status)
         self.reminders = Reminders(services.reminders, self)
+        self.sync = SyncRunner(services, relay, self)
 
         more = self.sidebar.nav_button("more", _("More"), checkable=False)
         more.setPopupMode(QToolButton.InstantPopup)
@@ -217,7 +219,7 @@ class MainWindow(QMainWindow):
         EventDialog(self.services, day=self.today.day, parent=self).exec()
 
     def open_settings(self):
-        SettingsDialog(self.services, self.backup, self).exec()
+        SettingsDialog(self.services, self.backup, self, self.sync).exec()
 
     def new_shift(self):
         ShiftDialog(self.services, day=self.today.day, parent=self).exec()
