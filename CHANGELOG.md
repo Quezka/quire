@@ -4,6 +4,18 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.10.2] - 2026-09-27
+
+### Changed
+- **Windows: a real installer** instead of a portable `.exe`.
+  - `Quire-…-windows-x64-setup.exe` installs Quire for your user, with no admin needed.
+  - It adds a Start menu entry, and a desktop shortcut if you want one.
+  - Uninstall it from Settings → Apps.
+  - Running a newer setup upgrades Quire in place, keeping your notes and settings.
+  - The installer is in English, Italian or Russian.
+  - It also starts faster than the portable file did, since nothing is unpacked on each
+    launch.
+
 ## [0.10.1] - 2026-09-24
 
 ### Changed
