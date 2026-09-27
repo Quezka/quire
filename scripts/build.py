@@ -3,6 +3,7 @@
     python scripts/build.py            # folder build in dist/Quire/
     python scripts/build.py --onefile  # single executable
     python scripts/build.py --deb      # Debian/Ubuntu package in dist/
+    python scripts/build.py --installer  # Windows setup .exe in dist/ (needs Inno Setup 6)
 
 Run it on Linux to get a Linux build and on Windows to get a Windows .exe;
 PyInstaller does not cross-compile.
@@ -11,6 +12,8 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
+import subprocess
 import sys
 from datetime import date
 from pathlib import Path
@@ -74,14 +77,49 @@ def write_windows_version_file() -> Path:
     return target
 
 
+def find_iscc() -> str:
+    """Inno Setup's command-line compiler."""
+    candidates = [shutil.which("iscc")] + [
+        str(Path(base) / "Inno Setup 6" / "ISCC.exe")
+        for base in (os.environ.get("ProgramFiles(x86)", r"C:\Program Files (x86)"),
+                     os.environ.get("ProgramFiles", r"C:\Program Files"),
+                     os.environ.get("LOCALAPPDATA", "") + r"\Programs")
+    ]
+    found = next((c for c in candidates if c and Path(c).is_file()), None)
+    if not found:
+        raise SystemExit("Inno Setup 6 not found: install it (choco install innosetup) "
+                         "or put ISCC.exe on PATH")
+    return found
+
+
+def build_installer(icon: Path) -> Path:
+    """Wrap the folder build in dist/Quire into a Windows setup wizard."""
+    out = ROOT / "dist"
+    subprocess.run([
+        find_iscc(), "/Qp",
+        f"/DAppVersion={quire.__version__}",
+        f"/DPublisher={quire.DEVELOPER}",
+        f"/DHomepage={quire.HOMEPAGE}",
+        f"/DSourceDir={out / 'Quire'}",
+        f"/DIconFile={icon}",
+        f"/DOutputDir={out}",
+        str(ROOT / "packaging" / "quire.iss"),
+    ], check=True)
+    return out / f"Quire-{quire.__version__}-windows-x64-setup.exe"
+
+
 def main():
     parser = argparse.ArgumentParser()
     mode = parser.add_mutually_exclusive_group()
     mode.add_argument("--onefile", action="store_true", help="single self-contained executable")
     mode.add_argument("--deb", action="store_true", help="installable .deb (Linux only)")
+    mode.add_argument("--installer", action="store_true",
+                      help="setup wizard .exe (Windows only, needs Inno Setup 6)")
     args = parser.parse_args()
     if args.deb and not sys.platform.startswith("linux"):
         parser.error("--deb can only be built on Linux")
+    if args.installer and sys.platform != "win32":
+        parser.error("--installer can only be built on Windows")
 
     import PyInstaller.__main__
 
@@ -120,6 +158,8 @@ def main():
 
         deb = build_deb(ROOT / "dist" / "Quire", icon, ROOT / "dist", BUILD)
         print(f"\nPackage: {deb}\nInstall with: sudo apt install {deb}")
+    elif args.installer:
+        print(f"\nInstaller: {build_installer(icon)}")
     else:
         print(f"\nBuilt into {ROOT / 'dist'}")
 

@@ -135,16 +135,20 @@ stored in your home folder and are left untouched.
 ./scripts/install-linux.sh
 ```
 
-**Standalone builds (Linux binary or Windows .exe):**
+**Windows installer:**
 
 ```bash
 pip install -e ".[build]"
-python scripts/build.py --onefile   # output in dist/
+python scripts/build.py --installer   # needs Inno Setup 6; output in dist/
 ```
 
-PyInstaller builds for the platform it runs on, so run the build on Windows to get
-`Quire.exe`. The GitHub Actions workflow in `.github/workflows/build.yml` builds both on every
-push and uploads the `.deb` and `Quire.exe` as artifacts.
+This makes `Quire-<version>-windows-x64-setup.exe`, a setup wizard built with Inno Setup from
+`packaging/quire.iss`. It installs per user by default (no admin), adds Start menu and
+uninstall entries, and upgrades in place. `--onefile` still makes a single portable binary.
+
+PyInstaller builds for the platform it runs on, so build the installer on Windows. The GitHub
+Actions workflow in `.github/workflows/build.yml` builds the `.deb` and the setup `.exe` on
+every push and uploads them as artifacts.
 
 ## Releasing a new version
 
