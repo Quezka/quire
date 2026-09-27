@@ -53,6 +53,8 @@ jobs:
           QT_QPA_PLATFORM: offscreen
       - uses: actions/upload-artifact@v4
         with:
+          # Only the release job needs these; releases keep the files for good.
+          retention-days: 1
           name: Quire-${{ runner.os }}
           path: ${{ matrix.artifact }}
 
