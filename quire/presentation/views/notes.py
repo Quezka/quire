@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from ...application.bus import Topic
+from ...application.errors import NotFound
 from ...application.dto import NoteSummary
 from ...application.services import Services
 from ...application.inputs import NoteInput
@@ -35,6 +36,7 @@ class NotesView(Page):
         super().__init__(parent)
         self.services = services
         self.notes = services.notes
+        self._saving = False  # our own autosave is publishing NOTES
         self.note: NoteRecord | None = None
         self._dirty = False
         self._loading = False
@@ -155,10 +157,30 @@ class NotesView(Page):
         self._loading = False
 
     def _changed(self, topic: Topic):
-        # Our own saves publish NOTES too; the list is already up to date for those.
         if topic is Topic.COURSES:
             self._fill_course_combos()
             self.reload_list()
+        elif topic is Topic.NOTES and not self._saving:
+            # Someone else changed notes (e.g. a sync); our own autosaves are skipped.
+            self._refresh_open_note()
+            self.reload_list()
+
+    def _refresh_open_note(self):
+        """Show the open note as it is now, unless there are unsaved edits (they win)."""
+        if self.note is None or self._dirty:
+            return
+        try:
+            fresh = self.notes.note(self.note.id)
+        except NotFound:  # deleted elsewhere
+            self._show(None)
+            return
+        shown = (self.note.body, self.note.course_id, self.note.pinned, self.note.topic)
+        if (fresh.body, fresh.course_id, fresh.pinned, fresh.topic) != shown:
+            position = self.editor.textCursor().position()
+            self._show(fresh)
+            cursor = self.editor.textCursor()
+            cursor.setPosition(min(position, len(fresh.body)))
+            self.editor.setTextCursor(cursor)
 
     def reload_list(self, select_id=None):
         select_id = select_id or (self.note.id if self.note else None)
@@ -359,9 +381,18 @@ class NotesView(Page):
         self._timer.stop()
         if not self._dirty or self.note is None:
             return
-        self.note = self.notes.update(self.note.id, NoteInput(
-            self.editor.toPlainText(), self.course.currentData(), self.pin.isChecked(),
-            self.topic.currentText()))
+        body, course_id, topic = (self.editor.toPlainText(), self.course.currentData(),
+                                  self.topic.currentText())
+        self._saving = True
+        try:
+            self.note = self.notes.update(self.note.id, NoteInput(
+                body, course_id, self.pin.isChecked(), topic))
+        except NotFound:
+            # Deleted on another computer while being edited here: keep the text.
+            self.note = self.notes.create(body, course_id, topic)
+            self.reload_list(self.note.id)
+        finally:
+            self._saving = False
         self._dirty = False
         self.status.setText(_("Saved"))
         item = self.list.currentItem()

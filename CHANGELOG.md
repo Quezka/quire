@@ -4,6 +4,18 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.13.1] - 2026-09-28
+
+### Fixed
+- **Day notes and notes from another computer show up right away.** They synced, but
+  Today's day note and the note open on the Notes page only updated after switching day or
+  note, or restarting.
+  - Typing into that stale copy could then overwrite what was written on the other computer.
+  - Now they refresh as soon as a sync brings a change. Anything you're in the middle of
+    typing is kept and saved as the newer version.
+- A note deleted on another computer while you were editing it here is saved again as a new
+  note, instead of the edit failing.
+
 ## [0.13.0] - 2026-09-28
 
 ### Added

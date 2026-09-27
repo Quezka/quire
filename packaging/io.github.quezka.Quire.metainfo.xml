@@ -52,6 +52,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.13.1" date="2026-09-28">
+      <description>
+        <p>Day notes and notes changed on another computer now show up right away.</p>
+      </description>
+    </release>
     <release version="0.13.0" date="2026-09-28">
       <description>
         <p>School: absences with the 25% limit, the Classeviva noticeboard, textbooks and

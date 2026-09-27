@@ -171,6 +171,22 @@ class TodayView(Page):
     def _changed(self, topic: Topic):
         if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS, Topic.WORK):
             self.refresh()
+        elif topic is Topic.JOURNAL:
+            self._reload_journal()
+
+    def _reload_journal(self):
+        """Show the day note as stored (e.g. after a sync), unless it's being edited."""
+        if self._journal_dirty or self._journal_day is None:
+            return
+        stored = self.planner.journal(self._journal_day)
+        if stored != self.journal.toPlainText():
+            position = self.journal.textCursor().position()
+            self.journal.blockSignals(True)
+            self.journal.setPlainText(stored)
+            self.journal.blockSignals(False)
+            cursor = self.journal.textCursor()
+            cursor.setPosition(min(position, len(stored)))
+            self.journal.setTextCursor(cursor)
 
     def _theme_changed(self, _theme):
         self.refresh()

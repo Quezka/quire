@@ -911,3 +911,41 @@ def test_school_sections_absences_notices_books_and_grade_tools(window, services
 def test_fmt_mark():
     from quire.presentation.views.school_panels import fmt_mark
     assert [fmt_mark(v) for v in (6, 6.25, 6.5, 6.75, 10)] == ["6", "6+", "6½", "7-", "10"]
+
+
+def test_day_note_from_another_computer_shows_up_but_never_replaces_typing(window, services):
+    from .conftest import TODAY
+
+    window.show_page(0)
+    today = window.today
+    today.set_day(TODAY)
+    services.planner.save_journal(TODAY, "Written on the laptop")  # as a sync would
+    assert today.journal.toPlainText() == "Written on the laptop"
+
+    today.journal.setPlainText("Typing here…")  # unsaved edit
+    services.planner.save_journal(TODAY, "Changed on the laptop again")
+    assert today.journal.toPlainText() == "Typing here…"
+    today.flush_journal()
+    assert services.planner.journal(TODAY) == "Typing here…"  # the newer edit wins
+
+
+def test_open_note_follows_changes_from_elsewhere(window, services):
+    from quire.application.inputs import NoteInput
+
+    page = window.notes
+    window.show_page(window.stack.indexOf(page))
+    note = services.notes.create("# Draft", None, "")
+    page._open(services.notes.note(note.id))
+    services.notes.update(note.id, NoteInput("# Draft\n\nAdded on the laptop"))
+    assert page.editor.toPlainText() == "# Draft\n\nAdded on the laptop"
+
+    page.editor.setPlainText("# Draft\n\nMy unsaved words")
+    services.notes.delete(note.id)  # deleted on the laptop meanwhile
+    page.flush()
+    assert page.note is not None  # recreated rather than lost
+    assert services.notes.note(page.note.id).body == "# Draft\n\nMy unsaved words"
+
+    other = services.notes.create("# Another", None, "")
+    page._open(services.notes.note(other.id))
+    services.notes.delete(other.id)
+    assert page.note is None and page.editor.toPlainText() == ""
