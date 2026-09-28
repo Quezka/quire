@@ -10,6 +10,7 @@ from .planner import PlannerService
 from .reminders import Reminder, ReminderService, ReminderSettings
 from .school import SchoolSyncService
 from .school_records import SchoolRecordsService
+from .startup import StartupService
 from .sync import SyncResult, SyncService, SyncStatus
 from .tasks import TaskService
 from .timetable import TimetableService
@@ -32,9 +33,10 @@ class Services:
     reminders: ReminderService
     sync: SyncService  # between your devices, through a cloud account
     updates: UpdateService  # new versions of Quire itself
+    startup: StartupService  # background running and starting at login
     storage: Storage
     bus: ChangeBus
 
 
-__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "SchoolSyncService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
+__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "SchoolSyncService", "StartupService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
            "TimetableService", "AvailableUpdate", "UpdateService", "WorkService"]

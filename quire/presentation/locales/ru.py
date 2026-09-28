@@ -628,4 +628,14 @@ MESSAGES = {
     'School calendar': 'Школьный календарь',
     'Free software under the GNU General Public License, version 3 or later.': 'Свободная программа под лицензией GNU General Public License версии 3 или более поздней.',
     'Licence': 'Лицензия',
+    # Background and startup
+    'In the background, reminders, sync and school updates keep working; Quire waits in the system tray.': 'В фоне напоминания, синхронизация и обновления из школы продолжают работать; Quire ждёт в системном трее.',
+    'Keep running in the background when the window is closed': 'Продолжать работать в фоне после закрытия окна',
+    'Open Quire': 'Открыть Quire',
+    'Quire is still running': 'Quire всё ещё работает',
+    'Quit Quire': 'Выйти из Quire',
+    'Reminders and sync keep working. Click the tray icon to open Quire, or quit it from there or with Ctrl+Q.': 'Напоминания и синхронизация продолжают работать. Щёлкните значок в трее, чтобы открыть Quire, или выйдите оттуда или сочетанием Ctrl+Q.',
+    'Start Quire when I log in': 'Запускать Quire при входе в систему',
+    'Startup': 'Запуск',
+    "Couldn't change whether Quire starts when you log in.": 'Не удалось изменить запуск Quire при входе в систему.',
 }

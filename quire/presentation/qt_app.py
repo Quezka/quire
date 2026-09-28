@@ -22,10 +22,24 @@ def create_application(argv: list[str]) -> QApplication:
     return app
 
 
-def run(services: Services, argv: list[str]) -> int:
+def run(services: Services, argv: list[str], background: bool = False) -> int:
+    from .background import SingleInstance, Tray, instance_name
     from .main_window import MainWindow
 
     app = create_application(argv)
-    window = MainWindow(services)
-    window.show()
+    single = SingleInstance(instance_name(str(services.storage.location)), app)
+    if single.already_running():
+        return 0  # the running Quire shows its window instead
+    single.listen()
+
+    tray = Tray(app) if Tray.available() else None
+    window = MainWindow(services, tray)
+    single.activated.connect(window.bring_back)
+    if tray is not None:
+        tray.show()
+        # Closing the window keeps Quire in the tray; quitting is explicit.
+        app.setQuitOnLastWindowClosed(False)
+    services.startup.refresh_login_item()
+    if not (background and tray is not None):
+        window.show()
     return app.exec()

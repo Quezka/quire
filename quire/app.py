@@ -15,6 +15,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--db", type=Path, help="use this database file instead of the default")
     parser.add_argument("--demo", action="store_true",
                         help="open a throwaway database filled with sample data")
+    parser.add_argument("--background", action="store_true",
+                        help="start in the tray without opening the window (used at login)")
     args, qt_args = parser.parse_known_args(argv[1:])
 
     if args.demo and args.db:
@@ -42,6 +44,6 @@ def main(argv: list[str] | None = None) -> int:
     from .presentation.qt_app import run
 
     try:
-        return run(services, [argv[0], *qt_args])
+        return run(services, [argv[0], *qt_args], background=args.background)
     finally:
         db.close()

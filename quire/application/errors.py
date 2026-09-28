@@ -7,7 +7,7 @@ from ..domain.errors import DomainError, NotFound, ValidationError
 
 __all__ = ["ApplicationError", "AuthenticationError", "CloudAuthError", "CredentialStorageError",
            "DomainError", "NotConnected", "NotFound", "RegisterError", "SyncError",
-           "SyncNotSetUp", "UpdateError", "ValidationError"]
+           "StartupError", "SyncNotSetUp", "UpdateError", "ValidationError"]
 
 
 
@@ -45,3 +45,7 @@ class SyncNotSetUp(ApplicationError):
 
 class UpdateError(ApplicationError):
     """Checking for, downloading or installing an update didn't work."""
+
+
+class StartupError(ApplicationError):
+    """Starting Quire with the system couldn't be switched on or off."""

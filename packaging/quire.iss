@@ -56,6 +56,11 @@ Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs 
 ; Drop files from the previous version's folder build before copying the new one.
 Type: filesandordirs; Name: "{app}\_internal"
 
+[Registry]
+; "Start Quire when I log in" adds this value; remove it on uninstall so Windows doesn't try
+; to start a program that's gone.
+Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: none; ValueName: "Quire"; Flags: uninsdeletevalue dontcreatekey
+
 [Icons]
 Name: "{autoprograms}\{#AppName}"; Filename: "{app}\{#AppExe}"
 Name: "{autodesktop}\{#AppName}"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon

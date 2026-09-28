@@ -4,6 +4,23 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.14.0] - 2026-09-28
+
+### Added
+- **Runs in the background.** Closing the window keeps Quire in the system tray, so
+  reminders, sync and school updates carry on.
+  - Click the tray icon to bring the window back.
+  - Quit from the tray menu, More → Quit Quire, or Ctrl+Q.
+  - Switch this off in Settings → Startup.
+- **Start Quire when I log in** (Settings → Startup). Quire starts straight into the tray.
+  Uninstalling on Windows removes the login entry.
+- **Only one Quire at a time.** Opening Quire while it's already running brings up the
+  running window instead of starting a second copy.
+
+### Changed
+- The Settings dialog is wider and shorter, in two columns, so everything fits without
+  scrolling.
+
 ## [0.13.2] - 2026-09-28
 
 ### Changed

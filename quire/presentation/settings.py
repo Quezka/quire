@@ -1,14 +1,15 @@
 """More → Settings: appearance, currency and your data."""
 from __future__ import annotations
 
-from PySide6.QtCore import QUrl
+from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QPushButton,
+    QCheckBox, QComboBox, QDialog, QMessageBox, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QPushButton,
     QVBoxLayout,
 )
 
 from .. import __version__
+from ..application.errors import ApplicationError
 from ..application.services import ReminderSettings, Services
 from . import theme
 from .formatting import money
@@ -38,7 +39,7 @@ class SettingsDialog(QDialog):
         self.sync_runner = sync_runner
         self.updater = updater
         self.setWindowTitle(_("Settings"))
-        self.setMinimumWidth(460)
+        self.setMinimumWidth(900)
 
         self.appearance = QComboBox()
         for mode, text in (("system", _("Match system")), ("light", _("Light")),
@@ -111,6 +112,19 @@ class SettingsDialog(QDialog):
             sync_runner.changed.connect(self._show_sync)
         self._show_sync()
 
+        startup = services.startup
+        self.background = QCheckBox(_("Keep running in the background when the window is "
+                                      "closed"), checked=startup.background_on_close())
+        self.background.toggled.connect(startup.set_background_on_close)
+        self.start_on_login = QCheckBox(_("Start Quire when I log in"),
+                                        checked=startup.start_on_login())
+        self.start_on_login.setEnabled(startup.can_start_on_login())
+        self.start_on_login.toggled.connect(self._start_on_login_toggled)
+        startup_hint = QLabel(_("In the background, reminders, sync and school updates keep "
+                                "working; Quire waits in the system tray."), objectName="hint")
+        startup_hint.setWordWrap(True)
+        self._startup_rows = (self.background, self.start_on_login, startup_hint)
+
         self.auto_update = QCheckBox(_("Check for updates automatically"),
                                      checked=services.updates.auto_check())
         self.auto_update.toggled.connect(services.updates.set_auto_check)
@@ -132,8 +146,12 @@ class SettingsDialog(QDialog):
         data_row.addWidget(folder)
         data_row.addStretch()
 
+        # Two columns, so the dialog is wide rather than tall: preferences on the left,
+        # sync, updates and data on the right.
         form = QFormLayout()
         form.setVerticalSpacing(12)
+        right = QFormLayout()
+        right.setVerticalSpacing(12)
         form.addRow(self._section(_("Look")))
         form.addRow(_("Appearance"), self.appearance)
         form.addRow(_("Language"), language_row)
@@ -145,23 +163,39 @@ class SettingsDialog(QDialog):
         form.addRow(_("Remind me"), self.remind)
         form.addRow(_("For"), remind_kinds)
         form.addRow("", remind_hint)
-        form.addRow(self._section(_("Sync")))
-        form.addRow("", self.sync_status)
-        form.addRow("", sync_row)
-        form.addRow(self._section(_("Updates")))
-        form.addRow("", update_row)
-        form.addRow(self._section(_("Your data")))
-        form.addRow("", data_row)
+
+        right.addRow(self._section(_("Sync")))
+        right.addRow(self.sync_status)
+        right.addRow(sync_row)
+        right.addRow(self._section(_("Updates")))
+        right.addRow(update_row)
+        right.addRow(self._section(_("Startup")))
+        for widget in self._startup_rows:
+            right.addRow(widget)
+        right.addRow(self._section(_("Your data")))
+        right.addRow(data_row)
         location = QLabel(str(services.storage.location), objectName="hint")
         location.setWordWrap(True)
-        form.addRow(_("Stored in"), location)
+        location.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        right.addRow(_("Stored in"), location)
+
+        columns = QHBoxLayout()
+        columns.setSpacing(36)
+        columns.addLayout(form, 1)
+        columns.addLayout(right, 1)
 
         close = QDialogButtonBox(QDialogButtonBox.Close)
         close.rejected.connect(self.accept)
+        bottom = QHBoxLayout()
+        bottom.addWidget(QLabel(_("Quire {version}").format(version=__version__),
+                                objectName="hint"))
+        bottom.addStretch()
+        bottom.addWidget(close)
         layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(QLabel(_("Quire {version}").format(version=__version__), objectName="hint"))
-        layout.addWidget(close)
+        layout.setContentsMargins(22, 18, 22, 16)
+        layout.addLayout(columns)
+        layout.addStretch()
+        layout.addLayout(bottom)
 
     @staticmethod
     def _section(text: str) -> QLabel:
@@ -217,6 +251,17 @@ class SettingsDialog(QDialog):
                                                     "here, and the cloud copy isn't deleted.")):
             self.services.sync.disconnect()
             self._show_sync()
+
+    def _start_on_login_toggled(self, on: bool):
+        try:
+            self.services.startup.set_start_on_login(on)
+            if on and not self.background.isChecked():
+                self.background.setChecked(True)  # it starts in the tray, so it must stay there
+        except ApplicationError as e:
+            self.start_on_login.blockSignals(True)
+            self.start_on_login.setChecked(not on)
+            self.start_on_login.blockSignals(False)
+            QMessageBox.warning(self, _("Startup"), _(str(e)))
 
     def _currency_picked(self):
         preferences().set_currency(self.currency.currentData())

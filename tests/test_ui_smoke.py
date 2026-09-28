@@ -949,3 +949,58 @@ def test_open_note_follows_changes_from_elsewhere(window, services):
     page._open(services.notes.note(other.id))
     services.notes.delete(other.id)
     assert page.note is None and page.editor.toPlainText() == ""
+
+
+def test_closing_hides_to_the_tray_and_quit_really_quits(services, app, monkeypatch):
+    from PySide6.QtCore import QObject, Signal
+
+    from quire.presentation import main_window as mw
+
+    class FakeTray(QObject):
+        show_requested = Signal()
+        quit_requested = Signal()
+
+        def __init__(self):
+            super().__init__()
+            self.told = []
+
+        def tell(self, title, text):
+            self.told.append(title)
+
+    quits = []
+    monkeypatch.setattr(mw.QApplication, "quit", lambda: quits.append(True))
+    tray = FakeTray()
+    window = mw.MainWindow(services, tray)
+    window.show()
+    window.close()
+    assert window.isHidden() and not quits  # still running
+    tray.show_requested.emit()
+    assert window.isVisible()
+
+    services.startup.set_background_on_close(False)
+    window.close()
+    assert quits == [True]  # with background off, closing quits
+
+    services.startup.set_background_on_close(True)
+    window.show()
+    tray.quit_requested.emit()
+    assert window.isHidden() and len(quits) == 3  # close() then quit()
+    window.deleteLater()
+
+
+def test_a_second_launch_brings_the_first_one_back(app, tmp_path):
+    from quire.presentation.background import SingleInstance, instance_name
+
+    name = instance_name(str(tmp_path / "quire.db"))
+    first = SingleInstance(name)
+    assert not first.already_running()
+    first.listen()
+    seen = []
+    first.activated.connect(lambda: seen.append(True))
+    assert SingleInstance(name).already_running()
+    for _i in range(20):
+        app.processEvents()
+        if seen:
+            break
+    assert seen == [True]
+    assert instance_name("/a.db") != instance_name("/b.db")  # --demo runs alongside

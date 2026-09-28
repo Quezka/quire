@@ -374,3 +374,15 @@ class UpdateInstaller(Protocol):
         """Install it. True: the installer took over and the app must quit now (it will be
         started again). False: installed, restart the app to use the new version."""
         ...
+
+
+# ---- starting with the system ---------------------------------------------------------
+
+class LoginItem(Protocol):
+    """Starting the app when the user logs in (an autostart entry, a Run key, …)."""
+
+    def supported(self) -> bool: ...
+    def enabled(self) -> bool: ...
+    def set_enabled(self, on: bool) -> None:
+        """Raises OSError if the system refused."""
+        ...

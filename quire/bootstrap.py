@@ -6,17 +6,19 @@ from pathlib import Path
 from .application.bus import ChangeBus
 from . import HOMEPAGE, __version__
 from .application.ports import (
-    CloudBackend, Clock, CredentialStore, ReleaseFeed, SchoolRegister, UpdateInstaller,
+    CloudBackend, Clock, CredentialStore, LoginItem, ReleaseFeed, SchoolRegister,
+    UpdateInstaller,
 )
 from .application.services import (
     FocusService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
-    SchoolSyncService, Services, SyncService, TaskService, TimetableService, UpdateService,
-    WorkService,
+    SchoolSyncService, Services, StartupService, SyncService, TaskService, TimetableService,
+    UpdateService, WorkService,
 )
 from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
 from .infrastructure.credentials import KeyringCredentialStore
 from .infrastructure.firebase import FirebaseCloud
+from .infrastructure.login_item import platform_login_item
 from .infrastructure.repositories import (
     SqliteCourseRepository, SqliteEventRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
@@ -35,6 +37,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                    sync_secrets: CredentialStore | None = None,
                    releases: ReleaseFeed | None = None,
                    installer: UpdateInstaller | None = None,
+                   login_item: LoginItem | None = None,
                    ) -> tuple[Services, SqliteDatabase]:
     db = SqliteDatabase(db_path)
     clock = clock or SystemClock()
@@ -67,6 +70,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
             releases or GitHubReleaseFeed(HOMEPAGE.removeprefix("https://github.com/"),
                                           __version__),
             installer or platform_installer(), settings, clock, __version__),
+        startup=StartupService(login_item or platform_login_item(), settings),
         storage=db,
         bus=bus,
     )

@@ -5,7 +5,7 @@ from datetime import date
 from PySide6.QtCore import QSettings, QSize, Qt, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence
 from PySide6.QtWidgets import (
-    QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox,
+    QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox,
     QSizePolicy, QStackedWidget, QToolButton, QVBoxLayout, QWidget,
 )
 
@@ -82,9 +82,14 @@ class MainWindow(QMainWindow):
              ("notes", N_("Notes")), ("school", N_("School")), ("briefcase", N_("Work")),
              ("timer", N_("Focus"))]
 
-    def __init__(self, services: Services):
+    def __init__(self, services: Services, tray=None):
         super().__init__()
         self.services = services
+        self.tray = tray  # None when the desktop has no tray: closing then quits
+        self._quitting = False
+        if tray is not None:
+            tray.show_requested.connect(self.bring_back)
+            tray.quit_requested.connect(self.quit_app)
         self.setWindowTitle(_("Quire"))
         self.resize(1240, 800)
         self.setMinimumSize(980, 620)
@@ -170,6 +175,7 @@ class MainWindow(QMainWindow):
         for i in range(len(self.PAGES)):
             self._shortcut(f"Ctrl+{i + 1}", lambda _checked=False, i=i: self.show_page(i))
         self._shortcut("Ctrl+N", self.new_note)
+        self._shortcut("Ctrl+Q", self.quit_app)
         self._shortcut("Ctrl+T", self.new_task)
         self._shortcut("Ctrl+Shift+E", self.new_event)
         self._shortcut("Ctrl+Shift+C", self.open_courses)
@@ -196,6 +202,8 @@ class MainWindow(QMainWindow):
             (_("Check for updates…"), None, lambda: self.updater.check_now()),
             (_("Keyboard shortcuts"), None, self.show_shortcuts),
             (_("About Quire"), None, self.about),
+            None,
+            (_("Quit Quire"), "Ctrl+Q", self.quit_app),
         ]
         for entry in entries:
             if entry is None:
@@ -288,4 +296,30 @@ class MainWindow(QMainWindow):
         settings = QSettings()
         settings.setValue("window/geometry", self.saveGeometry())
         settings.setValue("window/tab", self.stack.currentIndex())
+        if (self.tray is not None and not self._quitting
+                and self.services.startup.background_on_close()):
+            # Keep running in the tray: reminders and syncing carry on.
+            event.ignore()
+            self.hide()
+            if not settings.value("tray/told", False, type=bool):
+                settings.setValue("tray/told", True)
+                self.tray.tell(_("Quire is still running"), _(
+                    "Reminders and sync keep working. Click the tray icon to open Quire, or "
+                    "quit it from there or with Ctrl+Q."))
+            return
         super().closeEvent(event)
+        if self.tray is not None:
+            QApplication.quit()
+
+    def bring_back(self):
+        """Show the window again (tray click, or Quire launched a second time)."""
+        if self.isMinimized():
+            self.showNormal()
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def quit_app(self):
+        self._quitting = True
+        self.close()
+        QApplication.quit()

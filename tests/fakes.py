@@ -180,3 +180,22 @@ class FakeInstaller:
     def install(self, path):
         self.installed.append(path)
         return self.takes_over
+
+
+class FakeLoginItem:
+    def __init__(self, supported=True):
+        self._supported = supported
+        self.on = False
+        self.writes = 0
+
+    def supported(self):
+        return self._supported
+
+    def enabled(self):
+        return self.on
+
+    def set_enabled(self, on):
+        if not self._supported:
+            raise OSError("not supported")
+        self.on = on
+        self.writes += 1

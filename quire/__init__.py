@@ -3,7 +3,7 @@
 Release metadata below is the single source for packaging (the .deb, AppStream
 metainfo checks, Windows file properties) and the About dialog.
 """
-__version__ = "0.13.2"
+__version__ = "0.14.0"
 
 APP_NAME = "Quire"
 APP_ID = "io.github.quezka.Quire"  # reverse-DNS id used by desktop files and AppStream
