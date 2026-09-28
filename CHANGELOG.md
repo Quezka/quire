@@ -4,6 +4,17 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.13.2] - 2026-09-28
+
+### Changed
+- **Quire is free software**, under the GNU General Public License, version 3 or later. The
+  licence is in the repository, the packages and More → About Quire.
+- The README now has a **Privacy** section listing every connection Quire makes. There are no
+  analytics or telemetry.
+- Windows: the app is built without UPX compression. Antivirus software often distrusts
+  compressed executables, so this should make Avast and others less wary.
+- Groundwork for code-signed Windows releases through SignPath.
+
 ## [0.13.1] - 2026-09-28
 
 ### Fixed
