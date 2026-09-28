@@ -4,6 +4,23 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.15.0] - 2026-09-28
+
+### Added
+- **Quire for Android** (first version), attached to this release as
+  `Quire-0.15.0-android.apk`.
+  - **Today:** classes, events and work shifts, including overnight ones. Below them, what's
+    overdue or due soon, a quick "add a task for this day", and the day note.
+  - **Tasks:** grouped like the desktop (Overdue, Today, Next 7 days, …). Tick them off, or
+    open one to edit its type, course, due date and details.
+  - **Notes:** search, pinned first, and a full-screen editor with course, topic and pin.
+  - **Sync:** the same Firebase project and account as your computers. It syncs when the app
+    opens, about 10 seconds after a change, and every 15 minutes in the background. The newer
+    change wins, as on the desktop.
+  - It works offline, in English and Russian, in light and dark, with Quire's look and icon.
+  - Classeviva, work pay, the focus timer and reminders are for later versions. Things
+    synced from them (homework from Classeviva, your shifts) already show on the phone.
+
 ## [0.14.0] - 2026-09-28
 
 ### Added
