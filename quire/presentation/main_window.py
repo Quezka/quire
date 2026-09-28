@@ -279,6 +279,8 @@ class MainWindow(QMainWindow):
             f"<p>{_('Notes, day planner and school timetable.')}</p>"
             f"<p>{_('By {developer}').format(developer=DEVELOPER)} · "
             f"<a href='{HOMEPAGE}'>{HOMEPAGE}</a></p>"
+            f"<p>{_('Free software under the GNU General Public License, version 3 or later.')}"
+            f" <a href='{HOMEPAGE}/blob/main/LICENSE'>{_('Licence')}</a></p>"
             f"<p>{_('Your data lives in:')}<br><code>{self.services.storage.location}</code></p>")
 
     def closeEvent(self, event):

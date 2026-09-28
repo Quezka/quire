@@ -115,11 +115,16 @@ def main():
     mode.add_argument("--deb", action="store_true", help="installable .deb (Linux only)")
     mode.add_argument("--installer", action="store_true",
                       help="setup wizard .exe (Windows only, needs Inno Setup 6)")
+    mode.add_argument("--installer-only", action="store_true",
+                      help="wrap an existing dist/Quire (e.g. after signing it) in the setup")
     args = parser.parse_args()
     if args.deb and not sys.platform.startswith("linux"):
         parser.error("--deb can only be built on Linux")
-    if args.installer and sys.platform != "win32":
+    if (args.installer or args.installer_only) and sys.platform != "win32":
         parser.error("--installer can only be built on Windows")
+    if args.installer_only:
+        print(f"Installer: {build_installer(render_icons())}")
+        return
 
     import PyInstaller.__main__
 
@@ -133,6 +138,7 @@ def main():
         "--windowed",
         "--noconfirm",
         "--clean",
+        "--noupx",  # UPX-packed executables are a classic antivirus false positive
         "--onefile" if args.onefile else "--onedir",
         "--icon", str(icon),
         "--add-data", f"{ASSETS}{os.pathsep}quire/assets",

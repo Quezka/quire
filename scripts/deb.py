@@ -69,6 +69,16 @@ def build_deb(app_dir: Path, png_icon: Path, out_dir: Path, work_dir: Path) -> P
                          ("metainfo", f"{app_id}.metainfo.xml")]:
         (share / folder).mkdir(parents=True)
         shutil.copy(PACKAGING / name, share / folder / name)
+    doc = share / "doc" / "quire"
+    doc.mkdir(parents=True)
+    year = __import__("datetime").date.today().year
+    (doc / "copyright").write_text(
+        "Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/\n"
+        f"Upstream-Name: Quire\nSource: {quire.HOMEPAGE}\n\n"
+        f"Files: *\nCopyright: {year} {quire.DEVELOPER} <{quire.MAINTAINER_EMAIL}>\n"
+        "License: GPL-3.0-or-later\n"
+        " On Debian systems, the full text of the GNU General Public License version 3\n"
+        " can be found in /usr/share/common-licenses/GPL-3.\n")
     icons = share / "icons" / "hicolor"
     (icons / "scalable" / "apps").mkdir(parents=True)
     shutil.copy(ROOT / "quire" / "assets" / "icon.svg", icons / "scalable" / "apps" / f"{app_id}.svg")

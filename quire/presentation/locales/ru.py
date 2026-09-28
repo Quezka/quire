@@ -626,4 +626,6 @@ MESSAGES = {
     '{missed} of about {limit} hours ({percent}% of the year so far). About {left} hours left before the limit.': '{missed} из примерно {limit} часов ({percent}% года на сейчас). До предела осталось около {left} часов.',
     'Documents': 'Документы',
     'School calendar': 'Школьный календарь',
+    'Free software under the GNU General Public License, version 3 or later.': 'Свободная программа под лицензией GNU General Public License версии 3 или более поздней.',
+    'Licence': 'Лицензия',
 }

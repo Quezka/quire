@@ -286,3 +286,34 @@ differ from the English.
 3. Expose the new behaviour as a use-case method on a service. Return a DTO if the UI needs a
    shaped view of the data.
 4. Call that method from `presentation/`. UI code should never reach past the service.
+
+## Privacy
+
+Quire keeps your data in a SQLite file on your computer. It connects to other systems only
+for features you turn on, plus one check you can switch off:
+
+| Connects to | When | What is sent |
+| --- | --- | --- |
+| `web.spaggiari.eu` (Classeviva) | Only after you connect your school account | Your Classeviva login; Quire reads your register and marks notices you open as read |
+| Your own Firebase project (`googleapis.com`) | Only after you set up sync | Your synced notes, tasks, timetable, journal, work shifts and focus log, into *your* project |
+| `api.github.com`, `github.com` | About once a day to check for updates (switch off in Settings → Updates), and when you choose to update | Nothing personal: a request for the latest release, and the download |
+
+There are no analytics, telemetry or ads. Passwords and sign-in tokens are kept in your system's
+keyring, never in Quire's database.
+
+## Code signing policy
+
+Free code signing for the Windows builds is provided by [SignPath.io](https://about.signpath.io),
+with a certificate by the [SignPath Foundation](https://signpath.org).
+
+- **Committers and reviewers:** [Quezka](https://github.com/Quezka)
+- **Approvers:** [Quezka](https://github.com/Quezka)
+
+Every signed file is built by GitHub Actions from this repository's source, at the tagged
+release commit (see `.github/workflows/build.yml`). Each signing request is approved by hand.
+
+## Licence
+
+Quire is free software: you can redistribute it and/or modify it under the terms of the
+[GNU General Public License](LICENSE) as published by the Free Software Foundation, either
+version 3 of the License, or (at your option) any later version. It comes with no warranty.

@@ -20,47 +20,108 @@ jobs:
         env:
           QT_QPA_PLATFORM: offscreen
 
-  package:
+  package-linux:
     needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-latest
-            build: --deb
-            artifact: dist/*.deb
-          - os: windows-latest
-            build: --installer
-            artifact: dist/*-setup.exe
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - if: runner.os == 'Windows'
-        name: Install Inno Setup (if the runner lacks it)
-        shell: pwsh
-        run: |
-          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
-            choco install innosetup -y --no-progress
-          }
-      - if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
+      - run: sudo apt-get update && sudo apt-get install -y libegl1 libgl1 libxkbcommon0 libfontconfig1 libdbus-1-3
       - run: pip install -e ".[build]"
-      - run: python scripts/build.py ${{ matrix.build }}
+      - run: python scripts/build.py --deb
         env:
           QT_QPA_PLATFORM: offscreen
       - uses: actions/upload-artifact@v4
         with:
           # Only the release job needs these; releases keep the files for good.
           retention-days: 1
-          name: Quire-${{ runner.os }}
-          path: ${{ matrix.artifact }}
+          name: Quire-Linux
+          path: dist/*.deb
+
+  package-windows:
+    needs: test
+    runs-on: windows-latest
+    env:
+      # Releases are code-signed through SignPath once the project is set up there
+      # (repository variable SIGNPATH_ORGANIZATION_ID and secret SIGNPATH_API_TOKEN).
+      SIGN: ${{ startsWith(github.ref, 'refs/tags/v') && vars.SIGNPATH_ORGANIZATION_ID != '' }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install Inno Setup (if the runner lacks it)
+        shell: pwsh
+        run: |
+          if (-not (Test-Path "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe")) {
+            choco install innosetup -y --no-progress
+          }
+      - run: pip install -e ".[build]"
+      - name: Build the app folder
+        run: python scripts/build.py
+
+      # ---- sign Quire.exe and its libraries (SignPath artifact configuration "app") ----
+      - if: env.SIGN == 'true'
+        id: app-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quire-app-unsigned
+          path: dist/Quire
+          retention-days: 1
+      - if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: quire
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: app
+          github-artifact-id: ${{ steps.app-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/Quire-signed
+      - if: env.SIGN == 'true'
+        shell: pwsh
+        run: |
+          Remove-Item -Recurse -Force dist/Quire
+          Move-Item dist/Quire-signed dist/Quire
+
+      - name: Build the installer
+        run: python scripts/build.py --installer-only
+
+      # ---- sign the installer (SignPath artifact configuration "installer") ----
+      - if: env.SIGN == 'true'
+        id: setup-unsigned
+        uses: actions/upload-artifact@v4
+        with:
+          name: Quire-setup-unsigned
+          path: dist/*-setup.exe
+          retention-days: 1
+      - if: env.SIGN == 'true'
+        uses: signpath/github-action-submit-signing-request@v1
+        with:
+          api-token: ${{ secrets.SIGNPATH_API_TOKEN }}
+          organization-id: ${{ vars.SIGNPATH_ORGANIZATION_ID }}
+          project-slug: quire
+          signing-policy-slug: release-signing
+          artifact-configuration-slug: installer
+          github-artifact-id: ${{ steps.setup-unsigned.outputs.artifact-id }}
+          wait-for-completion: true
+          output-artifact-directory: dist/signed
+      - if: env.SIGN == 'true'
+        shell: pwsh
+        run: Move-Item -Force dist/signed/*-setup.exe dist/
+
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: Quire-Windows
+          path: dist/*-setup.exe
 
   release:
     # Pushing a tag like v1.2.3 publishes that version's .deb and .exe.
-    needs: package
+    needs: [package-linux, package-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
