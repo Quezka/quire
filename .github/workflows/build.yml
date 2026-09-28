@@ -119,9 +119,41 @@ jobs:
           name: Quire-Windows
           path: dist/*-setup.exe
 
+  package-android:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - name: Android tests
+        working-directory: android
+        run: ./gradlew --no-daemon testDebugUnitTest
+      - name: Build the APK (signed with the Quire key on this repository)
+        working-directory: android
+        env:
+          QUIRE_KEYSTORE_B64: ${{ secrets.QUIRE_KEYSTORE_B64 }}
+          QUIRE_KEYSTORE_PASSWORD: ${{ secrets.QUIRE_KEYSTORE_PASSWORD }}
+        run: |
+          if [ -n "$QUIRE_KEYSTORE_B64" ]; then
+            echo "$QUIRE_KEYSTORE_B64" | base64 -d > "$RUNNER_TEMP/quire.jks"
+            export QUIRE_KEYSTORE="$RUNNER_TEMP/quire.jks"
+          fi
+          ./gradlew --no-daemon assembleRelease
+          version=$(python3 -c "import re; print(re.search(r'__version__ = \"(.+?)\"', open('../quire/__init__.py').read()).group(1))")
+          mkdir -p ../dist
+          cp app/build/outputs/apk/release/app-release*.apk "../dist/Quire-$version-android.apk"
+      - uses: actions/upload-artifact@v4
+        with:
+          retention-days: 1
+          name: Quire-Android
+          path: dist/*.apk
+
   release:
     # Pushing a tag like v1.2.3 publishes that version's .deb and .exe.
-    needs: [package-linux, package-windows]
+    needs: [package-linux, package-windows, package-android]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -155,6 +187,11 @@ jobs:
           for your user (no admin needed), adds it to the Start menu and to Settings → Apps for
           uninstalling, and upgrades an older install in place. Your data is kept. It isn't
           code-signed, so SmartScreen may warn you: choose *More info → Run anyway*.
+
+          **Android:** download `Quire-…-android.apk` on your phone and open it (allow installing
+          from your browser when asked). Later versions install over it, keeping your data. Set up
+          sync in its Settings with the same Firebase project and account as on your computer.
           NOTES
           gh release create "$GITHUB_REF_NAME" --verify-tag --title "Quire $VERSION" \
-            --notes-file notes.md artifacts/Quire-Linux/*.deb artifacts/Quire-Windows/*-setup.exe
+            --notes-file notes.md artifacts/Quire-Linux/*.deb artifacts/Quire-Windows/*-setup.exe \
+            artifacts/Quire-Android/*.apk

@@ -1,0 +1,513 @@
+[
+ {
+  "kind": "course",
+  "uid": "ef320d656fb4b200296060254b0f14fb",
+  "modified": "2026-09-28T05:36:24.042Z",
+  "deleted": false,
+  "data": {
+   "name": "Mathematics",
+   "teacher": "Ms. Okafor",
+   "room": "B12",
+   "color": "#4f7cff",
+   "external_id": null,
+   "slots": [
+    [
+     0,
+     510,
+     560,
+     ""
+    ],
+    [
+     2,
+     510,
+     560,
+     ""
+    ],
+    [
+     4,
+     630,
+     680,
+     ""
+    ]
+   ]
+  }
+ },
+ {
+  "kind": "course",
+  "uid": "2ea2a9d328e5dda749054cea74fc7e5c",
+  "modified": "2026-09-28T05:36:24.043Z",
+  "deleted": false,
+  "data": {
+   "name": "Biology",
+   "teacher": "Mr. Lindqvist",
+   "room": "Lab 2",
+   "color": "#30a46c",
+   "external_id": null,
+   "slots": [
+    [
+     0,
+     570,
+     620,
+     ""
+    ],
+    [
+     3,
+     780,
+     870,
+     ""
+    ]
+   ]
+  }
+ },
+ {
+  "kind": "course",
+  "uid": "a97f383fefbc0329a34e35dd69dcdd04",
+  "modified": "2026-09-28T05:36:24.043Z",
+  "deleted": false,
+  "data": {
+   "name": "English Literature",
+   "teacher": "Mrs. Patel",
+   "room": "A04",
+   "color": "#8e4ec6",
+   "external_id": null,
+   "slots": [
+    [
+     1,
+     510,
+     560,
+     ""
+    ],
+    [
+     3,
+     510,
+     560,
+     ""
+    ],
+    [
+     4,
+     510,
+     560,
+     ""
+    ]
+   ]
+  }
+ },
+ {
+  "kind": "course",
+  "uid": "27bb46c7415e3a2d0116bea7ca429fe6",
+  "modified": "2026-09-28T05:36:24.043Z",
+  "deleted": false,
+  "data": {
+   "name": "History",
+   "teacher": "Mr. Duarte",
+   "room": "C07",
+   "color": "#f5a524",
+   "external_id": null,
+   "slots": [
+    [
+     1,
+     630,
+     680,
+     ""
+    ],
+    [
+     4,
+     780,
+     830,
+     ""
+    ]
+   ]
+  }
+ },
+ {
+  "kind": "course",
+  "uid": "aea907e50c562df07ac440c8b2bc6cb3",
+  "modified": "2026-09-28T05:36:24.043Z",
+  "deleted": false,
+  "data": {
+   "name": "Chemistry",
+   "teacher": "Dr. Nakamura",
+   "room": "Lab 1",
+   "color": "#e5484d",
+   "external_id": null,
+   "slots": [
+    [
+     0,
+     780,
+     870,
+     ""
+    ],
+    [
+     2,
+     630,
+     680,
+     ""
+    ]
+   ]
+  }
+ },
+ {
+  "kind": "course",
+  "uid": "421e95bb6fba860ec0d1e3a7fd753e66",
+  "modified": "2026-09-28T05:36:24.043Z",
+  "deleted": false,
+  "data": {
+   "name": "PE",
+   "teacher": "Coach Rivera",
+   "room": "Gym",
+   "color": "#12a594",
+   "external_id": null,
+   "slots": [
+    [
+     2,
+     840,
+     930,
+     ""
+    ]
+   ]
+  }
+ },
+ {
+  "kind": "job",
+  "uid": "59d372536f86fa5489fd9c757bcb4fab",
+  "modified": "2026-09-28T05:36:24.047Z",
+  "deleted": false,
+  "data": {
+   "name": "Pizzeria Da Mario",
+   "color": "#f76b15",
+   "hourly_rate": 8.5,
+   "deductions": 9.19,
+   "patterns": [
+    [
+     1,
+     1080,
+     270,
+     30,
+     "2026-09-21",
+     null
+    ],
+    [
+     5,
+     1140,
+     360,
+     30,
+     "2026-09-21",
+     null
+    ]
+   ],
+   "skips": []
+  }
+ },
+ {
+  "kind": "job",
+  "uid": "17aceddf0f581ebaadd4106a00fa0160",
+  "modified": "2026-09-28T05:36:24.047Z",
+  "deleted": false,
+  "data": {
+   "name": "Maths tutoring",
+   "color": "#12a594",
+   "hourly_rate": 15.0,
+   "deductions": 20.0,
+   "patterns": [],
+   "skips": []
+  }
+ },
+ {
+  "kind": "event",
+  "uid": "651643f1d78cdf9235214bf976988713",
+  "modified": "2026-09-28T05:36:24.044Z",
+  "deleted": false,
+  "data": {
+   "day": "2026-09-23",
+   "start": 720,
+   "end": 765,
+   "title": "Lunch with Sam",
+   "details": "",
+   "color": "#978365"
+  }
+ },
+ {
+  "kind": "event",
+  "uid": "4bba5e53e88ea1a67d90ec089d4fbeff",
+  "modified": "2026-09-28T05:36:24.044Z",
+  "deleted": false,
+  "data": {
+   "day": "2026-09-23",
+   "start": 960,
+   "end": 1050,
+   "title": "Study group",
+   "details": "Library, 2nd floor",
+   "color": "#0090ff"
+  }
+ },
+ {
+  "kind": "event",
+  "uid": "0cd6eb0f91e12d68eff47effa93f6463",
+  "modified": "2026-09-28T05:36:24.044Z",
+  "deleted": false,
+  "data": {
+   "day": "2026-09-25",
+   "start": 1020,
+   "end": 1140,
+   "title": "Football practice",
+   "details": "",
+   "color": "#12a594"
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "5d30cd1f7200a66e57223035faa95ed0",
+  "modified": "2026-09-28T05:36:24.044Z",
+  "deleted": false,
+  "data": {
+   "title": "Problem set 3 (q1–12)",
+   "kind": "homework",
+   "course": "ef320d656fb4b200296060254b0f14fb",
+   "due": "2026-09-24",
+   "done": false,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "d3c78fa9ee04c99c1964e7d433e1fd75",
+  "modified": "2026-09-28T05:36:24.044Z",
+  "deleted": false,
+  "data": {
+   "title": "Read chapters 5–6 of Frankenstein",
+   "kind": "reading",
+   "course": "a97f383fefbc0329a34e35dd69dcdd04",
+   "due": "2026-09-26",
+   "done": false,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "7bb2c25fcf784da1c552e5b232531ffd",
+  "modified": "2026-09-28T05:36:24.045Z",
+  "deleted": false,
+  "data": {
+   "title": "Cell respiration lab report",
+   "kind": "assignment",
+   "course": "2ea2a9d328e5dda749054cea74fc7e5c",
+   "due": "2026-09-29",
+   "done": false,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "b12db96ad029de3d02b30fb93edabefd",
+  "modified": "2026-09-28T05:36:24.045Z",
+  "deleted": false,
+  "data": {
+   "title": "Unit test: Industrial Revolution",
+   "kind": "exam",
+   "course": "27bb46c7415e3a2d0116bea7ca429fe6",
+   "due": "2026-10-02",
+   "done": false,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "36af9259d3557cf9ce404756558df2c8",
+  "modified": "2026-09-28T05:36:24.045Z",
+  "deleted": false,
+  "data": {
+   "title": "Titration pre-lab questions",
+   "kind": "homework",
+   "course": "aea907e50c562df07ac440c8b2bc6cb3",
+   "due": "2026-09-22",
+   "done": false,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "bca4a793cb3eaaa71778fb59bff8f344",
+  "modified": "2026-09-28T05:36:24.045Z",
+  "deleted": false,
+  "data": {
+   "title": "Buy a new graphing calculator",
+   "kind": "task",
+   "course": null,
+   "due": "2026-09-23",
+   "done": false,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "dba95d64f0496e6de53cfe724403659d",
+  "modified": "2026-09-28T05:36:24.045Z",
+  "deleted": false,
+  "data": {
+   "title": "Return library books",
+   "kind": "task",
+   "course": null,
+   "due": null,
+   "done": false,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "task",
+  "uid": "2b6a60ce41917c91b57fd1abc07f8935",
+  "modified": "2026-09-28T05:36:24.045Z",
+  "deleted": false,
+  "data": {
+   "title": "Vocabulary list 4",
+   "kind": "homework",
+   "course": "a97f383fefbc0329a34e35dd69dcdd04",
+   "due": "2026-09-21",
+   "done": true,
+   "details": "",
+   "external_id": null
+  }
+ },
+ {
+  "kind": "note",
+  "uid": "1b77af65e406dd79999c4f3042a3c2b3",
+  "modified": "2026-09-28T05:36:24.046Z",
+  "deleted": false,
+  "data": {
+   "title": "Biology: cellular respiration",
+   "body": "# Biology: cellular respiration\n\n**Equation:** C6H12O6 + 6 O2 → 6 CO2 + 6 H2O + energy (ATP)\n\n## Stages\n1. Glycolysis: cytoplasm, 2 ATP\n2. Krebs cycle: mitochondrial matrix\n3. Electron transport chain: inner membrane, ~34 ATP\n\n- [x] Review diagram on p. 112\n- [ ] Ask about anaerobic pathways\n",
+   "course": "2ea2a9d328e5dda749054cea74fc7e5c",
+   "pinned": false,
+   "updated": "2026-09-23T12:00:00",
+   "topic": "Cell biology"
+  }
+ },
+ {
+  "kind": "note",
+  "uid": "07083460e0bc7ec7b64d952bafffe13c",
+  "modified": "2026-09-28T05:36:24.046Z",
+  "deleted": false,
+  "data": {
+   "title": "Mitochondria",
+   "body": "# Mitochondria\n\nThe powerhouse of the cell: inner membrane folds (cristae) increase surface area for the electron transport chain.\n",
+   "course": "2ea2a9d328e5dda749054cea74fc7e5c",
+   "pinned": false,
+   "updated": "2026-09-23T12:00:00",
+   "topic": "Cell biology"
+  }
+ },
+ {
+  "kind": "note",
+  "uid": "bb769af34931e950fb8d8b9d97e79b89",
+  "modified": "2026-09-28T05:36:24.046Z",
+  "deleted": false,
+  "data": {
+   "title": "Mendel's laws",
+   "body": "# Mendel's laws\n\n1. Segregation\n2. Independent assortment\n",
+   "course": "2ea2a9d328e5dda749054cea74fc7e5c",
+   "pinned": false,
+   "updated": "2026-09-23T12:00:00",
+   "topic": "Genetics"
+  }
+ },
+ {
+  "kind": "note",
+  "uid": "d362306436912b0d5af6a924b18b08ba",
+  "modified": "2026-09-28T05:36:24.046Z",
+  "deleted": false,
+  "data": {
+   "title": "Frankenstein: themes",
+   "body": "# Frankenstein: themes\n\n- Ambition and its costs\n- Isolation\n- *Nature vs. nurture*\n\n> \"Beware; for I am fearless, and therefore powerful.\"\n",
+   "course": "a97f383fefbc0329a34e35dd69dcdd04",
+   "pinned": false,
+   "updated": "2026-09-23T12:00:00",
+   "topic": "Frankenstein"
+  }
+ },
+ {
+  "kind": "note",
+  "uid": "454483f4c777067119e189e4b0372fc7",
+  "modified": "2026-09-28T05:36:24.047Z",
+  "deleted": false,
+  "data": {
+   "title": "Ideas",
+   "body": "# Ideas\n\nThings I want to try this term:\n\n- Pomodoro for maths homework\n- Join the robotics club\n",
+   "course": null,
+   "pinned": true,
+   "updated": "2026-09-23T12:00:00",
+   "topic": ""
+  }
+ },
+ {
+  "kind": "journal",
+  "uid": "day:2026-09-23",
+  "modified": "2026-09-28T05:36:24.048Z",
+  "deleted": false,
+  "data": {
+   "day": "2026-09-23",
+   "body": "Remember the permission slip"
+  }
+ },
+ {
+  "kind": "shift",
+  "uid": "fb99b9d5bcd225d7bc0015d6f7db2126",
+  "modified": "2026-09-28T05:36:24.048Z",
+  "deleted": false,
+  "data": {
+   "job": "17aceddf0f581ebaadd4106a00fa0160",
+   "day": "2026-09-24",
+   "start": 960,
+   "duration": 90,
+   "break": 0,
+   "notes": ""
+  }
+ },
+ {
+  "kind": "shift",
+  "uid": "7154c7ebe298139fcf97590ce66635f6",
+  "modified": "2026-09-28T05:36:24.048Z",
+  "deleted": false,
+  "data": {
+   "job": "17aceddf0f581ebaadd4106a00fa0160",
+   "day": "2026-10-01",
+   "start": 960,
+   "duration": 90,
+   "break": 0,
+   "notes": ""
+  }
+ },
+ {
+  "kind": "shift",
+  "uid": "2178691cbc7595acde0622063f513216",
+  "modified": "2026-09-28T05:36:24.048Z",
+  "deleted": false,
+  "data": {
+   "job": "17aceddf0f581ebaadd4106a00fa0160",
+   "day": "2026-10-08",
+   "start": 960,
+   "duration": 90,
+   "break": 0,
+   "notes": ""
+  }
+ },
+ {
+  "kind": "shift",
+  "uid": "1cec8e2296c65b844976255703ecaf42",
+  "modified": "2026-09-28T05:36:24.048Z",
+  "deleted": false,
+  "data": {
+   "job": "17aceddf0f581ebaadd4106a00fa0160",
+   "day": "2026-10-15",
+   "start": 960,
+   "duration": 90,
+   "break": 0,
+   "notes": ""
+  }
+ }
+]

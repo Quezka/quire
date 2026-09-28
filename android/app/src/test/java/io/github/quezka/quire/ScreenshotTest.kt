@@ -1,0 +1,103 @@
+package io.github.quezka.quire
+
+import android.graphics.Bitmap
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.padding
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.Notes
+import androidx.compose.material.icons.filled.CheckCircle
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Today
+import androidx.compose.material3.Icon
+import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.test.junit4.createAndroidComposeRule
+import io.github.quezka.quire.data.MemoryRowStore
+import io.github.quezka.quire.data.Records
+import io.github.quezka.quire.data.Repository
+import io.github.quezka.quire.data.SyncRecord
+import io.github.quezka.quire.ui.NotesScreen
+import io.github.quezka.quire.ui.QuireTheme
+import io.github.quezka.quire.ui.TasksScreen
+import io.github.quezka.quire.ui.TodayScreen
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
+import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.jsonArray
+import kotlinx.serialization.json.jsonObject
+import org.junit.Rule
+import org.junit.Test
+import org.junit.runner.RunWith
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.annotation.Config
+import org.robolectric.annotation.GraphicsMode
+import java.io.File
+import java.time.LocalDate
+
+/** Renders screens with the desktop's demo data to build/screenshots (set SCREENSHOTS=1). */
+@RunWith(RobolectricTestRunner::class)
+@GraphicsMode(GraphicsMode.Mode.NATIVE)
+@Config(sdk = [34], qualifiers = "w400dp-h860dp-xxhdpi", application = android.app.Application::class)
+class ScreenshotTest {
+    @get:Rule val compose = createAndroidComposeRule<androidx.activity.ComponentActivity>()
+    private val today = LocalDate.of(2026, 9, 23)
+
+    private fun repo(): Repository {
+        val text = javaClass.classLoader!!.getResource("desktop_records.json")!!.readText()
+        val records = Records(MemoryRowStore())
+        records.apply(Json.parseToJsonElement(text).jsonArray.map {
+            val o = it.jsonObject
+            fun s(k: String) = (o[k] as JsonPrimitive).content
+            SyncRecord(s("kind"), s("uid"), s("modified"),
+                (o["deleted"] as JsonPrimitive).booleanOrNull ?: false, o["data"] as? JsonObject)
+        })
+        return Repository(records, today = { today })
+    }
+
+    @Composable
+    private fun Shell(tab: Int, content: @Composable () -> Unit) = QuireTheme {
+        Scaffold(bottomBar = {
+            NavigationBar {
+                listOf(R.string.nav_today to Icons.Filled.Today, R.string.nav_tasks to Icons.Filled.CheckCircle,
+                    R.string.nav_notes to Icons.AutoMirrored.Filled.Notes, R.string.nav_settings to Icons.Filled.Settings)
+                    .forEachIndexed { i, (label, icon) ->
+                        NavigationBarItem(selected = i == tab, onClick = {}, icon = { Icon(icon, null) },
+                            label = { Text(androidx.compose.ui.res.stringResource(label)) })
+                    }
+            }
+        }) { padding -> Box(Modifier.padding(padding)) { content() } }
+    }
+
+    private fun shoot(name: String) {
+        if (System.getenv("SCREENSHOTS") == null) return
+        compose.waitForIdle()
+        val view = compose.activity.window.decorView
+        val bitmap = Bitmap.createBitmap(view.width, view.height, Bitmap.Config.ARGB_8888)
+        view.draw(android.graphics.Canvas(bitmap))
+        val out = File("build/screenshots").apply { mkdirs() }.resolve("$name.png")
+        out.outputStream().use { bitmap.compress(Bitmap.CompressFormat.PNG, 100, it) }
+    }
+
+    @Test fun today() {
+        val repo = repo()
+        compose.setContent { Shell(0) { TodayScreen(repo, 0) {} } }
+        shoot("today")
+    }
+
+    @Test fun tasks() {
+        val repo = repo()
+        compose.setContent { Shell(1) { TasksScreen(repo, 0) {} } }
+        shoot("tasks")
+    }
+
+    @Test fun notes() {
+        val repo = repo()
+        compose.setContent { Shell(2) { NotesScreen(repo, 0) {} } }
+        shoot("notes")
+    }
+}

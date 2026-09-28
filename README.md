@@ -119,6 +119,23 @@ your data sits in an account only you control.
 - **Sign-in:** a sign-in token is kept in the system keyring; your password isn't stored.
 - **Sign out** stops syncing that computer. Its data stays, and the cloud copy isn't deleted.
 
+### Android app
+
+Quire for Android (`android/`, Kotlin and Jetpack Compose) covers the everyday parts:
+- **Today:** classes, events and work shifts, what's due, and the day note.
+- **Tasks:** with an editor.
+- **Notes:** with course and topic.
+- **Sync:** the same Firebase project and account as on your computers.
+
+It works offline and syncs when the app opens, about 10 seconds after a change, and every
+15 minutes in the background. Install `Quire-<version>-android.apk` from the releases. Later
+versions install over it.
+
+The phone stores records in the same format sync uses (`android/app/src/main/java/.../data`).
+Tests read real desktop records (`android/app/src/test/resources/desktop_records.json`), so the
+two apps can't drift apart silently. Build it with `cd android && ./gradlew assembleRelease`
+(needs JDK 17 and the Android SDK).
+
 ### Updates
 
 Quire updates itself from its GitHub releases. It checks about once a day (switch that off
