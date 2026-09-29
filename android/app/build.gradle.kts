@@ -28,6 +28,8 @@ android {
         targetSdk = 35
         versionCode = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
         versionName = desktopVersion
+        // Phones only (Tesseract ships native code per ABI); keeps the APK small.
+        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
     }
 
     signingConfigs {
@@ -55,6 +57,7 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+    androidResources { noCompress += "traineddata" }
     buildFeatures {
         compose = true
         buildConfig = true
@@ -82,6 +85,9 @@ dependencies {
     implementation("androidx.core:core-ktx:1.15.0")
     // Scanning the computer's "set up your phone" QR code (Apache-2.0).
     implementation("com.journeyapps:zxing-android-embedded:4.3.0")
+    // Reading printed handouts into notes, offline (Apache-2.0; models in assets/tessdata).
+    implementation("cz.adaptech.tesseract4android:tesseract4android:4.7.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     debugImplementation("androidx.compose.ui:ui-tooling")
 
     testImplementation("junit:junit:4.13.2")

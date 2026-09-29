@@ -162,6 +162,7 @@ def note_snippet(body: str, length: int = 90) -> str:
     text = re.sub(r"^#{1,6}\s+|(?<=\s)#{1,6}\s+", "", text)
     text = re.sub(r"[-*+]\s+\[[ xX]\]\s+|(?:^|(?<=\s))[-*+>]\s+|\*\*|__|`|~~", "", text)
     text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = re.sub(r"(?<![\w*])[*_](?=\S)(.+?)(?<=\S)[*_](?![\w*])", r"\1", text)
     text = " ".join(text.split())
     return text if len(text) <= length else text[: length - 1].rstrip() + "…"
 

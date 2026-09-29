@@ -143,6 +143,16 @@ class ScreenshotTest {
         shoot("notes")
     }
 
+    @Test fun noteEditor() {
+        val repo = repo()
+        val note = repo.saveNote(io.github.quezka.quire.domain.Note("n1",
+            "# Mitochondria\n\nThe **powerhouse** of the cell: inner membrane folds (*cristae*).\n\n## To revise\n" +
+                "- [x] Electron transport chain\n- [ ] Krebs cycle\n- [ ] ATP synthase, see `p. 112`\n\n> Ask about uncoupling",
+            topic = "Cell biology"))
+        compose.setContent { QuireTheme { io.github.quezka.quire.ui.NoteEditor(repo, 0, note.uid) {} } }
+        shoot("note_editor")
+    }
+
     @Test fun more() {
         val c = container()
         compose.setContent { Shell(4) { MoreScreen(c) {} } }

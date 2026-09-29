@@ -102,3 +102,4 @@ def test_the_list_shows_the_text_after_the_title():
     body = "# Mitochondria\n\nThe **powerhouse** of the cell\n- [ ] see [p. 4](http://x)"
     assert note_snippet(body) == "The powerhouse of the cell see p. 4"
     assert note_snippet("Only a title") == ""
+    assert note_snippet("T\n*Nature vs. nurture* and _this_") == "Nature vs. nurture and this"

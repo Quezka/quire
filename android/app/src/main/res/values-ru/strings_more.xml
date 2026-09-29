@@ -216,4 +216,32 @@
         <item quantity="many">%d часов</item>
         <item quantity="other">%d часа</item>
     </plurals>
+    <string name="scanned_title"># Скан страницы, %1$s</string>
+    <string name="all_notes">Все</string>
+    <string name="no_matching_notes">Подходящих заметок нет.</string>
+    <string name="no_topic">Без темы</string>
+    <string name="note_deleted">Заметка удалена</string>
+    <string name="undo">Отменить</string>
+    <string name="scan_page">Сканировать страницу</string>
+    <string name="from_picture">Текст с картинки</string>
+    <string name="no_text_found">На снимке не найден текст. Попробуйте более чёткое и ровное фото при хорошем свете.</string>
+    <string name="reading_page">Читаю страницу…</string>
+    <string name="edit_note">Редактировать</string>
+    <string name="preview">Предпросмотр</string>
+    <string name="heading">Заголовок</string>
+    <string name="bold">Жирный</string>
+    <string name="italic">Курсив</string>
+    <string name="bulleted_list">Маркированный список</string>
+    <string name="checklist">Чек-лист</string>
+    <string name="quote">Цитата</string>
+    <string name="code">Код</string>
+    <string name="bold_placeholder">жирный</string>
+    <string name="italic_placeholder">курсив</string>
+    <string name="code_placeholder">код</string>
+    <plurals name="words">
+        <item quantity="one">%d слово</item>
+        <item quantity="few">%d слова</item>
+        <item quantity="many">%d слов</item>
+        <item quantity="other">%d слова</item>
+    </plurals>
 </resources>

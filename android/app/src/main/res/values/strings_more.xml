@@ -202,4 +202,30 @@
         <item quantity="one">%d hour</item>
         <item quantity="other">%d hours</item>
     </plurals>
+    <string name="scanned_title"># Scanned page, %1$s</string>
+    <string name="all_notes">All</string>
+    <string name="no_matching_notes">No notes match.</string>
+    <string name="no_topic">No topic</string>
+    <string name="note_deleted">Note deleted</string>
+    <string name="undo">Undo</string>
+    <string name="scan_page">Scan a page</string>
+    <string name="from_picture">Text from a picture</string>
+    <string name="no_text_found">No text found in that picture. Try a sharper, flatter photo in good light.</string>
+    <string name="reading_page">Reading the page…</string>
+    <string name="edit_note">Edit</string>
+    <string name="preview">Preview</string>
+    <string name="heading">Heading</string>
+    <string name="bold">Bold</string>
+    <string name="italic">Italic</string>
+    <string name="bulleted_list">Bulleted list</string>
+    <string name="checklist">Checklist</string>
+    <string name="quote">Quote</string>
+    <string name="code">Code</string>
+    <string name="bold_placeholder">bold</string>
+    <string name="italic_placeholder">italic</string>
+    <string name="code_placeholder">code</string>
+    <plurals name="words">
+        <item quantity="one">%d word</item>
+        <item quantity="other">%d words</item>
+    </plurals>
 </resources>

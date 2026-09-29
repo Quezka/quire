@@ -57,7 +57,7 @@
     <string name="search_notes">Поиск заметок</string>
     <string name="no_notes">Заметок пока нет. Начните новую кнопкой +.</string>
     <string name="new_note">Новая заметка</string>
-    <string name="note_hint">Начните печатать… Первая строка станет заголовком.</string>
+    <string name="note_hint">Начните печатать… Первая строка станет заголовком. Работает Markdown: # заголовки, **жирный**, - [ ] чек-листы.</string>
     <string name="topic">Тема</string>
     <string name="pin">Закрепить</string>
     <string name="unpin">Открепить</string>

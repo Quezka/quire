@@ -59,7 +59,7 @@
     <string name="search_notes">Search notes</string>
     <string name="no_notes">No notes yet. Start one with +.</string>
     <string name="new_note">New note</string>
-    <string name="note_hint">Start typing… The first line is the title.</string>
+    <string name="note_hint">Start typing… The first line is the title. Markdown works: # headings, **bold**, - [ ] checklists.</string>
     <string name="topic">Topic</string>
     <string name="pin">Pin</string>
     <string name="unpin">Unpin</string>
