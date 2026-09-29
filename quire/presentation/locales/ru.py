@@ -578,6 +578,20 @@ MESSAGES = {
     'LATE ENTRIES': 'ОПОЗДАНИЯ',
     'Late entry, hour {hour}': 'Опоздание, пришёл к {hour}-му уроку',
     'Left early, hour {hour}': 'Ранний уход, с {hour}-го урока',
+    'Late entry, hour not recorded': 'Опоздание, урок не указан',
+    'Left early, hour not recorded': 'Ранний уход, урок не указан',
+    'Lesson hour': 'Номер урока',
+    "The school didn't record the hour you came in. Which lesson hour was it?":
+        'Школа не указала, к какому уроку вы пришли. Какой это был урок?',
+    "The school didn't record the hour you left. Which lesson hour was it?":
+        'Школа не указала, с какого урока вы ушли. Какой это был урок?',
+    'Forget': 'Забыть',
+    "That absence isn't in the register any more. Sync again.":
+        'Этого пропуска больше нет в журнале. Синхронизируйте ещё раз.',
+    'The hour must be between 1 and 10.': 'Номер урока должен быть от 1 до 10.',
+    'hour entered by you': 'урок указан вами',
+    "Double-click a late entry or early exit to enter an hour the school didn't record.":
+        'Дважды щёлкните по опозданию или раннему уходу, чтобы указать урок, который школа не записала.',
     'Line: your average over time · dots: each mark · dashed: the pass mark': 'Линия: средний балл со временем · точки: оценки · пунктир: проходной балл',
     "Missing more than a quarter of the year's lesson hours can mean repeating the year, unless the school grants an exception. The year's hours are estimated from the school calendar and your timetable.": 'Если пропустить больше четверти учебных часов за год, можно остаться на второй год, если школа не сделает исключение. Число часов за год оценивается по школьному календарю и вашему расписанию.',
     'New': 'Новое',

@@ -201,10 +201,18 @@ class FocusEvent:
 class AbsenceRecord:
     day: date
     kind: AbsenceKind
-    hour: int | None
+    hour: int | None  # from the register, or else the one you entered
     justified: bool
     reason: str
     hours_missed: int
+    id: str = ""
+    hour_is_yours: bool = False  # the register has no hour; `hour` is what you entered
+
+    @property
+    def needs_hour(self) -> bool:
+        """A late entry or early exit the register gave no hour for."""
+        return self.kind in (AbsenceKind.LATE, AbsenceKind.EARLY_EXIT) and (
+            self.hour is None or self.hour_is_yours)
 
 
 @dataclass(frozen=True)
@@ -306,8 +314,9 @@ def focus_settings_data(s: FocusSettings) -> FocusSettingsData:
 
 
 def absence_record(a: Absence, hours_that_day: int) -> AbsenceRecord:
-    return AbsenceRecord(a.day, a.kind, a.hour, a.justified, a.reason,
-                         a.hours_missed(hours_that_day))
+    return AbsenceRecord(a.day, a.kind, a.known_hour, a.justified, a.reason,
+                         a.hours_missed(hours_that_day), a.external_id,
+                         a.hour is None and a.own_hour is not None)
 
 
 def notice_record(n: Notice) -> NoticeRecord:

@@ -241,9 +241,15 @@ class SchoolSyncService:
         new_notices: tuple[str, ...] = ()
         new_absences = 0
         if snap.absences is not None:
-            known = {a.external_id for a in self._records.absences()}
-            absences = [replace(a, external_id=self._external("absence", a.external_id))
-                        for a in snap.absences]
+            local = {a.external_id: a for a in self._records.absences()}
+            known = set(local)
+            absences = []
+            for a in snap.absences:
+                key = self._external("absence", a.external_id)
+                previous = local.get(key)
+                # Keep an hour you entered for it; the register never sends one back.
+                absences.append(replace(a, external_id=key,
+                                        own_hour=previous.own_hour if previous else None))
             new_absences = sum(1 for a in absences if a.external_id not in known)
             self._records.replace_absences(absences)
         if snap.notices is not None:

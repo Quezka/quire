@@ -324,12 +324,13 @@ class SqliteSchoolRecordRepository(_Repo):
     def absences(self):
         return [Absence(d["id"], date.fromisoformat(d["day"]), AbsenceKind(d["kind"]),
                         d.get("hour"), d.get("justified", False), d.get("reason", ""),
-                        d.get("hours", 0)) for d in self._items("absence")]
+                        d.get("hours", 0), d.get("own_hour")) for d in self._items("absence")]
 
     def replace_absences(self, absences):
         self._replace("absence", [(a.external_id, a.day.isoformat(), {
             "id": a.external_id, "day": a.day.isoformat(), "kind": a.kind.value,
-            "hour": a.hour, "justified": a.justified, "reason": a.reason, "hours": a.hours})
+            "hour": a.hour, "justified": a.justified, "reason": a.reason, "hours": a.hours,
+            "own_hour": a.own_hour})
             for a in absences])
 
     def notices(self):

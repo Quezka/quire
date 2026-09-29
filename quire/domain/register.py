@@ -29,6 +29,13 @@ class Absence:
     justified: bool = False
     reason: str = ""
     hours: int = 0  # hours the register itself counted, when it says (0: unknown)
+    # The hour you entered yourself, for when the school recorded the late entry or early
+    # exit without one (Classeviva then sends no hour at all).
+    own_hour: int | None = None
+
+    @property
+    def known_hour(self) -> int | None:
+        return self.hour if self.hour is not None else self.own_hour
 
     def hours_missed(self, hours_that_day: int) -> int:
         """Lesson hours lost, given how many hours that day has (from the timetable)."""
@@ -37,9 +44,9 @@ class Absence:
         if self.kind is AbsenceKind.ABSENT:
             return hours_that_day
         if self.kind is AbsenceKind.LATE:  # "entered at the 2nd hour": missed the 1st
-            return max((self.hour or 2) - 1, 0)
+            return max((self.known_hour or 2) - 1, 0)
         if self.kind is AbsenceKind.EARLY_EXIT:  # "left at the 5th hour": missed 5th onwards
-            return max(hours_that_day - (self.hour or hours_that_day) + 1, 0)
+            return max(hours_that_day - (self.known_hour or hours_that_day) + 1, 0)
         return 0
 
 

@@ -18,6 +18,7 @@ from ...application.records import DocumentRecord, NoticeRecord
 from ...application.services import Services
 from ...application.types import GRADE_MAX, GRADE_MIN, PASS_MARK, AbsenceKind, DocumentKind
 from .. import theme
+from ..dialogs import _buttons, attempt
 from ..formatting import long_date, money, relative_date
 from ..i18n import C_, _, month_short, plural
 from ..sync_ui import run_in_background
@@ -52,12 +53,38 @@ def _error_text(error: Exception) -> str:
 
 # ---- absences ---------------------------------------------------------------------
 
-ABSENCE_TITLES = {
-    AbsenceKind.ABSENT: lambda a: _("Absent"),
-    AbsenceKind.LATE: lambda a: _("Late entry, hour {hour}").format(hour=a.hour or "?"),
-    AbsenceKind.SHORT_LATE: lambda a: _("A few minutes late"),
-    AbsenceKind.EARLY_EXIT: lambda a: _("Left early, hour {hour}").format(hour=a.hour or "?"),
-}
+def absence_title(a) -> str:
+    if a.kind is AbsenceKind.ABSENT:
+        return _("Absent")
+    if a.kind is AbsenceKind.SHORT_LATE:
+        return _("A few minutes late")
+    late = a.kind is AbsenceKind.LATE
+    if a.hour is None:
+        return _("Late entry, hour not recorded") if late else _("Left early, hour not recorded")
+    return (_("Late entry, hour {hour}") if late else _("Left early, hour {hour}")).format(
+        hour=a.hour)
+
+
+class AbsenceHourDialog(QDialog):
+    """Enter the hour of a late entry or early exit that the school left blank."""
+
+    FORGET = 2
+
+    def __init__(self, record, parent=None):
+        super().__init__(parent)
+        self.setWindowTitle(_("Lesson hour"))
+        late = record.kind is AbsenceKind.LATE
+        text = label(_("The school didn't record the hour you came in. Which lesson hour was "
+                       "it?") if late else _("The school didn't record the hour you left. "
+                                             "Which lesson hour was it?"))
+        text.setWordWrap(True)
+        self.hour = QSpinBox(minimum=1, maximum=10, value=record.hour or (2 if late else 5))
+        forget = (lambda: self.done(self.FORGET)) if record.hour_is_yours else None
+        buttons = _buttons(self, self.accept, forget, _("Forget"))
+        layout = QVBoxLayout(self)
+        layout.addWidget(text)
+        layout.addWidget(self.hour)
+        layout.addWidget(buttons)
 
 
 class AbsencesPanel(QWidget):
@@ -91,8 +118,13 @@ class AbsencesPanel(QWidget):
         self.list.setItemDelegate(TwoLineDelegate(self.list))
         self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.empty = label(_("No absences this year."), "hint")
+        self.list.itemActivated.connect(self._edit_hour)
+        self.hours_hint = label(_("Double-click a late entry or early exit to enter an hour "
+                                  "the school didn't record."), "hint")
+        self.hours_hint.setWordWrap(True)
         records.add(self.list, 1)
         records.add(self.empty)
+        records.add(self.hours_hint)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -135,8 +167,11 @@ class AbsencesPanel(QWidget):
 
         self.list.clear()
         for a in s.items:
-            row = QListWidgetItem(ABSENCE_TITLES[a.kind](a))
+            row = QListWidgetItem(absence_title(a))
+            row.setData(Qt.UserRole, a)
             meta = [relative_date(a.day, today)]
+            if a.hour_is_yours:
+                meta.append(_("hour entered by you"))
             if a.hours_missed:
                 meta.append(plural(a.hours_missed, "hour"))
             meta.append(_("justified") if a.justified else _("not justified"))
@@ -148,6 +183,19 @@ class AbsencesPanel(QWidget):
             self.list.addItem(row)
         self.list.setVisible(bool(s.items))
         self.empty.setVisible(not s.items)
+        self.hours_hint.setVisible(any(a.needs_hour for a in s.items))
+
+    def _edit_hour(self, item: QListWidgetItem):
+        record = item.data(Qt.UserRole)
+        if record is None or not record.needs_hour:
+            return
+        dialog = AbsenceHourDialog(record, self)
+        result = dialog.exec()
+        if result == QDialog.Rejected:
+            return
+        hour = None if result == AbsenceHourDialog.FORGET else dialog.hour.value()
+        attempt(self, lambda: self.services.school.set_absence_hour(record.id, hour))
+        self.refresh()
 
 
 # ---- noticeboard ------------------------------------------------------------------------

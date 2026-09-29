@@ -4,8 +4,8 @@ from dataclasses import dataclass
 from datetime import date, timedelta
 
 from ...domain import (
-    ABSENCE_LIMIT, GRADE_MAX, GRADE_MIN, PASS_MARK, AbsenceKind, Grade, Task, TaskKind, average,
-    lesson_hours, needed_grade, running_average,
+    ABSENCE_LIMIT, GRADE_MAX, GRADE_MIN, PASS_MARK, AbsenceKind, Grade, NotFound, Task, TaskKind,
+    ValidationError, average, lesson_hours, needed_grade, running_average,
 )
 from ..dto import TaskItem
 from ..ports import Clock, CourseRepository, SchoolRecordRepository, TaskRepository
@@ -16,6 +16,7 @@ from ..records import (
 )
 
 SCHOOL_WEEKS = 33  # when the register has no calendar: a typical Italian school year
+MAX_LESSON_HOUR = 10
 
 
 @dataclass(frozen=True)
@@ -230,6 +231,18 @@ class SchoolRecordsService:
             school_hours=school_hours,
             limit_hours=int(school_hours * ABSENCE_LIMIT),
         )
+
+    def set_absence_hour(self, absence_id: str, hour: int | None) -> None:
+        """Enter the lesson hour of a late entry or early exit the register left blank
+        (None forgets it). Kept across syncs."""
+        if hour is not None and not 1 <= hour <= MAX_LESSON_HOUR:
+            raise ValidationError("The hour must be between 1 and 10.")
+        absences = self._records.absences()
+        absence = next((a for a in absences if a.external_id == absence_id), None)
+        if absence is None:
+            raise NotFound("That absence isn't in the register any more. Sync again.")
+        absence.own_hour = hour
+        self._records.replace_absences(absences)
 
     # ---- noticeboard, textbooks, documents -----------------------------------------------
 

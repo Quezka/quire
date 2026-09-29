@@ -77,6 +77,33 @@ def test_absences_are_counted_against_the_limit(connected, register):
     assert connected.school_sync.sync().new_absences == 0
 
 
+def test_an_hour_the_register_left_blank_can_be_entered_and_survives_syncs(connected,
+                                                                         register):
+    """Classeviva sends `evtHPos: null` when the school didn't record the hour."""
+    from quire.domain import ValidationError
+    timetable(connected)
+    register.absences_ = [Absence("7", TODAY, AbsenceKind.EARLY_EXIT, justified=True)]
+    connected.school_sync.sync()
+    item = connected.school.absence_summary().items[0]
+    assert item.hour is None and item.needs_hour and item.hours_missed == 1
+
+    connected.school.set_absence_hour(item.id, 3)
+    item = connected.school.absence_summary().items[0]
+    assert (item.hour, item.hour_is_yours, item.hours_missed) == (3, True, 3)
+
+    connected.school_sync.sync()  # the register still has no hour: yours stays
+    assert connected.school.absence_summary().items[0].hour == 3
+
+    register.absences_ = [Absence("7", TODAY, AbsenceKind.EARLY_EXIT, hour=4)]
+    connected.school_sync.sync()  # the school filled it in later: theirs wins
+    item = connected.school.absence_summary().items[0]
+    assert (item.hour, item.hour_is_yours, item.needs_hour) == (4, False, False)
+
+    with pytest.raises(ValidationError):
+        connected.school.set_absence_hour(item.id, 0)
+    connected.school.set_absence_hour(item.id, None)  # forgetting is fine
+
+
 def test_without_a_calendar_the_year_is_estimated_and_without_a_timetable_unknown(connected,
                                                                                  register):
     register.absences_ = [Absence("1", TODAY, AbsenceKind.ABSENT)]
