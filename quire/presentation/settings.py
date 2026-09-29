@@ -104,8 +104,10 @@ class SettingsDialog(QDialog):
         self.sync_now.clicked.connect(self._sync_now)
         self.sync_off = QPushButton(_("Sign out"))
         self.sync_off.clicked.connect(self._sign_out)
+        self.sync_phone = QPushButton(_("Set up your phone…"))
+        self.sync_phone.clicked.connect(self._set_up_phone)
         sync_row = QHBoxLayout()
-        for widget in (self.sync_setup, self.sync_now, self.sync_off):
+        for widget in (self.sync_setup, self.sync_now, self.sync_phone, self.sync_off):
             sync_row.addWidget(widget)
         sync_row.addStretch()
         if sync_runner is not None:
@@ -231,6 +233,7 @@ class SettingsDialog(QDialog):
         self.sync_now.setEnabled(not busy)
         self.sync_now.setText(_("Syncing…") if busy else _("Sync now"))
         self.sync_off.setVisible(bool(status.email))
+        self.sync_phone.setVisible(status.set_up)
 
     def _set_up_sync(self):
         from .sync_ui import SyncSetupDialog
@@ -238,6 +241,11 @@ class SettingsDialog(QDialog):
         if SyncSetupDialog(self.services, self).exec() and self.sync_runner is not None:
             self.sync_runner.sync_now()
         self._show_sync()
+
+    def _set_up_phone(self):
+        from .sync_ui import PhoneSetupDialog
+
+        PhoneSetupDialog(self.services, self).exec()
 
     def _sync_now(self):
         if self.sync_runner is not None:

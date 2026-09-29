@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import base64
+import json
 import re
 import uuid
 from dataclasses import dataclass
@@ -95,6 +97,21 @@ class SyncService:
                           self._store.pending(), self._get("problem"))
 
     # ---- account ----------------------------------------------------------------
+
+    def phone_link(self, register: Credentials | None = None) -> str:
+        """A setup code for the phone app (shown as a QR code): the sync project and this
+        computer's sign-in, and optionally the school register login, so the phone is ready
+        without typing anything. It carries secrets: it's shown on screen, never sent."""
+        config, saved = self.config(), self._secrets.load()
+        if config is None or saved is None:
+            raise SyncNotSetUp("Set up sync on this computer first.")
+        data = {"v": "1", "project": config.project_id, "api_key": config.api_key,
+                "email": self._get("email"), "refresh": saved.password}
+        if register is not None:
+            data.update(cv_user=register.username, cv_pass=register.password)
+        raw = json.dumps(data, separators=(",", ":")).encode()
+        return "quire-link:" + base64.urlsafe_b64encode(raw).decode().rstrip("=")
+
 
     @staticmethod
     def check(project_id: str, api_key: str, email: str, password: str) -> CloudConfig:

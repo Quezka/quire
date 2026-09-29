@@ -56,3 +56,33 @@ fun syncMessage(context: Context, message: String?): String {
     )
     return known.entries.firstOrNull { text.contains(it.key) }?.let { context.getString(it.value) } ?: text
 }
+
+/** An amount with the phone's currency format (euros by default, like the desktop). */
+fun money(value: Double): String {
+    val format = java.text.NumberFormat.getCurrencyInstance(Locale.getDefault())
+    runCatching { format.currency = java.util.Currency.getInstance(currencyCode) }
+    return format.format(value)
+}
+
+/** Set from Settings; ISO 4217 code. */
+var currencyCode: String = "EUR"
+
+/** "7 h 30 min", "45 min". */
+fun hoursText(minutes: Int): String {
+    val h = minutes / 60
+    val m = minutes % 60
+    return when {
+        h == 0 -> "$m min"
+        m == 0 -> "$h h"
+        else -> "$h h $m min"
+    }
+}
+
+/** Work rules speak English (like the desktop's core); show them in the phone's language. */
+fun workMessage(context: Context, message: String): String = when {
+    message.startsWith("A shift must last") -> context.getString(R.string.err_shift_short)
+    message.startsWith("A shift can't be longer") -> context.getString(R.string.err_shift_long)
+    message.startsWith("The break must") -> context.getString(R.string.err_break_long)
+    message.startsWith("A break can't") -> context.getString(R.string.err_break_negative)
+    else -> message
+}

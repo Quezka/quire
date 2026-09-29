@@ -585,6 +585,13 @@ MESSAGES = {
         'Школа не указала, к какому уроку вы пришли. Какой это был урок?',
     "The school didn't record the hour you left. Which lesson hour was it?":
         'Школа не указала, с какого урока вы ушли. Какой это был урок?',
+    'Set up your phone': 'Настроить телефон',
+    'Set up your phone…': 'Настроить телефон…',
+    'Install Quire on your Android phone, open More → Settings → Sync and tap “Scan the code”. The phone signs in to the same sync account and takes a copy of your data.':
+        'Установите Quire на телефон Android, откройте Ещё → Настройки → Синхронизация и нажмите «Сканировать код». Телефон войдёт в тот же аккаунт синхронизации и получит копию ваших данных.',
+    'Also set up Classeviva on the phone': 'Заодно подключить Classeviva на телефоне',
+    "This code signs in to your account: don't share a photo of it.": 'Этот код открывает ваш аккаунт: не делитесь его фотографией.',
+    'Set up sync on this computer first.': 'Сначала настройте синхронизацию на этом компьютере.',
     'Forget': 'Забыть',
     "That absence isn't in the register any more. Sync again.":
         'Этого пропуска больше нет в журнале. Синхронизируйте ещё раз.',

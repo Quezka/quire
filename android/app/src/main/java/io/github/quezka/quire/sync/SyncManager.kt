@@ -82,6 +82,19 @@ class SyncManager(
         }
     }
 
+    /** Connect with the computer's QR link, off the main thread. */
+    fun connectWithLink(link: DeviceLink, done: (Throwable?) -> Unit) {
+        scope.launch {
+            val result = runCatching { engine.connectWithLink(link) }
+            withContext(Dispatchers.Main) {
+                if (result.isSuccess) repository.refreshed()
+                refreshState()
+                done(result.exceptionOrNull())
+            }
+            if (result.isSuccess) syncNow()
+        }
+    }
+
     fun disconnect() {
         engine.disconnect()
         refreshState()

@@ -17,6 +17,9 @@ data class AgendaItem(
     val teacher: String = "",
     val details: String = "",
     val continues: Boolean = false, // the rest of a shift that started the day before
+    val weekly: Boolean = false, // an occurrence of a job's weekly schedule (refUid: the job)
+    val originDay: LocalDate = day, // for a shift: the day and minute it started
+    val originStart: Int = start,
 )
 
 data class DayAgenda(
@@ -70,10 +73,12 @@ object Agenda {
             val color = job?.color ?: "#0090ff"
             if (s.day == day) {
                 items += AgendaItem(ItemKind.SHIFT, s.uid ?: s.jobUid, day, s.start,
-                    minOf(s.end, MINUTES_PER_DAY), name, color, details = s.notes)
+                    minOf(s.end, MINUTES_PER_DAY), name, color, details = s.notes,
+                    weekly = s.uid == null)
             } else if (s.end > MINUTES_PER_DAY) { // yesterday's shift running past midnight
                 items += AgendaItem(ItemKind.SHIFT, s.uid ?: s.jobUid, day, 0,
-                    s.end - MINUTES_PER_DAY, name, color, details = s.notes, continues = true)
+                    s.end - MINUTES_PER_DAY, name, color, details = s.notes, continues = true,
+                    weekly = s.uid == null, originDay = s.day, originStart = s.start)
             }
         }
         return items.sortedWith(compareBy({ it.start }, { it.end }, { it.title }))

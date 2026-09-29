@@ -123,6 +123,10 @@ class SchoolSyncService:
         self._bus.publish(Topic.SCHOOL)
         return account
 
+    def login_for_phone(self) -> Credentials | None:
+        """The saved register login, to hand to the phone app in its setup code."""
+        return self._credentials.load()
+
     def disconnect(self):
         """Forget the account. Imported tasks, grades and lessons stay."""
         self._credentials.clear()

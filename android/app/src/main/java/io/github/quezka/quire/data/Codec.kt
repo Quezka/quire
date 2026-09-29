@@ -3,6 +3,7 @@ package io.github.quezka.quire.data
 import io.github.quezka.quire.domain.ClassSlot
 import io.github.quezka.quire.domain.Course
 import io.github.quezka.quire.domain.Event
+import io.github.quezka.quire.domain.FocusSession
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
 import io.github.quezka.quire.domain.Shift
@@ -21,6 +22,7 @@ import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 import kotlinx.serialization.json.put
 import java.time.LocalDate
+import java.time.LocalDateTime
 import java.util.UUID
 
 /**
@@ -145,6 +147,43 @@ object Codec {
                 ShiftPattern(it.i(0), it.i(1), it.i(2), it.i(3), date(it.s(4)), date(it.s(5)))
             },
             d.list("skips").mapNotNull { a -> date(a.s(0))?.let { it to a.i(1) } }.toSet())
+    }
+
+    fun jobData(j: Job, previous: JsonObject?) = merged(previous, mapOf(
+        "name" to JsonPrimitive(j.name), "color" to JsonPrimitive(j.color),
+        "hourly_rate" to (j.hourlyRate?.let(::JsonPrimitive) ?: JsonNull),
+        "deductions" to JsonPrimitive(j.deductions),
+        "patterns" to buildJsonArray {
+            for (p in j.patterns.sortedWith(compareBy({ it.weekday }, { it.start }))) add(buildJsonArray {
+                add(JsonPrimitive(p.weekday)); add(JsonPrimitive(p.start)); add(JsonPrimitive(p.duration))
+                add(JsonPrimitive(p.breakMinutes)); add(text(p.since?.toString())); add(text(p.until?.toString()))
+            })
+        },
+        "skips" to buildJsonArray {
+            for ((day, start) in j.skips.sortedWith(compareBy({ it.first }, { it.second }))) add(buildJsonArray {
+                add(JsonPrimitive(day.toString())); add(JsonPrimitive(start))
+            })
+        },
+    ))
+
+    fun shiftData(s: Shift, previous: JsonObject?) = merged(previous, mapOf(
+        "job" to JsonPrimitive(s.jobUid), "day" to JsonPrimitive(s.day.toString()),
+        "start" to JsonPrimitive(s.start), "duration" to JsonPrimitive(s.duration),
+        "break" to JsonPrimitive(s.breakMinutes), "notes" to JsonPrimitive(s.notes),
+    ))
+
+    // ---- focus sessions ----
+
+    fun focus(r: SyncRecord): FocusSession? {
+        val d = r.data!!
+        val started = d.strOrNull("started")?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }
+            ?: return null
+        return FocusSession(r.uid, started, d.int("minutes"), d.strOrNull("task"), d.str("label"))
+    }
+
+    fun focusData(f: FocusSession) = buildJsonObject {
+        put("started", f.started.withNano(0).toString().let { if (it.length == 16) "$it:00" else it })
+        put("minutes", f.minutes); put("task", text(f.taskUid)); put("label", f.label)
     }
 
     fun shift(r: SyncRecord): Shift? {

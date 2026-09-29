@@ -1,9 +1,12 @@
 """Sync between devices: the background runner, the setup dialog and the status line."""
 from __future__ import annotations
 
+import io
+
 from PySide6.QtCore import QObject, QRunnable, Qt, QThreadPool, QTimer, Signal
+from PySide6.QtGui import QImage, QPixmap
 from PySide6.QtWidgets import (
-    QApplication, QCheckBox, QDialog, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
+    QApplication, QCheckBox, QDialog, QDialogButtonBox, QFormLayout, QFrame, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QVBoxLayout,
 )
 
@@ -266,3 +269,50 @@ class SyncSetupDialog(QDialog):
         self.connect_btn.setText(_("Connect"))
         self._show_error(_(str(error)) if isinstance(error, ApplicationError)
                          else _("Sync failed unexpectedly: {error}").format(error=error))
+
+
+class PhoneSetupDialog(QDialog):
+    """Shows the setup code for the phone app as a QR code."""
+
+    def __init__(self, services: Services, parent=None):
+        super().__init__(parent)
+        self.services = services
+        self.setWindowTitle(_("Set up your phone"))
+        intro = QLabel(_("Install Quire on your Android phone, open More → Settings → Sync and "
+                         "tap “Scan the code”. The phone signs in to the same sync account "
+                         "and takes a copy of your data."))
+        intro.setWordWrap(True)
+        self.include_school = QCheckBox(_("Also set up Classeviva on the phone"))
+        has_school = services.school_sync.login_for_phone() is not None
+        self.include_school.setChecked(has_school)
+        self.include_school.setVisible(has_school)
+        self.include_school.toggled.connect(self._show_code)
+        self.code = QLabel(alignment=Qt.AlignCenter)
+        self.code.setMinimumSize(320, 320)
+        warning = QLabel(_("This code signs in to your account: don't share a photo of it."))
+        warning.setObjectName("hint")
+        warning.setWordWrap(True)
+        close = QDialogButtonBox(QDialogButtonBox.Close)
+        close.rejected.connect(self.reject)
+        layout = QVBoxLayout(self)
+        for widget in (intro, self.include_school, self.code, warning, close):
+            layout.addWidget(widget)
+        self._show_code()
+
+    def _show_code(self, *_args):
+        import segno
+
+        register = (self.services.school_sync.login_for_phone()
+                    if self.include_school.isChecked() else None)
+        try:
+            link = self.services.sync.phone_link(register)
+        except ApplicationError as e:
+            self.code.setText(_(str(e)))
+            return
+        # Dark modules on white, whatever the theme: cameras read that best.
+        qr = segno.make(link, error="m")
+        buffer = io.BytesIO()
+        qr.save(buffer, kind="png", scale=8, border=3, dark="#000000", light="#ffffff")
+        image = QImage.fromData(buffer.getvalue(), "PNG")
+        self.code.setPixmap(QPixmap.fromImage(image).scaled(
+            320, 320, Qt.KeepAspectRatio, Qt.FastTransformation))

@@ -81,6 +81,18 @@ class SyncEngine(
         set("cursor", null); set("problem", null)
     }
 
+    /** Connect with a link from the computer (its QR code): no password needed, the
+     *  computer's sign-in is checked and reused, and this phone takes the cloud copy.
+     *  Network: call off the main thread. */
+    fun connectWithLink(link: DeviceLink) {
+        val config = CloudConfig(link.projectId, link.apiKey)
+        val session = cloud.refresh(config, link.refreshToken)
+        records.clear()
+        set("project", config.projectId); set("api_key", config.apiKey)
+        set("email", link.email.ifEmpty { session.email }); set("refresh", session.refreshToken)
+        set("cursor", null); set("problem", null)
+    }
+
     fun disconnect() {
         for (name in listOf("project", "api_key", "email", "refresh", "cursor", "last_sync", "problem")) {
             set(name, null)

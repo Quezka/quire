@@ -294,3 +294,29 @@ def test_wrong_password_and_existing_account(services, cloud):
         services.sync.authenticate(config, EMAIL, PASSWORD, create=True)
     with pytest.raises(CloudAuthError):
         services.sync.authenticate(config, EMAIL, "wrong", create=False)
+
+
+def test_the_phone_setup_code_carries_the_sign_in_and_optionally_the_register(tmp_path,
+                                                                             shared_cloud):
+    import base64
+    import json
+
+    from quire.application.errors import SyncNotSetUp
+    from quire.application.ports import Credentials
+
+    services, db = device(tmp_path, shared_cloud, "a")
+    with pytest.raises(SyncNotSetUp):
+        services.sync.phone_link()
+    connect(services, create=True)
+    link = services.sync.phone_link()
+    assert link.startswith("quire-link:")
+    body = link.removeprefix("quire-link:")
+    data = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    # The fields the phone reads (android sync/DeviceLink.kt).
+    assert data["v"] == "1" and data["project"] and data["api_key"] and data["refresh"]
+    assert "cv_user" not in data
+    with_school = services.sync.phone_link(Credentials("S1234567X", "pw"))
+    body = with_school.removeprefix("quire-link:")
+    data = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    assert (data["cv_user"], data["cv_pass"]) == ("S1234567X", "pw")
+    db.close()
