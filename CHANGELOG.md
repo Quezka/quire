@@ -4,6 +4,13 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.16.1] - 2026-09-29
+
+### Fixed
+- Finished tasks and homework showed an empty circle in Today's due list and the School
+  page's homework list, even though they were saved as done, and clicking a finished one
+  couldn't untick it. They're shown ticked and crossed out again.
+
 ## [0.16.0] - 2026-09-29
 
 ### Added

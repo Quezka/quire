@@ -1004,3 +1004,29 @@ def test_a_second_launch_brings_the_first_one_back(app, tmp_path):
             break
     assert seen == [True]
     assert instance_name("/a.db") != instance_name("/b.db")  # --demo runs alongside
+
+
+def test_round_checkbox_shows_done_and_unticks(app):
+    # The model returns the check state as a plain int; the row must still read as done.
+    from PySide6.QtCore import QEvent, QPointF
+    from PySide6.QtGui import QMouseEvent
+    from PySide6.QtWidgets import QListWidget, QListWidgetItem, QStyleOptionViewItem
+    from quire.presentation.widgets import TwoLineDelegate
+
+    lst = QListWidget()
+    delegate = TwoLineDelegate(lst)
+    lst.setItemDelegate(delegate)
+    item = QListWidgetItem("Storia")
+    item.setFlags(item.flags() | Qt.ItemIsUserCheckable)
+    item.setCheckState(Qt.Checked)
+    lst.addItem(item)
+    index = lst.model().index(0, 0)
+    assert TwoLineDelegate._checked(index)
+
+    option = QStyleOptionViewItem()
+    option.rect = lst.visualItemRect(item)
+    centre = delegate._check_rect(option).center()
+    click = QMouseEvent(QEvent.MouseButtonRelease, QPointF(centre), QPointF(centre),
+                        Qt.LeftButton, Qt.NoButton, Qt.NoModifier)
+    assert delegate.editorEvent(click, lst.model(), option, index)
+    assert item.checkState() == Qt.Unchecked

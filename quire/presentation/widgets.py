@@ -577,6 +577,13 @@ class TwoLineDelegate(QStyledItemDelegate):
             return QSize(0, 28)
         return QSize(0, 54)
 
+    @staticmethod
+    def _checked(index) -> bool:
+        # The model hands the state back as a plain int (2), which newer PySide6 doesn't
+        # consider equal to Qt.Checked, so compare the converted value.
+        state = index.data(Qt.CheckStateRole)
+        return state is not None and Qt.CheckState(state) == Qt.Checked
+
     def _check_rect(self, option) -> QRectF:
         r = QRectF(option.rect)
         return QRectF(r.left() + 10, r.top() + 17 - self.CHECK / 2 + 2, self.CHECK, self.CHECK)
@@ -586,7 +593,7 @@ class TwoLineDelegate(QStyledItemDelegate):
         if (index.data(Qt.CheckStateRole) is not None and not index.data(self.HEADER)
                 and event.type() == QEvent.MouseButtonRelease
                 and self._check_rect(option).adjusted(-4, -4, 4, 4).contains(event.position())):
-            checked = index.data(Qt.CheckStateRole) == Qt.Checked
+            checked = self._checked(index)
             model.setData(index, Qt.Unchecked if checked else Qt.Checked, Qt.CheckStateRole)
             return True
         return super().editorEvent(event, model, option, index)
@@ -648,7 +655,7 @@ class TwoLineDelegate(QStyledItemDelegate):
 
         x = r.left() + 12
         checkable = index.data(Qt.CheckStateRole) is not None
-        checked = index.data(Qt.CheckStateRole) == Qt.Checked
+        checked = self._checked(index)
         if checkable:
             box = self._check_rect(option)
             if checked:
