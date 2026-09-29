@@ -26,7 +26,8 @@ class FocusService:
     """Use cases for the Pomodoro focus timer.
 
     Holds the one running timer; the UI calls `tick()` about once a second.
-    Finished focus sessions are logged (with the task you were on) for the stats.
+    Focus sessions are logged (with the task you were on) for the stats; one skipped or
+    reset part-way is logged too, as unfinished, so its minutes still count.
     """
 
     PREFIX = "focus."
@@ -128,10 +129,19 @@ class FocusService:
         (self._timer.pause if self._timer.running else self._timer.start)(now)
 
     def reset(self):
+        self._log_cut_short()
         self._timer.reset()
 
     def skip(self):
+        self._log_cut_short()
         self._timer.skip(self._clock.now())
+
+    def _log_cut_short(self):
+        """A focus session ended early still counts towards your focus time."""
+        self.tick()  # a phase that has already run out counts as finished, not cut short
+        session = self._timer.cut_short(self._clock.now())
+        if session is not None:
+            self._log_session(session.started, session.minutes, complete=False)
 
     def tick(self) -> FocusEvent | None:
         """Advance the timer; returns the phase that just ended, if any.
@@ -143,12 +153,14 @@ class FocusService:
         while (event := self._timer.tick(self._clock.now())) is not None:
             last = FocusEvent(event.phase, event.next_phase)
             if event.phase is Phase.WORK:
-                task = self._focus_task()
-                self._log.add(FocusSession(event.started, event.minutes,
-                                           task.id if task else None,
-                                           task.title if task else self.focus_project()))
-                self._bus.publish(Topic.FOCUS)
+                self._log_session(event.started, event.minutes, complete=True)
         return last
+
+    def _log_session(self, started: datetime, minutes: int, complete: bool):
+        task = self._focus_task()
+        self._log.add(FocusSession(started, minutes, task.id if task else None,
+                                   task.title if task else self.focus_project(), complete))
+        self._bus.publish(Topic.FOCUS)
 
     # ---- stats ------------------------------------------------------------------
 
@@ -161,6 +173,7 @@ class FocusService:
         for s in todays:
             if s.label:
                 projects[s.label] = projects.get(s.label, 0) + s.minutes
-        return FocusStats(len(todays), sum(s.minutes for s in todays),
-                          len(week), sum(s.minutes for s in week),
+        # Sessions cut short add their minutes, but only finished ones count as pomodori.
+        return FocusStats(sum(s.complete for s in todays), sum(s.minutes for s in todays),
+                          sum(s.complete for s in week), sum(s.minutes for s in week),
                           tuple(sorted(projects.items(), key=lambda p: (-p[1], p[0]))))

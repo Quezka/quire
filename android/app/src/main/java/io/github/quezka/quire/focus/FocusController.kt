@@ -18,7 +18,8 @@ import java.time.ZoneId
 /**
  * The one focus timer. Its state is saved on every change, and an alarm is set for the
  * end of the running phase, so it keeps time (and notifies) while the app is closed.
- * Finished focus sessions are logged and synced, like on the desktop.
+ * Focus sessions are logged and synced, like on the desktop; one skipped or reset part-way
+ * is logged as unfinished, so its minutes still count.
  */
 class FocusController(
     private val repo: Repository,
@@ -44,6 +45,7 @@ class FocusController(
         settings.get("focus.state.remaining")?.toLongOrNull(),
         settings.get("focus.state.ends")?.let { runCatching { Instant.parse(it) }.getOrNull() },
         settings.get("focus.state.started")?.let { runCatching { Instant.parse(it) }.getOrNull() },
+        settings.get("focus.state.length")?.toLongOrNull(),
     )
 
     private fun saveState() {
@@ -53,6 +55,7 @@ class FocusController(
         settings.set("focus.state.remaining", s.remainingMs?.toString())
         settings.set("focus.state.ends", s.endsAt?.toString())
         settings.set("focus.state.started", s.startedAt?.toString())
+        settings.set("focus.state.length", s.lengthMs?.toString())
         _changes.value += 1
         planAlarm()
     }
@@ -64,8 +67,19 @@ class FocusController(
     fun now(): Instant = clock()
 
     fun toggle() { tick(); timer.toggle(clock()); saveState() }
-    fun skip() { timer.skip(clock()); saveState() }
-    fun reset() { timer.reset(); saveState() }
+    fun skip() { tick(); logCutShort(); timer.skip(clock()); saveState() }
+    fun reset() { tick(); logCutShort(); timer.reset(); saveState() }
+
+    /** A focus session ended early still counts towards your focus time. */
+    private fun logCutShort() {
+        timer.cutShort(clock())?.let { log(it.started, it.minutes, complete = false) }
+    }
+
+    private fun log(started: Instant, minutes: Int, complete: Boolean) {
+        val task = taskUid?.let(repo::task)
+        repo.logFocus(FocusSession(Codec.newUid(), LocalDateTime.ofInstant(started, ZoneId.systemDefault()),
+            minutes, task?.uid, task?.title ?: project, complete))
+    }
 
     fun saveSettings(new: FocusSettings) {
         if (!new.valid()) return
@@ -96,12 +110,7 @@ class FocusController(
         while (true) {
             val event = timer.tick(clock()) ?: break
             last = event
-            if (event.phase == Phase.WORK) {
-                val task = taskUid?.let(repo::task)
-                repo.logFocus(FocusSession(Codec.newUid(),
-                    LocalDateTime.ofInstant(event.started, ZoneId.systemDefault()), event.minutes,
-                    task?.uid, task?.title ?: project))
-            }
+            if (event.phase == Phase.WORK) log(event.started, event.minutes, complete = true)
         }
         if (last != null) {
             saveState()

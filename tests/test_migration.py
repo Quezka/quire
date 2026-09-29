@@ -74,3 +74,18 @@ def test_v8_rows_get_sync_ids_and_are_sent_once(tmp_path):
     again = SqliteDatabase(path)  # upgrading twice changes nothing
     assert again.conn.execute("SELECT uid FROM tasks WHERE title = 'Mine'").fetchone()[0] == uid
     again.close()
+
+
+def test_v10_focus_sessions_count_as_complete(tmp_path):
+    path = tmp_path / "v10.db"
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            CREATE TABLE focus_sessions (id INTEGER PRIMARY KEY, started TEXT NOT NULL,
+                                         minutes INTEGER NOT NULL, task_id INTEGER,
+                                         label TEXT NOT NULL DEFAULT '');
+            INSERT INTO focus_sessions (started, minutes) VALUES ('2026-09-23T10:00:00', 25);
+            PRAGMA user_version = 10;
+        """)
+    db = SqliteDatabase(path)
+    assert db.conn.execute("SELECT complete FROM focus_sessions").fetchone()["complete"] == 1
+    db.close()

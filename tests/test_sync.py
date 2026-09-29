@@ -1,6 +1,7 @@
 """Two devices syncing through one (fake) cloud account."""
 import time
-from datetime import timedelta
+from dataclasses import replace
+from datetime import datetime, timedelta
 
 import pytest
 
@@ -11,6 +12,7 @@ from quire.application.inputs import (
 )
 from quire.application.types import TaskKind
 from quire.bootstrap import build_services
+from quire.domain import FocusSession
 from quire.infrastructure.credentials import MemoryCredentialStore
 
 from .conftest import TODAY, FixedClock
@@ -320,3 +322,30 @@ def test_the_phone_setup_code_carries_the_sign_in_and_optionally_the_register(tm
     data = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
     assert (data["cv_user"], data["cv_pass"]) == ("S1234567X", "pw")
     db.close()
+
+
+def test_focus_sessions_keep_whether_they_were_finished(pair, shared_cloud):
+    a, b = pair
+    started = datetime.combine(TODAY, datetime.min.time()).replace(hour=9)
+    a.focus._log.add(FocusSession(started, 25, label="Essay"))
+    a.focus._log.add(FocusSession(started + timedelta(minutes=30), 12, label="Essay",
+                                  complete=False))
+    a.sync.sync()
+    b.sync.sync()
+    stats = b.focus.stats()
+    assert (stats.today_sessions, stats.today_minutes) == (1, 37)
+
+
+def test_focus_sessions_from_older_apps_count_as_finished(tmp_path, pair, shared_cloud):
+    a, _b = pair
+    a.focus._log.add(FocusSession(datetime.combine(TODAY, datetime.min.time()), 25))
+    a.sync.sync()
+    for key, (stamp, rec) in list(shared_cloud.docs.items()):
+        if rec.kind == "focus":  # as sent by a phone or desktop from before "complete"
+            data = {k: v for k, v in rec.data.items() if k != "complete"}
+            shared_cloud.docs[key] = (stamp, replace(rec, data=data))
+    c, db_c = device(tmp_path, shared_cloud, "old")
+    connect(c)
+    c.sync.sync()
+    assert c.focus.stats().today_sessions == 1
+    db_c.close()

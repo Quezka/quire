@@ -83,6 +83,33 @@ def test_reset_starts_the_cycle_over():
     assert timer.remaining(T0) == minutes(25)
 
 
+def test_cutting_a_focus_session_short_counts_the_time_actually_spent():
+    timer = PomodoroTimer(FocusSettings(work_minutes=25))
+    assert timer.cut_short(T0) is None  # not started
+    timer.start(T0)
+    timer.pause(T0 + minutes(10))
+    timer.start(T0 + minutes(40))  # the half hour paused doesn't count
+    session = timer.cut_short(T0 + minutes(42) + timedelta(seconds=40))
+    assert (session.started, session.minutes, session.complete) == (T0, 13, False)
+
+
+def test_less_than_a_minute_or_a_break_leaves_nothing_to_log():
+    timer = PomodoroTimer(FocusSettings(work_minutes=25))
+    timer.start(T0)
+    assert timer.cut_short(T0 + timedelta(seconds=25)) is None
+    timer.skip(T0 + minutes(1))
+    assert timer.phase is Phase.SHORT_BREAK
+    assert timer.cut_short(T0 + minutes(3)) is None
+
+
+def test_a_running_phase_keeps_its_length_when_settings_change():
+    timer = PomodoroTimer(FocusSettings(work_minutes=25))
+    timer.start(T0)
+    timer.apply_settings(FocusSettings(work_minutes=50))
+    assert timer.cut_short(T0 + minutes(20)).minutes == 20
+    assert timer.tick(T0 + minutes(25)).minutes == 25
+
+
 def test_new_settings_apply_to_a_fresh_timer_right_away():
     timer = PomodoroTimer()
     timer.apply_settings(FocusSettings(work_minutes=50))
@@ -234,3 +261,44 @@ def test_ad_hoc_projects_are_logged_and_offered_again(focus_env):
     assert focus.stats().today_by_project == (("Essay", 25), ("Portfolio website", 25))
     focus.set_focus_project("")
     assert focus.focus_project() == "" and focus.focus_task() is None
+
+
+@pytest.mark.parametrize("end", ["skip", "reset"])
+def test_a_session_ended_early_adds_its_minutes_but_not_a_pomodoro(focus_env, end):
+    services, clock, _ = focus_env
+    focus = services.focus
+    focus.set_focus_project("Side project")
+    focus.toggle()
+    clock.advance(minutes=25)
+    focus.tick()  # one full pomodoro
+    clock.advance(minutes=5)
+    focus.tick()  # the break ends and the next focus session starts
+    clock.advance(minutes=12)
+    getattr(focus, end)()
+
+    stats = focus.stats()
+    assert (stats.today_sessions, stats.today_minutes) == (1, 37)
+    assert (stats.week_sessions, stats.week_minutes) == (1, 37)
+    assert stats.today_by_project == (("Side project", 37),)
+    cut = [s for s in focus._log.between(T0.date(), T0.date()) if not s.complete]
+    assert [(s.started, s.minutes) for s in cut] == [(T0 + timedelta(minutes=30), 12)]
+
+
+def test_skipping_a_break_or_an_unstarted_session_logs_nothing(focus_env):
+    services, clock, _ = focus_env
+    focus = services.focus
+    focus.skip()  # not started
+    focus.toggle()
+    clock.advance(minutes=2)
+    focus.skip()  # 2 minutes of a short break: breaks aren't focus
+    assert focus.stats().today_minutes == 0
+
+
+def test_skipping_after_the_session_already_ran_out_counts_it_as_finished(focus_env):
+    services, clock, _ = focus_env
+    focus = services.focus
+    focus.toggle()
+    clock.advance(minutes=25, seconds=1)  # ended, but the UI hasn't ticked yet
+    focus.skip()
+    stats = focus.stats()
+    assert (stats.today_sessions, stats.today_minutes) == (1, 25)

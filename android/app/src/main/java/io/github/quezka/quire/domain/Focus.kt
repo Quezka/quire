@@ -42,6 +42,7 @@ data class TimerState(
     val remainingMs: Long? = null, // null: the phase's full length
     val endsAt: Instant? = null, // set while running
     val startedAt: Instant? = null, // when the current phase first started
+    val lengthMs: Long? = null, // the phase's length, fixed once it starts (null: from settings)
 )
 
 class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: TimerState = TimerState()) {
@@ -49,7 +50,19 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
     val started get() = state.startedAt != null
     val phase get() = state.phase
     val completed get() = state.completed
-    private val duration get() = Duration.ofMinutes(settings.minutes(state.phase).toLong())
+    private val duration get() = state.lengthMs?.let(Duration::ofMillis)
+        ?: Duration.ofMinutes(settings.minutes(state.phase).toLong())
+
+    /** Time spent in the current phase so far, not counting pauses. */
+    fun elapsed(now: Instant): Duration = if (started) duration - remaining(now) else Duration.ZERO
+
+    /** The minutes of an unfinished focus session that ending the phase now would leave:
+     *  only focus phases count, and only a whole minute or more (like the desktop). */
+    fun cutShort(now: Instant): PhaseEnded? {
+        if (phase != Phase.WORK || !started) return null
+        val minutes = Math.round(elapsed(now).toMillis() / 60_000.0).toInt()
+        return if (minutes < 1) null else PhaseEnded(phase, state.startedAt!!, minutes, phase)
+    }
 
     fun remaining(now: Instant): Duration {
         val ends = state.endsAt ?: return state.remainingMs?.let(Duration::ofMillis) ?: duration
@@ -66,7 +79,8 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
 
     fun start(now: Instant) {
         if (running) return
-        state = state.copy(startedAt = state.startedAt ?: now, endsAt = now + remaining(now), remainingMs = null)
+        state = state.copy(startedAt = state.startedAt ?: now, endsAt = now + remaining(now), remainingMs = null,
+            lengthMs = duration.toMillis())
     }
 
     fun pause(now: Instant) {
@@ -84,7 +98,7 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
 
     fun applySettings(new: FocusSettings) {
         settings = new
-        if (!started) state = state.copy(remainingMs = null)
+        if (!started) state = state.copy(remainingMs = null, lengthMs = null)
     }
 
     /** Advance if the running phase has run out; report what ended. */
@@ -92,7 +106,7 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
         val ends = state.endsAt ?: return null
         if (now < ends) return null
         val event = PhaseEnded(state.phase, state.startedAt ?: (ends - duration),
-            settings.minutes(state.phase), nextPhase(counting = true, dryRun = true))
+            duration.toMinutes().toInt(), nextPhase(counting = true, dryRun = true))
         enter(nextPhase(counting = true), if (settings.autoContinue) ends else null)
         return event
     }
@@ -110,17 +124,19 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
     private fun enter(phase: Phase, runningFrom: Instant?) {
         val length = Duration.ofMinutes(settings.minutes(phase).toLong())
         state = state.copy(phase = phase, remainingMs = null, startedAt = runningFrom,
-            endsAt = runningFrom?.plus(length))
+            endsAt = runningFrom?.plus(length), lengthMs = runningFrom?.let { length.toMillis() })
     }
 }
 
-/** A finished focus session, synced like on the desktop (kind "focus"). */
+/** A focus session, synced like on the desktop (kind "focus"). One cut short (skipped or
+ *  reset) isn't [complete]: its minutes count as focus time, but it isn't a pomodoro. */
 data class FocusSession(
     val uid: String,
     val started: LocalDateTime,
     val minutes: Int,
     val taskUid: String? = null,
     val label: String = "",
+    val complete: Boolean = true,
 )
 
 data class FocusStats(
@@ -138,5 +154,6 @@ fun focusStats(sessions: List<FocusSession>, today: java.time.LocalDate): FocusS
     val projects = todays.filter { it.label.isNotBlank() }.groupBy { it.label }
         .map { (label, list) -> label to list.sumOf { it.minutes } }
         .sortedWith(compareBy({ -it.second }, { it.first }))
-    return FocusStats(todays.size, todays.sumOf { it.minutes }, week.size, week.sumOf { it.minutes }, projects)
+    return FocusStats(todays.count { it.complete }, todays.sumOf { it.minutes },
+        week.count { it.complete }, week.sumOf { it.minutes }, projects)
 }

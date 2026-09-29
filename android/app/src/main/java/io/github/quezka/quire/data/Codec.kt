@@ -178,12 +178,15 @@ object Codec {
         val d = r.data!!
         val started = d.strOrNull("started")?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }
             ?: return null
-        return FocusSession(r.uid, started, d.int("minutes"), d.strOrNull("task"), d.str("label"))
+        // Older apps don't send "complete": everything they logged was finished.
+        val complete = (d["complete"] as? JsonPrimitive)?.booleanOrNull ?: true
+        return FocusSession(r.uid, started, d.int("minutes"), d.strOrNull("task"), d.str("label"), complete)
     }
 
     fun focusData(f: FocusSession) = buildJsonObject {
         put("started", f.started.withNano(0).toString().let { if (it.length == 16) "$it:00" else it })
         put("minutes", f.minutes); put("task", text(f.taskUid)); put("label", f.label)
+        put("complete", f.complete)
     }
 
     fun shift(r: SyncRecord): Shift? {

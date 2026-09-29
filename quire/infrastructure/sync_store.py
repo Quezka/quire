@@ -188,7 +188,8 @@ class SqliteSyncStore:
                     "break": r["break_min"], "notes": r["notes"]}
         if kind == "focus":
             return {"started": r["started"], "minutes": r["minutes"],
-                    "task": self._uid("tasks", r["task_id"]), "label": r["label"]}
+                    "task": self._uid("tasks", r["task_id"]), "label": r["label"],
+                    "complete": bool(r["complete"])}
         raise ValueError(kind)
 
     # ---- incoming ----------------------------------------------------------------
@@ -265,8 +266,10 @@ class SqliteSyncStore:
                       "duration_min": d["duration"], "break_min": d.get("break", 0),
                       "notes": d.get("notes", "")}
         elif s.kind == "focus":
+            # Older apps don't send "complete": everything they logged was finished.
             values = {"started": d["started"], "minutes": d["minutes"],
-                      "task_id": self._id("tasks", d.get("task")), "label": d.get("label", "")}
+                      "task_id": self._id("tasks", d.get("task")), "label": d.get("label", ""),
+                      "complete": int(d.get("complete", True))}
         else:
             raise ValueError(s.kind)
 

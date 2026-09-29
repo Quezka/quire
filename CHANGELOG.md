@@ -4,6 +4,15 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.18.0] - 2026-09-29
+
+### Changed
+- **A focus session you end early still counts.** Skipping or resetting part-way through a
+  focus session now adds the minutes you actually focused (pauses don't count) to your focus
+  time for today and this week, and to the task or project you were on. It isn't counted as
+  a pomodoro, since it wasn't finished. Less than a minute, or a skipped break, adds nothing.
+  The desktop and the phone both do this, and sync it.
+
 ## [0.17.0] - 2026-09-29
 
 ### Added

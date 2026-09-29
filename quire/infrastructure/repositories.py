@@ -492,16 +492,16 @@ class SqliteShiftRepository(_Repo):
 
 class SqliteFocusLogRepository(_Repo):
     def add(self, session: FocusSession) -> None:
-        self._write("INSERT INTO focus_sessions (started, minutes, task_id, label)"
-                    " VALUES (?, ?, ?, ?)", session.started.isoformat(timespec="seconds"),
-                    session.minutes, session.task_id, session.label)
+        self._write("INSERT INTO focus_sessions (started, minutes, task_id, label, complete)"
+                    " VALUES (?, ?, ?, ?, ?)", session.started.isoformat(timespec="seconds"),
+                    session.minutes, session.task_id, session.label, int(session.complete))
 
     def between(self, first, last):
         rows = self._all("SELECT * FROM focus_sessions WHERE started >= ? AND started < ?"
                          " ORDER BY started", first.isoformat(),
                          (last + timedelta(days=1)).isoformat())
         return [FocusSession(datetime.fromisoformat(r["started"]), r["minutes"], r["task_id"],
-                             r["label"]) for r in rows]
+                             r["label"], bool(r["complete"])) for r in rows]
 
     def recent_labels(self, limit):
         rows = self._all("SELECT label FROM focus_sessions WHERE task_id IS NULL AND label != ''"

@@ -55,7 +55,8 @@ class PomodoroTimer:
         self.settings = settings or FocusSettings()
         self.phase = Phase.WORK
         self.completed = 0  # focus sessions finished in the current cycle
-        self._remaining = timedelta(minutes=self.settings.work_minutes)
+        self._length = timedelta(minutes=self.settings.work_minutes)  # of the current phase
+        self._remaining = self._length
         self._ends_at: datetime | None = None  # set while running
         self._started_at: datetime | None = None  # when the current phase first started
 
@@ -72,7 +73,24 @@ class PomodoroTimer:
 
     @property
     def duration(self) -> timedelta:
-        return timedelta(minutes=self.settings.minutes(self.phase))
+        """How long the current phase lasts (set when it began, even if settings change)."""
+        return self._length
+
+    def elapsed(self, now: datetime) -> timedelta:
+        """Time spent in the current phase so far, not counting pauses."""
+        return self._length - self.remaining(now) if self.started else timedelta(0)
+
+    def cut_short(self, now: datetime) -> FocusSession | None:
+        """The unfinished focus session that ending the phase now would leave, if any.
+
+        Only focus phases count, and only a whole minute or more of them.
+        """
+        if self.phase is not Phase.WORK or not self.started:
+            return None
+        minutes = round(self.elapsed(now).total_seconds() / 60)
+        if minutes < 1:
+            return None
+        return FocusSession(self._started_at, minutes, complete=False)
 
     def remaining(self, now: datetime) -> timedelta:
         if self._ends_at is None:
@@ -118,7 +136,7 @@ class PomodoroTimer:
         settings.validate()
         self.settings = settings
         if self._started_at is None:
-            self._remaining = self.duration
+            self._length = self._remaining = timedelta(minutes=settings.minutes(self.phase))
 
     def tick(self, now: datetime) -> PhaseEnded | None:
         """Advance if the running phase has run out; report what ended."""
@@ -126,7 +144,7 @@ class PomodoroTimer:
             return None
         ended_at = self._ends_at
         event = PhaseEnded(self.phase, self._started_at or ended_at - self.duration,
-                           self.settings.minutes(self.phase),
+                           round(self.duration.total_seconds() / 60),
                            self._next_phase(counting=True, dry_run=True))
         next_phase = self._next_phase(counting=True)
         self._enter(next_phase, running_from=ended_at if self.settings.auto_continue else None)
@@ -146,16 +164,21 @@ class PomodoroTimer:
 
     def _enter(self, phase: Phase, running_from: datetime | None):
         self.phase = phase
-        self._remaining = self.duration
+        self._length = self._remaining = timedelta(minutes=self.settings.minutes(phase))
         self._started_at = running_from
         self._ends_at = running_from + self._remaining if running_from else None
 
 
 @dataclass(frozen=True)
 class FocusSession:
-    """A completed focus session, for the stats."""
+    """A focus session, for the stats.
+
+    One cut short (skipped or reset) isn't `complete`: its minutes count towards your focus
+    time, but it isn't counted as a pomodoro.
+    """
 
     started: datetime
     minutes: int
     task_id: int | None = None
     label: str = ""  # what it was spent on: the task's title or an ad-hoc project
+    complete: bool = True

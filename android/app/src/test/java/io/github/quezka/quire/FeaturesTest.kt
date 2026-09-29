@@ -17,6 +17,7 @@ import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
 import io.github.quezka.quire.domain.Work
+import io.github.quezka.quire.domain.focusStats
 import io.github.quezka.quire.domain.formatMark
 import io.github.quezka.quire.domain.neededGrade
 import io.github.quezka.quire.focus.FocusController
@@ -30,6 +31,7 @@ import io.github.quezka.quire.sync.DeviceLink
 import io.github.quezka.quire.sync.MemorySettings
 import io.github.quezka.quire.update.newer
 import io.github.quezka.quire.update.parseRelease
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -124,6 +126,43 @@ class FeaturesTest {
         assertEquals(LocalDateTime.ofInstant(Instant.parse("2026-09-23T10:00:00Z"), java.time.ZoneId.systemDefault()),
             LocalDateTime.parse(started))
         assertEquals(19, started.length) // seconds included, like the desktop's
+    }
+
+    @Test fun aFocusSessionEndedEarlyAddsItsMinutesButNotAPomodoro() {
+        val repo = repo()
+        var now = Instant.parse("2026-09-23T10:00:00Z")
+        val focus = FocusController(repo, MemorySettings(), null) { now }
+        focus.focusOn(null, "Side project")
+        focus.toggle()
+        now = now.plus(Duration.ofMinutes(10))
+        focus.toggle() // a pause doesn't count
+        now = now.plus(Duration.ofMinutes(30))
+        focus.toggle()
+        now = now.plus(Duration.ofMinutes(2)).plusSeconds(40)
+        focus.skip()
+        val cut = repo.focusSessions().single()
+        assertEquals(13, cut.minutes)
+        assertFalse(cut.complete)
+        assertEquals("Side project", cut.label)
+        focus.toggle()
+        now = now.plus(Duration.ofMinutes(2))
+        focus.skip() // a break isn't focus time
+        val stats = focusStats(repo.focusSessions(), LocalDateTime.ofInstant(now, java.time.ZoneId.systemDefault()).toLocalDate())
+        assertEquals(0, stats.todaySessions)
+        assertEquals(13, stats.todayMinutes)
+        // Synced with the flag; a record from an older app without it counts as finished.
+        assertEquals(JsonPrimitive(false), Codec.focusData(cut)["complete"])
+        val old = JsonObject(Codec.focusData(cut).filterKeys { it != "complete" })
+        assertTrue(Codec.focus(SyncRecord("focus", cut.uid, "2026-09-23T10:00:00.000Z", false, old))!!.complete)
+    }
+
+    @Test fun aRunningPhaseKeepsItsLengthWhenSettingsChange() {
+        val t0 = Instant.parse("2026-09-23T10:00:00Z")
+        val timer = PomodoroTimer(FocusSettings(25, 5, 15, 4))
+        timer.start(t0)
+        timer.applySettings(FocusSettings(50, 5, 15, 4))
+        assertEquals(20, timer.cutShort(t0 + Duration.ofMinutes(20))!!.minutes)
+        assertEquals(25, timer.tick(t0 + Duration.ofMinutes(25))!!.minutes)
     }
 
     // ---- reminders ----
