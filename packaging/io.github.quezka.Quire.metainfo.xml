@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.17.0" date="2026-09-29">
+      <description>
+        <p>Quire's notifications have their own chime, on the desktop and the phone.</p>
+      </description>
+    </release>
     <release version="0.16.1" date="2026-09-29">
       <description>
         <p>Finished tasks show as ticked again in Today and on the School page.</p>

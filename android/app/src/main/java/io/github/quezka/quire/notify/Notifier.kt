@@ -9,6 +9,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
+import android.media.AudioAttributes
+import android.net.Uri
 import android.os.Build
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -26,22 +28,35 @@ import java.time.ZoneId
 /** Posts Quire's notifications and wakes the app for reminders and the focus timer. */
 class Notifier(private val context: Context) {
     companion object {
-        const val REMINDERS = "reminders"
-        const val FOCUS = "focus"
-        const val SCHOOL = "school"
+        // A channel's sound can't change once created, so the chime came with new ids;
+        // the old soundless channels are deleted in createChannels().
+        const val REMINDERS = "reminders_chime"
+        const val FOCUS = "focus_chime"
+        const val SCHOOL = "school_chime"
+        private val OLD_CHANNELS = listOf("reminders", "focus", "school")
         const val ACTION_REMIND = "io.github.quezka.quire.REMIND"
         const val ACTION_FOCUS = "io.github.quezka.quire.FOCUS"
         private const val FOCUS_ID = 2
         private const val SCHOOL_ID = 3
     }
 
+    /** Quire's chime (res/raw/chime.wav, the same sound as on the desktop). */
+    private val chime: Uri get() = Uri.parse("android.resource://${context.packageName}/${R.raw.chime}")
+
     fun createChannels() {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) return
         val manager = context.getSystemService(NotificationManager::class.java)
+        val audio = AudioAttributes.Builder()
+            .setUsage(AudioAttributes.USAGE_NOTIFICATION)
+            .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+            .build()
+        fun channel(id: String, name: Int, importance: Int) =
+            NotificationChannel(id, context.getString(name), importance).apply { setSound(chime, audio) }
+        OLD_CHANNELS.forEach(manager::deleteNotificationChannel)
         manager.createNotificationChannels(listOf(
-            NotificationChannel(REMINDERS, context.getString(R.string.channel_reminders), NotificationManager.IMPORTANCE_HIGH),
-            NotificationChannel(FOCUS, context.getString(R.string.channel_focus), NotificationManager.IMPORTANCE_HIGH),
-            NotificationChannel(SCHOOL, context.getString(R.string.channel_school), NotificationManager.IMPORTANCE_DEFAULT),
+            channel(REMINDERS, R.string.channel_reminders, NotificationManager.IMPORTANCE_HIGH),
+            channel(FOCUS, R.string.channel_focus, NotificationManager.IMPORTANCE_HIGH),
+            channel(SCHOOL, R.string.channel_school, NotificationManager.IMPORTANCE_DEFAULT),
         ))
     }
 

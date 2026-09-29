@@ -477,6 +477,9 @@ MESSAGES = {
     # Reminders
     "Reminders": "Напоминания",
     "Remind me": "Напоминать",
+    "Sound": "Звук",
+    "Play Quire's chime with notifications": "Сигнал Quire при уведомлениях",
+    "Play": "Прослушать",
     "For": "Для",
     "Off": "Выкл.",
     "When it starts": "В момент начала",

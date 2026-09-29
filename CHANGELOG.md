@@ -4,6 +4,19 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.17.0] - 2026-09-29
+
+### Added
+- **Quire has its own notification sound**, a soft two-note chime, the same on the desktop and
+  the phone. You can tell Quire's reminders, focus timer and school news apart from other
+  apps.
+  - Desktop: Settings → Reminders → Sound, with a *Play* button to hear it and a switch to
+    turn it off. On GNOME and KDE the desktop plays it, so Do Not Disturb silences it too.
+  - Phone: every Quire notification plays it. To change or mute it, go to Android's settings
+    for Quire → Notifications. Because Android can't change a channel's sound after the fact,
+    the channels were replaced, and any sound or mute setting you'd changed there is back to
+    the default.
+
 ## [0.16.1] - 2026-09-29
 
 ### Fixed

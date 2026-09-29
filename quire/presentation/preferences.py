@@ -1,4 +1,4 @@
-"""Display preferences that aren't part of your data: currency (and later language)."""
+"""Preferences that aren't part of your data: currency, the notification sound."""
 from __future__ import annotations
 
 from PySide6.QtCore import QLocale, QObject, QSettings, Signal
@@ -26,6 +26,14 @@ class Preferences(QObject):
     def set_currency(self, code: str):
         QSettings().setValue("currency", code)
         self.changed.emit("currency")
+
+    def notification_sound(self) -> bool:
+        """Whether notifications come with Quire's chime (on unless turned off)."""
+        return QSettings().value("notification_sound", True, type=bool)
+
+    def set_notification_sound(self, on: bool):
+        QSettings().setValue("notification_sound", on)
+        self.changed.emit("notification_sound")
 
     def currency_symbol(self) -> str:
         return SYMBOLS.get(self.currency()) or QLocale.system().currencySymbol()

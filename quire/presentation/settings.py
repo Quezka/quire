@@ -13,6 +13,7 @@ from ..application.errors import ApplicationError
 from ..application.services import ReminderSettings, Services
 from . import theme
 from .formatting import money
+from .notify import play_chime
 from .i18n import LANGUAGES, chosen_language, language, resolve, set_chosen_language
 from .preferences import CURRENCIES, preferences
 from .i18n import _
@@ -91,6 +92,15 @@ class SettingsDialog(QDialog):
             box.toggled.connect(lambda _on: self._reminders_changed())
         remind_kinds.addStretch()
         self.remind.currentIndexChanged.connect(lambda _row: self._reminders_changed())
+        self.chime = QCheckBox(_("Play Quire's chime with notifications"),
+                               checked=preferences().notification_sound())
+        self.chime.toggled.connect(preferences().set_notification_sound)
+        play = QPushButton(_("Play"))
+        play.clicked.connect(play_chime)
+        chime_row = QHBoxLayout()
+        chime_row.addWidget(self.chime)
+        chime_row.addWidget(play)
+        chime_row.addStretch()
         remind_hint = QLabel(_("A desktop notification before things start, while Quire is open."),
                              objectName="hint")
         remind_hint.setWordWrap(True)
@@ -165,6 +175,7 @@ class SettingsDialog(QDialog):
         form.addRow(_("Remind me"), self.remind)
         form.addRow(_("For"), remind_kinds)
         form.addRow("", remind_hint)
+        form.addRow(_("Sound"), chime_row)
 
         right.addRow(self._section(_("Sync")))
         right.addRow(self.sync_status)
