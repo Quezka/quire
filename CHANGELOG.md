@@ -4,6 +4,45 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.16.0] - 2026-09-29
+
+### Added
+- **Quire for Android now does what the desktop does.**
+  - **Today:** swipe left and right to change days. Tap a class, event or shift to edit it;
+    the + button adds a task, an event or a work shift.
+  - **Week:** a view of the whole week, swipeable by week.
+  - **School:** connect Classeviva on the phone. Homework and tests become tasks and subjects
+    become courses, matching the ones your computer imports. Grades (with "what do I need?"),
+    absences and the 25% limit, lesson topics and the noticeboard stay on the phone. The
+    password is encrypted with a key kept in the phone's secure hardware.
+  - **Work:** hours and take-home pay for this week or month, upcoming shifts, jobs with a
+    weekly schedule. Change a weekly shift just this week, or skip a week.
+  - **Focus:** the Pomodoro timer. It keeps running while the app is closed, notifies you
+    when a phase ends, and logs your sessions (they sync).
+  - **Courses:** edit your timetable on the phone.
+  - **Notifications:** reminders before events, classes and shifts (same settings as the
+    desktop), the focus timer, and new grades, homework, absences and notices from
+    Classeviva, checked every two hours.
+  - **Updates:** Settings → Updates checks GitHub and installs the new version.
+  - Smoother motion throughout: sliding pages, animated lists and numbers, a timer ring.
+- **Set up the phone with a QR code.** On the computer, Settings → Sync → Set up your phone…
+  shows a code; scan it in the phone app and it's signed in, with Classeviva too if you
+  like. Nothing to type.
+- **Notes, on both.**
+  - Markdown is styled as you type: headings, **bold**, *italic*, code, quotes and ticked
+    checklist items, with the marks faded.
+  - A formatting bar (heading, bold, italic, lists, checklist, quote, code) and shortcuts
+    (Ctrl+B, Ctrl+I, Ctrl+Shift+L…). Enter continues a list; an empty item ends it.
+  - Click (or tap) a checkbox to tick it. The list shows the start of each note.
+  - On the phone: course and topic filters, swipe to delete (with undo), long-press to pin.
+- **Scan a page (phone):** photograph a printed handout, or pick a picture, and its text
+  becomes a note or goes into the one you're writing. It works offline, in Italian and
+  English.
+- **Enter the hour of a late entry or early exit** when the school didn't record it (Classeviva
+  then sends no hour, and even its website shows "ora -1"). Double-click it on the desktop's
+  Absences page, or tap it on the phone. Your hour is kept across syncs, and the school's
+  wins if it's added later.
+
 ## [0.15.0] - 2026-09-28
 
 ### Added

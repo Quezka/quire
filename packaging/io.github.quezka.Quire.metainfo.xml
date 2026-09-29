@@ -53,6 +53,13 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.16.0" date="2026-09-29">
+      <description>
+        <p>The Android app gains school, work, focus, the week view, editing and notifications;
+          set the phone up with a QR code; notes are styled as you type; enter an absence's
+          hour when the school left it blank.</p>
+      </description>
+    </release>
     <release version="0.15.0" date="2026-09-28">
       <description>
         <p>The first Quire for Android: Today, tasks, notes and sync with your computers.</p>

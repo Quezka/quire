@@ -121,11 +121,22 @@ your data sits in an account only you control.
 
 ### Android app
 
-Quire for Android (`android/`, Kotlin and Jetpack Compose) covers the everyday parts:
-- **Today:** classes, events and work shifts, what's due, and the day note.
-- **Tasks:** with an editor.
-- **Notes:** with course and topic.
-- **Sync:** the same Firebase project and account as on your computers.
+Quire for Android (`android/`, Kotlin and Jetpack Compose) has what the desktop has:
+- **Today:** swipe left and right between days. Classes, events and work shifts, what's due,
+  and the day note. Tap something to edit it; + adds a task, an event or a shift.
+- **Week:** swipe between weeks.
+- **Tasks** and **Notes.** Notes have course and topic filters, Markdown styled as you type,
+  a formatting bar and checklists. **Scan a page** turns a printed handout into a note,
+  offline (Tesseract, Italian and English).
+- **School:** Classeviva on the phone. Homework and tests become tasks, subjects become
+  courses; grades, absences, lesson topics and the noticeboard stay on the phone.
+- **Work** (hours and pay), **Focus** (the Pomodoro timer), **Courses** (the timetable).
+- **Notifications:** reminders before things start, the focus timer, and news from Classeviva.
+- **Sync:** the same Firebase project and account as on your computers. The quickest way to
+  set it up: on the computer, Settings → Sync → **Set up your phone…** shows a QR code, and
+  the phone scans it. It can bring the Classeviva login along; the code goes screen to camera
+  and is never uploaded.
+- **Updates:** Settings → Updates downloads the new APK from GitHub and installs it.
 
 It works offline and syncs when the app opens, about 10 seconds after a change, and every
 15 minutes in the background. Install `Quire-<version>-android.apk` from the releases. Later
