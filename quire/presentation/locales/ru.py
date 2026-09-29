@@ -18,6 +18,7 @@ PLURALS = {
     "attachment": ("вложение", "вложения", "вложений"),
     "book": ("учебник", "учебника", "учебников"),
     "hour": ("час", "часа", "часов"),
+    "word": ("слово", "слова", "слов"),
     "mark": ("оценке", "оценкам", "оценкам"),
     "change": ("изменение", "изменения", "изменений"),
     "assignment": ("задание", "задания", "заданий"),
@@ -225,10 +226,22 @@ MESSAGES = {
     "Delete note": "Удалить заметку",
     "Delete “{title}”? This can't be undone.": "Удалить «{title}»? Это нельзя отменить.",
     "Select a note, or press Ctrl+N to start one.": "Выберите заметку или нажмите Ctrl+N, чтобы создать новую.",
-    "Start typing. The first line becomes the title.\n\nMarkdown works: # headings, **bold**, *italic*, - lists, - [ ] checklists, `code`.\nPress Ctrl+E to switch between editing and preview.":
+    "Start typing. The first line becomes the title.\n\nMarkdown works: # headings, **bold**, *italic*, - lists, - [ ] checklists, `code`.\nEnter continues a list; click a checkbox to tick it. Ctrl+E shows the preview.":
         "Начните печатать. Первая строка станет заголовком.\n\n"
         "Работает Markdown: # заголовки, **жирный**, *курсив*, - списки, - [ ] чек-листы, "
-        "`код`.\nCtrl+E переключает между правкой и предпросмотром.",
+        "`код`.\nEnter продолжает список; щёлкните по флажку, чтобы отметить его. Ctrl+E — предпросмотр.",
+    "Heading": "Заголовок",
+    "Subheading": "Подзаголовок",
+    "Plain text": "Обычный текст",
+    "Bold": "Жирный",
+    "Italic": "Курсив",
+    "Bulleted list": "Маркированный список",
+    "Checklist": "Чек-лист",
+    "Quote": "Цитата",
+    "Code": "Код",
+    "bold": "жирный",
+    "italic": "курсив",
+    "code": "код",
     "New note in this class": "Новая заметка по этому предмету",
     "New note in this topic": "Новая заметка в этой теме",
     "Rename topic": "Переименовать тему",

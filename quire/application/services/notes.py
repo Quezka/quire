@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import date
 
-from ...domain import NotFound, Note, normalize_topic
+from ...domain import NotFound, Note, normalize_topic, note_snippet
 from ..bus import ChangeBus, Topic
 from ..dto import NoteGroup, NoteSummary
 from ..inputs import NoteInput
@@ -27,7 +27,8 @@ class NoteService:
     def search(self, text: str = "", course_id: int | None = None) -> list[NoteSummary]:
         """Pinned notes first, then most recently edited."""
         by_id = {c.id: course_record(c) for c in self._courses.list()}
-        return [NoteSummary(n.id, n.title, n.pinned, n.updated, by_id.get(n.course_id), n.topic)
+        return [NoteSummary(n.id, n.title, n.pinned, n.updated, by_id.get(n.course_id), n.topic,
+                            note_snippet(n.body))
                 for n in self._notes.search(text.strip(), course_id)]
 
     def grouped(self, text: str = "", course_id: int | None = None) -> list[NoteGroup]:

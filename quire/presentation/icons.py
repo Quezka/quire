@@ -65,6 +65,13 @@ _PATHS = {
     "pause": '<path d="M8 4v16M16 4v16"/>',
     "reset": '<path d="M3 12a9 9 0 1 0 2.64-6.36L3 8"/><path d="M3 3v5h5"/>',
     "skip": '<path d="M5 4l10 8-10 8zM19 5v14"/>',
+    "bold": '<path d="M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z"/>',
+    "italic": '<path d="M19 4h-9M14 20H5M15 4L9 20"/>',
+    "heading": '<path d="M6 4v16M18 4v16M6 12h12"/>',
+    "list": '<path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01"/>',
+    "checklist": '<path d="M3 5l2 2 4-4M3 15l2 2 4-4M13 6h8M13 16h8"/>',
+    "code": '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/>',
+    "quote": '<path d="M3 21c3 0 7-1 7-8V5H3v7h4M14 21c3 0 7-1 7-8V5h-7v7h4"/>',
     "bell": '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>'
             '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
 }

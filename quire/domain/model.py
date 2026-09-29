@@ -6,6 +6,7 @@ convention (0 = Monday ... 6 = Sunday).
 """
 from __future__ import annotations
 
+import re
 from dataclasses import dataclass, field
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -152,6 +153,17 @@ def derive_note_title(body: str) -> str:
         if text:
             return text[:120]
     return "Untitled"
+
+
+def note_snippet(body: str, length: int = 90) -> str:
+    """The start of a note's text after its title, as plain words: for the notes list."""
+    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    text = " ".join(lines[1:])
+    text = re.sub(r"^#{1,6}\s+|(?<=\s)#{1,6}\s+", "", text)
+    text = re.sub(r"[-*+]\s+\[[ xX]\]\s+|(?:^|(?<=\s))[-*+>]\s+|\*\*|__|`|~~", "", text)
+    text = re.sub(r"\[([^\]]+)\]\([^)]+\)", r"\1", text)
+    text = " ".join(text.split())
+    return text if len(text) <= length else text[: length - 1].rstrip() + "…"
 
 
 TOPIC_LENGTH = 60

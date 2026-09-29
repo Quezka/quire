@@ -95,6 +95,7 @@ class NoteSummary:
     updated: datetime | None
     course: CourseRecord | None
     topic: str = ""
+    snippet: str = ""  # the start of the text after the title
 
 
 @dataclass(frozen=True)

@@ -7,7 +7,7 @@ from PySide6.QtCore import QSettings, Qt, QTimer
 from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QComboBox, QCompleter, QHBoxLayout, QInputDialog, QLineEdit, QListWidget, QListWidgetItem,
-    QMenu, QPlainTextEdit, QStackedWidget, QTextBrowser,
+    QMenu, QStackedWidget, QTextBrowser, QToolButton,
 )
 
 from ...application.bus import Topic
@@ -20,6 +20,7 @@ from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import confirm, fill_course_combo, select_data
 from ..formatting import plural, relative_timestamp
+from ..markdown_editor import SHORTCUTS, MarkdownEdit
 from ..widgets import TwoLineDelegate, scaled_font
 from .common import Card, Page, icon_button, label, primary_button
 from ..i18n import N_, _
@@ -27,7 +28,7 @@ from ..i18n import N_, _
 PLACEHOLDER = N_(
     "Start typing. The first line becomes the title.\n\n"
     "Markdown works: # headings, **bold**, *italic*, - lists, - [ ] checklists, `code`.\n"
-    "Press Ctrl+E to switch between editing and preview."
+    "Enter continues a list; click a checkbox to tick it. Ctrl+E shows the preview."
 )
 
 
@@ -117,11 +118,12 @@ class NotesView(Page):
         bar.addWidget(delete)
 
         font = scaled_font(self, 1.1)
-        self.editor = QPlainTextEdit(placeholderText=_(PLACEHOLDER))
+        self.editor = MarkdownEdit(placeholderText=_(PLACEHOLDER))
         self.editor.setObjectName("bare")
         self.editor.setFont(font)
         self.editor.setTabStopDistance(self.editor.fontMetrics().horizontalAdvance(" ") * 4)
         self.editor.textChanged.connect(self._edited)
+        self.editor.textChanged.connect(lambda: self._count_words())
         self.viewer = QTextBrowser(openExternalLinks=True)
         self.viewer.setObjectName("bare")
         self.viewer.setFont(font)
@@ -131,6 +133,7 @@ class NotesView(Page):
 
         self.right = Card(padding=14)
         self.right.body.addLayout(bar)
+        self.right.body.addLayout(self._format_bar())
         self.right.add(self.stack, 1)
 
         body = QHBoxLayout()
@@ -146,6 +149,45 @@ class NotesView(Page):
         self.reload_list()
         if not self._select_first_note():
             self._show(None)
+
+    def _format_bar(self) -> QHBoxLayout:
+        """Buttons for the Markdown the editor understands, with their shortcuts."""
+        e = self.editor
+        heading = icon_button("heading", _("Heading"))
+        heading.setPopupMode(QToolButton.InstantPopup)
+        menu = QMenu(heading)
+        for level, text in ((1, _("Title")), (2, _("Heading")), (3, _("Subheading")),
+                            (0, _("Plain text"))):
+            menu.addAction(text, lambda level=level: e.set_heading(level))
+        heading.setMenu(menu)
+        buttons = [heading]
+        for name, tip, action in (
+                ("bold", _("Bold"), lambda: e.wrap("**", _("bold"))),
+                ("italic", _("Italic"), lambda: e.wrap("*", _("italic"))),
+                ("list", _("Bulleted list"), lambda: e.toggle_prefix("- ")),
+                ("checklist", _("Checklist"), lambda: e.toggle_prefix("- [ ] ")),
+                ("quote", _("Quote"), lambda: e.toggle_prefix("> ")),
+                ("code", _("Code"), lambda: e.wrap("`", _("code")))):
+            shortcut = SHORTCUTS.get(name)
+            if shortcut is not None:
+                tip += f" ({shortcut.toString(QKeySequence.NativeText)})"
+            button = icon_button(name, tip)
+            button.clicked.connect(action)
+            button.clicked.connect(e.setFocus)
+            buttons.append(button)
+        self.format_buttons = buttons
+        self.words = label("", "hint")
+        row = QHBoxLayout()
+        row.setSpacing(2)
+        for button in buttons:
+            row.addWidget(button)
+        row.addStretch()
+        row.addWidget(self.words)
+        return row
+
+    def _count_words(self):
+        words = len(self.editor.toPlainText().split())
+        self.words.setText(plural(words, "word") if words else "")
 
     # ---- list -----------------------------------------------------------
 
@@ -315,6 +357,8 @@ class NotesView(Page):
             meta += f" · {summary.course.name}"
         if with_course and summary.topic:
             meta += f" · {summary.topic}"
+        if summary.snippet:
+            meta += f" · {summary.snippet}"
         return meta
 
     def _selected(self, item, _previous):
@@ -404,6 +448,8 @@ class NotesView(Page):
         if on:
             self.viewer.setMarkdown(self.editor.toPlainText())
         self.stack.setCurrentIndex(1 if on else 0)
+        for button in self.format_buttons:
+            button.setEnabled(not on)
         if not on:
             self.editor.setFocus()
 
