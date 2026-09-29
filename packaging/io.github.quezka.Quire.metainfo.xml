@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.18.1" date="2026-09-29">
+      <description>
+        <p>Quitting during a focus session keeps the minutes focused so far.</p>
+      </description>
+    </release>
     <release version="0.18.0" date="2026-09-29">
       <description>
         <p>Focus sessions ended early add their minutes to your focus time.</p>

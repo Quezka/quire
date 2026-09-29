@@ -302,3 +302,16 @@ def test_skipping_after_the_session_already_ran_out_counts_it_as_finished(focus_
     focus.skip()
     stats = focus.stats()
     assert (stats.today_sessions, stats.today_minutes) == (1, 25)
+
+
+def test_quitting_mid_session_adds_the_focus_so_far(focus_env):
+    services, clock, path = focus_env
+    focus = services.focus
+    focus.toggle()
+    clock.advance(minutes=18)
+    focus.stop()
+    assert not focus.state().started
+    stats = focus.stats()
+    assert (stats.today_sessions, stats.today_minutes) == (0, 18)
+    focus.stop()  # quitting again (nothing running) adds nothing
+    assert focus.stats().today_minutes == 18

@@ -136,6 +136,11 @@ class FocusService:
         self._log_cut_short()
         self._timer.skip(self._clock.now())
 
+    def stop(self):
+        """Quire is quitting: the timer can't carry on, so the focus so far counts."""
+        self._log_cut_short()
+        self._timer.reset()
+
     def _log_cut_short(self):
         """A focus session ended early still counts towards your focus time."""
         self.tick()  # a phase that has already run out counts as finished, not cut short

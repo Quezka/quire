@@ -4,6 +4,13 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.18.1] - 2026-09-29
+
+### Fixed
+- Desktop: quitting Quire in the middle of a focus session threw that session away. The
+  minutes you'd focused now go into your focus time, the same as when you skip or reset.
+  (On the phone the timer keeps running while the app is closed, so nothing is lost there.)
+
 ## [0.18.0] - 2026-09-29
 
 ### Changed

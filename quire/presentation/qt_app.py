@@ -40,6 +40,9 @@ def run(services: Services, argv: list[str], background: bool = False) -> int:
         # Closing the window keeps Quire in the tray; quitting is explicit.
         app.setQuitOnLastWindowClosed(False)
     services.startup.refresh_login_item()
+    # However Quire quits (Ctrl+Q, the tray, an update, logging out), a focus session
+    # under way still adds the minutes spent so far.
+    app.aboutToQuit.connect(services.focus.stop)
     if not (background and tray is not None):
         window.show()
     return app.exec()
