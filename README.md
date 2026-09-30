@@ -41,8 +41,7 @@ you own.
     name and a colour, and file notes in it from the same picker you use for classes. A note
     is in a class *or* a notebook. Topics work inside notebooks too. Right-click a
     notebook's heading to add a note or to rename, recolour or delete it (its notes stay,
-    filed nowhere). Notebooks sync between your devices; the phone keeps them intact but
-    doesn't show them yet.
+    filed nowhere). Notebooks sync between your devices, and the phone has them too.
   - The **group** button next to the filter shows notes under their class or notebook and
     topic. Click a heading to collapse it. Right-click a topic to rename it (a rename into an
     existing name merges the two) or to start a new note in it.
@@ -142,7 +141,7 @@ Quire for Android (`android/`, Kotlin and Jetpack Compose) has what the desktop 
 - **Today:** swipe left and right between days. Classes, events and work shifts, what's due,
   and the day note. Tap something to edit it; + adds a task, an event or a shift.
 - **Week:** swipe between weeks.
-- **Tasks** and **Notes.** Notes have course and topic filters, Markdown styled as you type,
+- **Tasks** and **Notes.** Notes have course, notebook and topic filters, Markdown styled as you type,
   a formatting bar and checklists. Swipe a note away to delete it (with undo), long-press to
   pin it. **Scan a page** turns a photo of a printed handout into a note, offline (Tesseract,
   Italian and English).

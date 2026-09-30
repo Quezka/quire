@@ -49,6 +49,7 @@ import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
 import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CameraAlt
 import androidx.compose.material.icons.filled.ChecklistRtl
 import androidx.compose.material.icons.filled.Close
@@ -66,11 +67,16 @@ import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Title
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.outlined.PushPin
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.AssistChip
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.HorizontalDivider
@@ -86,6 +92,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SwipeToDismissBox
 import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
@@ -120,7 +127,9 @@ import io.github.quezka.quire.data.Codec
 import io.github.quezka.quire.data.Repository
 import io.github.quezka.quire.domain.BlockKind
 import io.github.quezka.quire.domain.Markdown
+import io.github.quezka.quire.domain.COURSE_COLORS
 import io.github.quezka.quire.domain.Note
+import io.github.quezka.quire.domain.Notebook
 import io.github.quezka.quire.domain.deriveNoteTitle
 import io.github.quezka.quire.ocr.Ocr
 import kotlinx.coroutines.Dispatchers
@@ -133,6 +142,16 @@ import java.time.LocalDate
 /** Which notes show: everything, pinned ones, or one course's. */
 private const val ALL = "*"
 private const val PINNED = "pinned"
+private const val NOTEBOOK = "nb:" // "nb:<uid>" filters to one notebook; a bare uid is a course
+
+private fun homed(filter: String) = filter != ALL && filter != PINNED
+
+/** (course uid, notebook uid) a new note gets when the list is filtered to [filter]. */
+private fun filterHome(filter: String): Pair<String?, String?> = when {
+    !homed(filter) -> null to null
+    filter.startsWith(NOTEBOOK) -> null to filter.removePrefix(NOTEBOOK)
+    else -> filter to null
+}
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
@@ -145,13 +164,19 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
     val notes = remember(version) { repo.notes() }
     val courses = remember(version) { repo.courses() }
     val courseIndex = remember(version) { repo.courseIndex() }
+    val notebooks = remember(version) { repo.notebooks() }
+    val notebookIndex = remember(version) { notebooks.associateBy { it.uid } }
+    var notebookDialog by remember { mutableStateOf<Notebook?>(null) }
+    var newNotebook by remember { mutableStateOf(false) }
+    var deletingNotebook by remember { mutableStateOf<Notebook?>(null) }
     val snackbar = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
     var menu by remember { mutableStateOf(false) }
     val scanner = rememberScanner { text ->
+        val (course, notebook) = filterHome(filter)
         val note = repo.saveNote(Note(Codec.newUid(),
             context.getString(R.string.scanned_title, longDate(repo.today(), repo.today())) + "\n\n" + text,
-            courseUid = filter.takeIf { it != ALL && it != PINNED }, topic = topic.orEmpty()))
+            courseUid = course, notebookUid = notebook, topic = topic.orEmpty()))
         openNote(note.uid)
     }
 
@@ -159,17 +184,18 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
         when (filter) {
             ALL -> true
             PINNED -> n.pinned
-            else -> courseIndex[n.courseUid]?.uid == filter
+            else -> if (filter.startsWith(NOTEBOOK)) n.notebookUid == filter.removePrefix(NOTEBOOK)
+                else courseIndex[n.courseUid]?.uid == filter
         }
     }
-    val topics = if (filter != ALL && filter != PINNED)
+    val topics = if (homed(filter))
         inFilter.map { it.topic }.filter { it.isNotBlank() }.distinct().sortedBy { it.lowercase() } else emptyList()
     val shown = inFilter.filter { n ->
         (topic == null || n.topic == topic) &&
             (query.isBlank() || n.body.contains(query, ignoreCase = true) || n.topic.contains(query, true))
     }
-    // With a course chosen, notes are grouped under their topics.
-    val grouped = if (filter != ALL && filter != PINNED && topic == null && topics.isNotEmpty())
+    // With a course or notebook chosen, notes are grouped under their topics.
+    val grouped = if (homed(filter) && topic == null && topics.isNotEmpty())
         shown.groupBy { it.topic }.toSortedMap(compareBy({ it.isEmpty() }, { it.lowercase() }))
     else mapOf("" to shown)
 
@@ -187,7 +213,7 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                     Icon(if (searching) Icons.Filled.Close else Icons.Filled.Search, stringResource(R.string.search_notes))
                 }
             })
-            // Course chips, then (for a course) its topics.
+            // Course and notebook chips, then (for one of them) its topics.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 FilterChip(filter == ALL, { filter = ALL; topic = null }, { Text(stringResource(R.string.all_notes)) })
@@ -199,6 +225,20 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                             Box(Modifier.size(10.dp).background(parseColor(c.color), CircleShape))
                         })
                 }
+                for (b in notebooks) {
+                    val key = NOTEBOOK + b.uid
+                    FilterChip(filter == key, { filter = if (filter == key) ALL else key; topic = null },
+                        { Text(b.name) }, leadingIcon = {
+                            Box(Modifier.size(10.dp).background(parseColor(b.color), CircleShape))
+                        })
+                }
+                notebookIndex[filter.removePrefix(NOTEBOOK)]?.takeIf { filter.startsWith(NOTEBOOK) }?.let { open ->
+                    IconButton(onClick = { notebookDialog = open }, Modifier.size(32.dp)) {
+                        Icon(Icons.Filled.Edit, stringResource(R.string.edit_notebook), Modifier.size(18.dp))
+                    }
+                }
+                AssistChip({ newNotebook = true }, { Text(stringResource(R.string.new_notebook)) },
+                    leadingIcon = { Icon(Icons.Filled.Add, null, Modifier.size(16.dp)) })
             }
             AnimatedVisibility(topics.isNotEmpty(), enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
                 Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
@@ -241,8 +281,8 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                                     tint = MaterialTheme.colorScheme.onErrorContainer)
                             }
                         }) {
-                            NoteCard(note, courseIndex[note.courseUid], repo.today(),
-                                showCourse = filter == ALL || filter == PINNED,
+                            NoteCard(note, courseIndex[note.courseUid], notebookIndex[note.notebookUid],
+                                repo.today(), showCourse = !homed(filter),
                                 onOpen = { openNote(note.uid) },
                                 onPin = { repo.saveNote(note.copy(pinned = !note.pinned)) })
                         }
@@ -258,9 +298,12 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                     DropdownMenuItem(text = { Text(stringResource(R.string.new_note)) },
                         leadingIcon = { Icon(Icons.Filled.Edit, null) }, onClick = {
                             menu = false
-                            val course = filter.takeIf { it != ALL && it != PINNED }
-                            openNote(repo.saveNote(Note(Codec.newUid(), "", courseUid = course, topic = topic.orEmpty())).uid)
+                            val (course, notebook) = filterHome(filter)
+                            openNote(repo.saveNote(Note(Codec.newUid(), "", courseUid = course,
+                                notebookUid = notebook, topic = topic.orEmpty())).uid)
                         })
+                    DropdownMenuItem(text = { Text(stringResource(R.string.new_notebook)) },
+                        leadingIcon = { Icon(Icons.Filled.Book, null) }, onClick = { menu = false; newNotebook = true })
                     DropdownMenuItem(text = { Text(stringResource(R.string.scan_page)) },
                         leadingIcon = { Icon(Icons.Filled.CameraAlt, null) }, onClick = { menu = false; scanner.camera() })
                     DropdownMenuItem(text = { Text(stringResource(R.string.from_picture)) },
@@ -271,12 +314,98 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
         SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))
         ScanProgress(scanner.busy)
     }
+
+    if (newNotebook) NotebookDialog(null, onDismiss = { newNotebook = false }, onDelete = null,
+        onSave = { saved ->
+            newNotebook = false
+            filter = NOTEBOOK + repo.saveNotebook(saved).uid; topic = null
+        })
+    notebookDialog?.let { open ->
+        NotebookDialog(open, onDismiss = { notebookDialog = null },
+            onDelete = { deletingNotebook = open; notebookDialog = null },
+            onSave = { repo.saveNotebook(it); notebookDialog = null })
+    }
+    deletingNotebook?.let { doomed ->
+        ConfirmDialog(stringResource(R.string.delete_notebook_question, doomed.name),
+            stringResource(R.string.delete),
+            onConfirm = {
+                repo.deleteNotebook(doomed.uid)
+                if (filter == NOTEBOOK + doomed.uid) { filter = ALL; topic = null }
+                deletingNotebook = null
+            },
+            onDismiss = { deletingNotebook = null })
+    }
+}
+
+/** Name and colour of a notebook: new (`initial` is null), or rename, recolour and delete. */
+@Composable
+fun NotebookDialog(initial: Notebook?, onSave: (Notebook) -> Unit, onDelete: (() -> Unit)?,
+                   onDismiss: () -> Unit) {
+    var name by remember { mutableStateOf(initial?.name.orEmpty()) }
+    var color by remember { mutableStateOf(initial?.color ?: COURSE_COLORS[4]) }
+    AlertDialog(onDismissRequest = onDismiss,
+        title = { Text(stringResource(if (initial == null) R.string.new_notebook else R.string.edit_notebook)) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), singleLine = true,
+                    label = { Text(stringResource(R.string.notebook_name)) },
+                    keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences))
+                ColorPicker(color) { color = it }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = name.isNotBlank(), onClick = {
+                onSave(Notebook(initial?.uid ?: Codec.newUid(), name.trim(), color))
+            }) { Text(stringResource(R.string.save)) }
+        },
+        dismissButton = {
+            Row {
+                if (onDelete != null) TextButton(onClick = onDelete,
+                    colors = ButtonDefaults.textButtonColors(contentColor = MaterialTheme.colorScheme.error)) {
+                    Text(stringResource(R.string.delete))
+                }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            }
+        })
+}
+
+/** Where a note is filed: no group, a course, or a notebook (or make a new notebook). */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun HomePicker(courses: List<io.github.quezka.quire.domain.Course>, notebooks: List<Notebook>,
+                       courseUid: String?, notebookUid: String?, onNew: () -> Unit,
+                       onPick: (course: String?, notebook: String?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    val name = courses.firstOrNull { it.uid == courseUid }?.name
+        ?: notebooks.firstOrNull { it.uid == notebookUid }?.name
+        ?: stringResource(R.string.no_course_or_notebook)
+    ExposedDropdownMenuBox(expanded = open, onExpandedChange = { open = it }) {
+        OutlinedTextField(name, {}, readOnly = true, singleLine = true,
+            label = { Text(stringResource(R.string.course_or_notebook)) },
+            trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(open) },
+            modifier = Modifier.fillMaxWidth().menuAnchor())
+        ExposedDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(text = { Text(stringResource(R.string.no_course_or_notebook)) },
+                onClick = { onPick(null, null); open = false })
+            for (c in courses) DropdownMenuItem(text = { Text(c.name) },
+                leadingIcon = { Box(Modifier.size(10.dp).background(parseColor(c.color), CircleShape)) },
+                onClick = { onPick(c.uid, null); open = false })
+            if (notebooks.isNotEmpty()) HorizontalDivider()
+            for (b in notebooks) DropdownMenuItem(text = { Text(b.name) },
+                leadingIcon = { Box(Modifier.size(10.dp).background(parseColor(b.color), CircleShape)) },
+                onClick = { onPick(null, b.uid); open = false })
+            HorizontalDivider()
+            DropdownMenuItem(text = { Text(stringResource(R.string.new_notebook)) },
+                leadingIcon = { Icon(Icons.Filled.Add, null) },
+                onClick = { open = false; onNew() })
+        }
+    }
 }
 
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun NoteCard(note: Note, course: io.github.quezka.quire.domain.Course?, today: LocalDate, showCourse: Boolean,
-                     onOpen: () -> Unit, onPin: () -> Unit) {
+private fun NoteCard(note: Note, course: io.github.quezka.quire.domain.Course?, notebook: Notebook?,
+                     today: LocalDate, showCourse: Boolean, onOpen: () -> Unit, onPin: () -> Unit) {
     val context = LocalContext.current
     val source = remember { MutableInteractionSource() }
     val snippet = remember(note.body) { Markdown.snippet(note.body, 140) }
@@ -286,7 +415,7 @@ private fun NoteCard(note: Note, course: io.github.quezka.quire.domain.Course?, 
         colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Box(Modifier.width(5.dp).fillMaxHeight()
-                .background(course?.let { parseColor(it.color) } ?: Color.Transparent))
+                .background((course?.color ?: notebook?.color)?.let { parseColor(it) } ?: Color.Transparent))
             Column(Modifier.weight(1f).padding(14.dp), verticalArrangement = Arrangement.spacedBy(3.dp)) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(note.title, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis,
@@ -300,7 +429,7 @@ private fun NoteCard(note: Note, course: io.github.quezka.quire.domain.Course?, 
                     style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                 val updated = runCatching { LocalDate.parse(note.updated.take(10)) }.getOrNull()
                     ?.let { relativeDate(context, it, today) }
-                val meta = listOfNotNull(course?.name?.takeIf { showCourse }, note.topic.ifBlank { null }, updated)
+                val meta = listOfNotNull((course?.name ?: notebook?.name)?.takeIf { showCourse }, note.topic.ifBlank { null }, updated)
                 if (meta.isNotEmpty()) Text(meta.joinToString(" · "), style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f), maxLines = 1)
             }
@@ -389,19 +518,24 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
     val editor = remember(uid) { BlockEditorState(stored?.body.orEmpty()) { dirty = true } }
     var topic by remember { mutableStateOf(stored?.topic.orEmpty()) }
     var courseUid by remember { mutableStateOf(stored?.courseUid) }
+    var notebookUid by remember { mutableStateOf(stored?.notebookUid) }
+    var newNotebook by remember { mutableStateOf(false) }
     var pinned by remember { mutableStateOf(stored?.pinned ?: false) }
     var confirming by remember { mutableStateOf(false) }
     var overflow by remember { mutableStateOf(false) }
     val courses = remember(version) { repo.courses() }
-    val topics = remember(version, courseUid) {
-        repo.notes().filter { it.courseUid == courseUid && it.topic.isNotBlank() }.map { it.topic }.distinct().sorted()
+    val notebooks = remember(version) { repo.notebooks() }
+    val topics = remember(version, courseUid, notebookUid) {
+        repo.notes().filter { it.courseUid == courseUid && it.notebookUid == notebookUid && it.topic.isNotBlank() }
+            .map { it.topic }.distinct().sorted()
     }
     val body = remember(editor.revision) { editor.markdown() }
 
     fun flush() {
         if (!dirty) return
         val base = repo.note(uid) ?: Note(uid, "")
-        repo.saveNote(base.copy(body = editor.markdown(), topic = topic, courseUid = courseUid, pinned = pinned))
+        repo.saveNote(base.copy(body = editor.markdown(), topic = topic, courseUid = courseUid,
+            notebookUid = notebookUid, pinned = pinned))
         dirty = false
     }
     // A scanned page's text goes where the cursor is.
@@ -411,10 +545,11 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
     LaunchedEffect(stored) {
         if (!dirty && stored != null && stored.body != editor.markdown()) {
             editor.load(stored.body)
-            topic = stored.topic; courseUid = stored.courseUid; pinned = stored.pinned
+            topic = stored.topic; courseUid = stored.courseUid; notebookUid = stored.notebookUid
+            pinned = stored.pinned
         }
     }
-    LaunchedEffect(editor.revision, topic, courseUid, pinned, dirty) { if (dirty) { delay(800); flush() } }
+    LaunchedEffect(editor.revision, topic, courseUid, notebookUid, pinned, dirty) { if (dirty) { delay(800); flush() } }
     DisposableEffect(uid) { onDispose { flush() } }
     BackHandler { flush(); close() }
 
@@ -449,7 +584,11 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
                 },
             )
             Row(Modifier.padding(horizontal = 16.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(Modifier.weight(1f)) { CoursePicker(courses, courseUid) { courseUid = it; dirty = true } }
+                Box(Modifier.weight(1f)) {
+                    HomePicker(courses, notebooks, courseUid, notebookUid, onNew = { newNotebook = true }) { course, book ->
+                        courseUid = course; notebookUid = book; dirty = true
+                    }
+                }
                 TopicField(topic, topics, Modifier.weight(1f)) { topic = it; dirty = true }
             }
             BlockEditor(editor, repo::image, stringResource(R.string.note_hint),
@@ -459,6 +598,12 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
         }
         ScanProgress(scanner.busy)
     }
+
+    if (newNotebook) NotebookDialog(null, onDismiss = { newNotebook = false }, onDelete = null,
+        onSave = { saved ->
+            newNotebook = false
+            courseUid = null; notebookUid = repo.saveNotebook(saved).uid; dirty = true
+        })
 
     if (confirming) ConfirmDialog(stringResource(R.string.delete_note_question),
         stringResource(R.string.delete),

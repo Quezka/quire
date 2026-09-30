@@ -4,6 +4,16 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.23.0] - 2026-09-30
+
+### Added
+- **Phone: notebooks.** The notes screen has a chip for each notebook next to your courses
+  (with its topics under it), and a **New notebook** chip and menu entry. With a notebook
+  chosen, the pencil next to its chip renames or recolours it, or deletes it (its notes
+  stay, filed nowhere). In a note, the picker now offers courses, notebooks and "New
+  notebook". New notes and scanned pages go into whatever the list is filtered to. As on
+  the computer, a note is in a course or a notebook, and a course wins.
+
 ## [0.22.0] - 2026-09-30
 
 ### Added

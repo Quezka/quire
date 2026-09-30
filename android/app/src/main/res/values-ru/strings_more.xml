@@ -248,4 +248,10 @@
     <string name="remove_picture">Убрать картинку</string>
     <string name="indent">Сдвинуть вправо</string>
     <string name="outdent">Сдвинуть влево</string>
+    <string name="new_notebook">Новый блокнот</string>
+    <string name="edit_notebook">Изменить блокнот</string>
+    <string name="notebook_name">Название блокнота</string>
+    <string name="course_or_notebook">Предмет или блокнот</string>
+    <string name="no_course_or_notebook">Без группы</string>
+    <string name="delete_notebook_question">Удалить блокнот «%1$s»? Заметки останутся, но будут вне блокнота.</string>
 </resources>

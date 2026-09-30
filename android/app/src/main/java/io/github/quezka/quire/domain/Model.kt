@@ -84,9 +84,20 @@ data class Note(
     val pinned: Boolean = false,
     val topic: String = "",
     val updated: String = "",
+    /** A note is in a course or a notebook, not both (a course wins, as on the desktop). */
+    val notebookUid: String? = null,
 ) {
     val title get() = deriveNoteTitle(body)
 }
+
+/** A group of notes that isn't a course: Ideas, Trips, a project. */
+data class Notebook(
+    val uid: String,
+    val name: String,
+    val color: String = NOTEBOOK_COLOR,
+)
+
+const val NOTEBOOK_COLOR = "#8a8f98"
 
 /** A note's title is its first non-empty line, minus markdown heading marks. */
 /** A picture in a note, as the desktop writes it: ![alt](quire-image:<uid>). */

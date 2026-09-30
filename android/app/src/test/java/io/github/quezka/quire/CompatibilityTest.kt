@@ -6,6 +6,8 @@ import io.github.quezka.quire.data.Records
 import io.github.quezka.quire.data.Repository
 import io.github.quezka.quire.data.SyncRecord
 import io.github.quezka.quire.domain.ItemKind
+import io.github.quezka.quire.domain.Note
+import io.github.quezka.quire.domain.Notebook
 import io.github.quezka.quire.domain.TaskKind
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -90,22 +92,69 @@ class CompatibilityTest {
             ["future_field"] as JsonPrimitive).content)
     }
 
-    @Test fun notesInDesktopNotebooksStayThereWhenEditedOnThePhone() {
-        // The phone doesn't show notebooks yet, but it must read them and never drop them.
+    @Test fun desktopNotebooksAreReadAndTheirNotesStayInThemWhenEdited() {
         val records = Records(MemoryRowStore())
         records.apply(desktopRecords())
         val repo = Repository(records, today = { today })
-        val notebook = desktopRecords().first { it.kind == "notebook" }
-        val record = desktopRecords().first {
-            it.kind == "note" && (it.data!!["notebook"] as? JsonPrimitive)?.content == notebook.uid
-        }
-        val note = repo.notes().first { it.uid == record.uid }
+        val trips = repo.notebooks().single()
+        assertEquals("Trips", trips.name)
+        assertEquals("#12a594", trips.color)
+        val note = repo.notes().first { it.notebookUid == trips.uid }
         assertEquals("Museum trip", note.title)
         assertEquals(null, note.courseUid)
+        assertEquals(1, repo.notes().count { it.notebookUid != null }) // the others are in courses or nowhere
+
         repo.saveNote(note.copy(body = note.body + "- Sunscreen\n"))
         val saved = records.get("note", note.uid)!!.data!!
-        assertEquals(notebook.uid, (saved["notebook"] as JsonPrimitive).content)
-        assertEquals(record.data!!.keys, saved.keys)
+        assertEquals(trips.uid, (saved["notebook"] as JsonPrimitive).content)
+        assertEquals(desktopRecords().first { it.uid == note.uid }.data!!.keys, saved.keys)
+    }
+
+    @Test fun aNoteIsInACourseOrANotebookAndACourseWins() {
+        val repo = repository()
+        val trips = repo.notebooks().single()
+        val maths = repo.courses().first { it.name == "Mathematics" }
+        val note = repo.notes().first { it.notebookUid == trips.uid }
+        val moved = repo.saveNote(note.copy(courseUid = maths.uid)) // the notebook field is still set
+        assertEquals(null, moved.notebookUid)
+        assertEquals(maths.uid, repo.note(note.uid)!!.courseUid)
+        assertEquals(null, repo.note(note.uid)!!.notebookUid)
+        val back = repo.saveNote(moved.copy(courseUid = null, notebookUid = trips.uid))
+        assertEquals(trips.uid, repo.note(back.uid)!!.notebookUid)
+        // A record from elsewhere with both set (an older phone, say): the course wins.
+        val both = desktopRecords().first { it.uid == note.uid }
+        val data = JsonObject(both.data!! + ("course" to JsonPrimitive(maths.uid)))
+        val records = Records(MemoryRowStore())
+        records.apply(listOf(both.copy(data = data)))
+        val read = Codec.note(records.get("note", note.uid)!!)
+        assertEquals(maths.uid, read.courseUid)
+        assertEquals(null, read.notebookUid)
+    }
+
+    @Test fun notebooksAreCreatedRenamedAndDeletedKeepingTheirNotes() {
+        val records = Records(MemoryRowStore())
+        records.apply(desktopRecords())
+        val repo = Repository(records, today = { today })
+        val ideas = repo.saveNotebook(Notebook(Codec.newUid(), "  Ideas ", "#f76b15"))
+        assertEquals("Ideas", ideas.name)
+        assertEquals(listOf("Ideas", "Trips"), repo.notebooks().map { it.name })
+        val note = repo.saveNote(Note(Codec.newUid(), "# Game", notebookUid = ideas.uid, topic = "Apps"))
+        assertEquals(ideas.uid, repo.note(note.uid)!!.notebookUid)
+        // Saved in the desktop's format, extra fields kept.
+        val stored = records.get("notebook", ideas.uid)!!.data!!
+        assertEquals(setOf("name", "color"), stored.keys)
+        val extra = JsonObject(stored + ("future_field" to JsonPrimitive("kept")))
+        records.save("notebook", ideas.uid, extra)
+        repo.saveNotebook(ideas.copy(name = "Projects"))
+        assertEquals("kept", (records.get("notebook", ideas.uid)!!.data!!["future_field"] as JsonPrimitive).content)
+        assertEquals("Projects", repo.notebook(ideas.uid)!!.name)
+
+        repo.deleteNotebook(ideas.uid)
+        assertEquals(null, repo.notebook(ideas.uid))
+        assertEquals(listOf("Trips"), repo.notebooks().map { it.name })
+        val kept = repo.note(note.uid)!! // the note stays, filed nowhere
+        assertEquals(null, kept.notebookUid)
+        assertEquals("Apps", kept.topic)
     }
 
     @Test fun desktopPicturesAreRead() {

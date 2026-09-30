@@ -8,6 +8,7 @@ import io.github.quezka.quire.domain.Event
 import io.github.quezka.quire.domain.FocusSession
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
+import io.github.quezka.quire.domain.Notebook
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
@@ -68,6 +69,9 @@ class Repository(
     fun notes(): List<Note> = records.live("note").map(Codec::note)
         .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updated })
     fun note(uid: String): Note? = records.get("note", uid)?.let(Codec::note)
+    fun notebooks(): List<Notebook> = records.live("notebook").map(Codec::notebook)
+        .sortedBy { it.name.lowercase() }
+    fun notebook(uid: String): Notebook? = records.get("notebook", uid)?.takeIf { !it.deleted }?.let(Codec::notebook)
     fun image(uid: String): ByteArray? = records.get("image", uid)?.takeIf { !it.deleted }?.let(Codec::image)
     fun jobs(): List<Job> = records.live("job").map(Codec::job).sortedBy { it.name.lowercase() }
     fun job(uid: String): Job? = records.get("job", uid)?.let(Codec::job)
@@ -113,6 +117,7 @@ class Repository(
 
     fun saveNote(note: Note): Note {
         val saved = note.copy(topic = normalizeTopic(note.topic),
+            notebookUid = if (note.courseUid != null) null else note.notebookUid,
             updated = now().truncatedTo(ChronoUnit.SECONDS).toString())
         records.save("note", saved.uid, Codec.noteData(saved, records.get("note", saved.uid)?.data))
         changed()
@@ -121,6 +126,22 @@ class Repository(
 
     fun deleteNote(uid: String) {
         records.delete("note", uid)
+        changed()
+    }
+
+    fun saveNotebook(notebook: Notebook): Notebook {
+        val saved = notebook.copy(name = notebook.name.trim().ifEmpty { "Untitled notebook" })
+        records.save("notebook", saved.uid, Codec.notebookData(saved, records.get("notebook", saved.uid)?.data))
+        changed()
+        return saved
+    }
+
+    /** Delete a notebook; its notes stay, filed nowhere (as on the desktop). */
+    fun deleteNotebook(uid: String) {
+        for (n in notes().filter { it.notebookUid == uid }) {
+            records.save("note", n.uid, Codec.noteData(n.copy(notebookUid = null), records.get("note", n.uid)?.data))
+        }
+        records.delete("notebook", uid)
         changed()
     }
 

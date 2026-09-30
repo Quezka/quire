@@ -232,4 +232,10 @@
     <string name="remove_picture">Remove picture</string>
     <string name="indent">Indent</string>
     <string name="outdent">Outdent</string>
+    <string name="new_notebook">New notebook</string>
+    <string name="edit_notebook">Edit notebook</string>
+    <string name="notebook_name">Notebook name</string>
+    <string name="course_or_notebook">Course or notebook</string>
+    <string name="no_course_or_notebook">Not filed</string>
+    <string name="delete_notebook_question">Delete the notebook “%1$s”? Its notes stay, but aren\'t in any notebook.</string>
 </resources>

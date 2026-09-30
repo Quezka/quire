@@ -6,6 +6,8 @@ import io.github.quezka.quire.domain.Event
 import io.github.quezka.quire.domain.FocusSession
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
+import io.github.quezka.quire.domain.NOTEBOOK_COLOR
+import io.github.quezka.quire.domain.Notebook
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
@@ -125,14 +127,27 @@ object Codec {
 
     fun note(r: SyncRecord): Note {
         val d = r.data!!
-        return Note(r.uid, d.str("body"), d.strOrNull("course"), d.bool("pinned"), d.str("topic"),
-            d.str("updated"))
+        val course = d.strOrNull("course")
+        return Note(r.uid, d.str("body"), course, d.bool("pinned"), d.str("topic"),
+            d.str("updated"), if (course != null) null else d.strOrNull("notebook"))
     }
 
     fun noteData(n: Note, previous: JsonObject?) = merged(previous, mapOf(
         "title" to JsonPrimitive(n.title), "body" to JsonPrimitive(n.body),
         "course" to text(n.courseUid), "pinned" to JsonPrimitive(n.pinned),
         "updated" to JsonPrimitive(n.updated), "topic" to JsonPrimitive(n.topic),
+        "notebook" to text(if (n.courseUid != null) null else n.notebookUid),
+    ))
+
+    // ---- notebooks (groups of notes that aren't courses) ----
+
+    fun notebook(r: SyncRecord): Notebook {
+        val d = r.data!!
+        return Notebook(r.uid, d.str("name"), d.str("color", NOTEBOOK_COLOR))
+    }
+
+    fun notebookData(n: Notebook, previous: JsonObject?) = merged(previous, mapOf(
+        "name" to JsonPrimitive(n.name), "color" to JsonPrimitive(n.color),
     ))
 
     // ---- journal ----
