@@ -4,6 +4,13 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.18.2] - 2026-09-30
+
+### Fixed
+- Desktop: noticeboard notices written as text, with no document attached, opened empty.
+  Opening a notice now shows its text (fetched from Classeviva, which also marks it read
+  there, as its own app does); formatting some schools add is turned into plain text.
+
 ## [0.18.1] - 2026-09-29
 
 ### Fixed

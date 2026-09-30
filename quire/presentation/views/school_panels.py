@@ -9,8 +9,8 @@ from pathlib import Path
 from PySide6.QtCore import QPointF, QRectF, QStandardPaths, Qt, QUrl
 from PySide6.QtGui import QColor, QDesktopServices, QPainter, QPainterPath, QPen
 from PySide6.QtWidgets import (
-    QDialog, QDoubleSpinBox, QHBoxLayout, QHeaderView, QLabel, QListWidget, QListWidgetItem,
-    QProgressBar, QPushButton, QSpinBox, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QDialog, QDoubleSpinBox, QFrame, QHBoxLayout, QHeaderView, QLabel, QListWidget, QListWidgetItem,
+    QProgressBar, QPushButton, QScrollArea, QSpinBox, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
 )
 
 from ...application.errors import ApplicationError
@@ -275,6 +275,16 @@ class NoticeDialog(QDialog):
         layout.setSpacing(10)
         layout.addWidget(title)
         layout.addWidget(info)
+        # The text only comes with opening the notice on the register.
+        self.body = QLabel(_("Loading…"), objectName="hint", wordWrap=True)
+        self.body.setTextFormat(Qt.PlainText)
+        self.body.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        self.body.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        text = QScrollArea(widgetResizable=True, frameShape=QFrame.NoFrame)
+        text.setWidget(self.body)
+        text.setMinimumHeight(120)
+        text.setMaximumHeight(420)
+        layout.addWidget(text, 1)
         if notice.attachments:
             layout.addWidget(label(_("Attachments"), "muted"))
             for attachment in notice.attachments:
@@ -283,8 +293,6 @@ class NoticeDialog(QDialog):
                 open_btn.clicked.connect(
                     lambda _on=False, a=attachment, b=open_btn: self._download(a, b))
                 layout.addWidget(open_btn)
-        else:
-            layout.addWidget(label(_("This notice has no attachments."), "hint"))
         self.status = label("", "hint")
         self.status.setWordWrap(True)
         self.status.hide()
@@ -298,10 +306,19 @@ class NoticeDialog(QDialog):
 
         if not notice.read:
             services.school_sync.mark_notice_read(notice.id)
-            # Tell the school it was read, like its own app does; a failure doesn't matter.
-            self._workers.append(run_in_background(
-                lambda: services.school_sync.tell_notice_read(notice),
-                lambda _r: None, lambda _e: None))
+        # Opening it on the register also tells the school it was read, like its own app does.
+        self._workers.append(run_in_background(
+            lambda: services.school_sync.notice_text(notice), self._show_text, self._no_text))
+
+    def _show_text(self, text: str):
+        self.body.setObjectName("")
+        self.body.setText(text or (_("The notice is in the attachments.") if self.notice.attachments
+                                   else _("This notice has no text.")))
+        self.body.style().unpolish(self.body)
+        self.body.style().polish(self.body)
+
+    def _no_text(self, error: Exception):
+        self.body.setText(_error_text(error))
 
     def _download(self, attachment, source: QPushButton):
         source.setEnabled(False)

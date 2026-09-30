@@ -129,7 +129,8 @@ def test_noticeboard_news_read_state_and_attachments(connected, register):
     (unread, _read) = connected.school.notices()
     assert unread.attachments[0].file_name == "c1.pdf"
     assert connected.school_sync.notice_attachment(unread, 1) == b"%PDF-1"
-    connected.school_sync.tell_notice_read(unread)
+    register.notice_texts["CF:1"] = "Uscita al museo giovedì."
+    assert connected.school_sync.notice_text(unread) == "Uscita al museo giovedì."
     connected.school_sync.mark_notice_read(unread.id)
     assert register.opened == ["CF:1"] and connected.school.unread_notices() == 0
 

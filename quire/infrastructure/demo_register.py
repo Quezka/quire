@@ -98,7 +98,10 @@ class DemoRegister:
         ]
 
     def open_notice(self, notice):
-        pass
+        if notice.code == "CF" and notice.pub_id == "3":
+            return ("L'assemblea d'istituto si terrà venerdì in aula magna dalle 10:00 alle 12:00.\n\n"
+                    "Le lezioni riprenderanno regolarmente dalla terza ora.")
+        return "Vedi allegato."
 
     def notice_attachment(self, notice, number):
         return b"%PDF-1.4\n% demo\n"

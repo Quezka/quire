@@ -7,6 +7,7 @@ maintained client https://github.com/Lioydiano/Classeviva.
 """
 from __future__ import annotations
 
+import html
 import json
 import re
 import urllib.error
@@ -69,6 +70,17 @@ def _day(value: str) -> date:
 
 def _stamp(d: date) -> str:
     return d.strftime("%Y%m%d")
+
+
+def _plain_text(text: str) -> str:
+    """Notice text as plain text: some schools write it with HTML markup."""
+    if re.search(r"<[a-zA-Z/][^>]*>", text):
+        text = re.sub(r"(?i)<br\s*/?>|</(p|div|li|tr|h[1-6])>", "\n", text)
+        text = re.sub(r"(?i)<li[^>]*>", "• ", text)
+        text = re.sub(r"<[^>]+>", "", text)
+    text = html.unescape(text).replace("\r\n", "\n").replace("\xa0", " ")
+    text = re.sub(r"[ \t]+\n", "\n", text)
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
 
 
 def _id(value) -> str | None:
@@ -291,10 +303,11 @@ class ClassevivaRegister:
                       for i, a in enumerate(n.get("attachments") or []))))
         return result
 
-    def open_notice(self, notice: Notice) -> None:
-        # 101 is the "read" action the official app sends.
-        self._request("POST", self._student_path(
+    def open_notice(self, notice: Notice) -> str:
+        # 101 is the "read" action the official app sends; the reply carries the text.
+        data = self._request("POST", self._student_path(
             f"/noticeboard/read/{notice.code}/{notice.pub_id}/101"))
+        return _plain_text((data.get("item") or {}).get("text") or "")
 
     def notice_attachment(self, notice: Notice, number: int) -> bytes:
         return self._send("GET", self._student_path(

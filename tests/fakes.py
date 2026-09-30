@@ -26,6 +26,7 @@ class FakeRegister:
     school_days_: list = field(default_factory=list)
     files: dict = field(default_factory=dict)  # (notice id or document id, number) -> bytes
     opened: list = field(default_factory=list)
+    notice_texts: dict = field(default_factory=dict)
     requested: list = field(default_factory=list)
     failing: dict = field(default_factory=dict)  # method name -> exception to raise
 
@@ -70,6 +71,7 @@ class FakeRegister:
 
     def open_notice(self, notice):
         self.opened.append(f"{notice.code}:{notice.pub_id}")
+        return self.notice_texts.get(f"{notice.code}:{notice.pub_id}", "")
 
     def notice_attachment(self, notice, number):
         return self.files[(f"{notice.code}:{notice.pub_id}", number)]

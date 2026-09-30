@@ -221,3 +221,19 @@ def test_agenda_notes_that_read_like_homework_are_homework():
     register, _, _ = signed_in({path: (200, notes)})
     kinds = [a.kind for a in register.assignments(date(2026, 9, 23), date(2026, 12, 31))]
     assert kinds == [TaskKind.HOMEWORK, TaskKind.TASK]
+
+
+def test_opening_a_notice_marks_it_read_and_returns_its_text():
+    from quire.domain import Notice
+    path = "/students/1234567/noticeboard/read/CF/9/101"
+    html = {"item": {"title": "Circolare", "text": "<p>Gentili famiglie,</p><p>l&#39;uscita "
+                     "&egrave; <b>gioved&igrave;</b>.<br>Grazie</p>"}, "reply": {}}
+    register, server, _ = signed_in({path: (200, html)})
+    notice = Notice("CF:9", "CF", "9", "Circolare", "", date(2026, 9, 23))
+    assert register.open_notice(notice) == "Gentili famiglie,\nl'uscita è giovedì.\nGrazie"
+    assert server.requests[-1].get_method() == "POST"
+
+    server.routes[path] = (200, {"item": {"title": "Circolare", "text": "vedi allegato\r\n"}})
+    assert register.open_notice(notice) == "vedi allegato"
+    server.routes[path] = (200, {"item": {"title": "Circolare", "text": None}})
+    assert register.open_notice(notice) == ""

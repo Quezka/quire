@@ -283,10 +283,10 @@ class SchoolSyncService:
             raise NotConnected(f"Connect your {self._register.name} account first.")
         self._register.login(credentials)
 
-    def tell_notice_read(self, notice: NoticeRecord) -> None:
-        """Let the register know the notice was read, as its own app does."""
+    def notice_text(self, notice: NoticeRecord) -> str:
+        """Fetch the notice's text; the register then counts it as read, as with its own app."""
         self._signed_in()
-        self._register.open_notice(_notice(notice))
+        return self._register.open_notice(_notice(notice))
 
     def notice_attachment(self, notice: NoticeRecord, number: int) -> bytes:
         self._signed_in()
