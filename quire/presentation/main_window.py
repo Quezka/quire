@@ -274,7 +274,6 @@ class MainWindow(QMainWindow):
                 ("Ctrl+R", _("Sync school register")), ("Ctrl+N", _("New note")),
                 ("Ctrl+T", _("New task")), ("Ctrl+Shift+E", _("New event")),
                 ("Ctrl+Shift+C", _("Courses & timetable")), ("Ctrl+F", _("Search notes")),
-                ("Ctrl+E", _("Toggle note preview")),
                 ("Ctrl+= / Ctrl+- / Ctrl+0", _("Zoom in / out / fit the day"))]
         table = "".join(f"<tr><td style='padding:3px 18px 3px 0'><b>{k}</b></td><td>{v}</td></tr>"
                         for k, v in rows)

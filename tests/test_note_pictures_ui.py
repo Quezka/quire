@@ -59,18 +59,18 @@ def test_pasting_a_picture_keeps_it_byte_for_byte(notes_view, services):
     assert has_diagram(data)
     mime = QMimeData()
     mime.setData("image/png", data)
-    notes_view.editor.insertPlainText("# Schema")
+    notes_view.editor.set_markdown("# Schema")
+    notes_view.editor.moveCursor(__import__("PySide6.QtGui", fromlist=["QTextCursor"]).QTextCursor.End)
     notes_view.editor.insertFromMimeData(mime)
-    (uid,) = image_uids(notes_view.editor.toPlainText())
+    (uid,) = image_uids(notes_view.editor.markdown())
     record = services.notes.image(uid)
     assert record.data == data and record.diagram
+    notes_view._edited()
     notes_view.flush()
     assert uid in services.notes.note(notes_view.note.id).body
-    notes_view.preview_btn.setChecked(True)
-    pump()
     from PySide6.QtCore import QUrl
     from PySide6.QtGui import QTextDocument
-    image = notes_view.viewer.loadResource(QTextDocument.ImageResource, QUrl(f"quire-image:{uid}"))
+    image = notes_view.editor.loadResource(QTextDocument.ImageResource, QUrl(f"quire-image:{uid}"))
     assert image.width() == 40
 
 
@@ -79,7 +79,7 @@ def test_pasted_screenshots_become_pictures(notes_view, services):
     mime = QMimeData()
     mime.setImageData(QImage.fromData(png()))
     notes_view.editor.insertFromMimeData(mime)
-    (uid,) = image_uids(notes_view.editor.toPlainText())
+    (uid,) = image_uids(notes_view.editor.markdown())
     assert services.notes.image(uid).data.startswith(PNG_HEADER)
 
 

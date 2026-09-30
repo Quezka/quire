@@ -56,7 +56,6 @@ MESSAGES = {
     "About Quire": "О программе Quire",
     "Keyboard shortcuts": "Сочетания клавиш",
     "Jump to today": "Перейти к сегодняшнему дню",
-    "Toggle note preview": "Переключить предпросмотр заметки",
     "Zoom in / out / fit the day": "Увеличить / уменьшить / вместить день",
     "Notes, day planner and school timetable.": "Заметки, планировщик дня и школьное расписание.",
     "By {developer}": "Автор: {developer}",
@@ -222,14 +221,11 @@ MESSAGES = {
     "Group by class and topic": "Группировать по предметам и темам",
     "Topic within the class, e.g. a chapter or unit": "Тема внутри предмета, например глава или раздел",
     "Pin to top": "Закрепить сверху",
-    "Preview (Ctrl+E)": "Предпросмотр (Ctrl+E)",
     "Delete note": "Удалить заметку",
     "Delete “{title}”? This can't be undone.": "Удалить «{title}»? Это нельзя отменить.",
     "Select a note, or press Ctrl+N to start one.": "Выберите заметку или нажмите Ctrl+N, чтобы создать новую.",
-    "Start typing. The first line becomes the title.\n\nMarkdown works: # headings, **bold**, *italic*, - lists, - [ ] checklists, `code`.\nEnter continues a list; click a checkbox to tick it. Ctrl+E shows the preview.":
-        "Начните печатать. Первая строка станет заголовком.\n\n"
-        "Работает Markdown: # заголовки, **жирный**, *курсив*, - списки, - [ ] чек-листы, "
-        "`код`.\nEnter продолжает список; щёлкните по флажку, чтобы отметить его. Ctrl+E — предпросмотр.",
+    "Start typing. The first line becomes the title.\n\nType # and a space for a heading, - for a list, [ ] for a checklist, > for a quote; **bold**, *italic* and `code` format as you close them. Paste or drop pictures in.":
+        "Начните писать. Первая строка станет заголовком.\n\nНаберите # и пробел для заголовка, - для списка, [ ] для чек-листа, > для цитаты; **жирный**, *курсив* и `код` оформляются, когда вы их закрываете. Картинки можно вставить или перетащить.",
     "Heading": "Заголовок",
     "Subheading": "Подзаголовок",
     "Plain text": "Обычный текст",
@@ -685,9 +681,6 @@ MESSAGES = {
     'picture': 'картинка',
     "Can't add the picture": 'Не удалось добавить картинку',
     "Quire couldn't read that picture.": 'Quire не смог прочитать эту картинку.',
-    "This picture hasn't arrived on this computer yet.": 'Эта картинка ещё не пришла на этот компьютер.',
-    'Right-click to edit the diagram in Ligature.': 'Щёлкните правой кнопкой, чтобы изменить диаграмму в Ligature.',
-    'Ctrl+E shows the note with its pictures.': 'Ctrl+E покажет заметку с картинками.',
     'Edit in Ligature': 'Изменить в Ligature',
     'Edit in Ligature (install Ligature first)': 'Изменить в Ligature (сначала установите Ligature)',
     'Copy picture': 'Копировать картинку',

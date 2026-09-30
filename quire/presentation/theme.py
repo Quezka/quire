@@ -227,7 +227,7 @@ def stylesheet(t: Theme) -> str:
         border: 1px solid {t.accent}; }}
     QLineEdit#search {{ background: {t.raised}; border-color: transparent; }}
     QLineEdit#search:focus {{ background: {t.surface}; border-color: {t.accent}; }}
-    QPlainTextEdit#bare, QTextBrowser#bare {{ border: none; background: transparent;
+    QPlainTextEdit#bare, QTextBrowser#bare, QTextEdit#bare {{ border: none; background: transparent;
         padding: 4px 2px; }}
     QComboBox::drop-down, QDateEdit::drop-down {{ border: none; width: 26px; }}
     QComboBox::down-arrow, QDateEdit::down-arrow {{ image: url({chevron}); width: 14px;

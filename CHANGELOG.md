@@ -4,6 +4,18 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.20.0] - 2026-09-30
+
+### Changed
+- **Notes: you write straight into the formatted note.** There's no separate preview
+  any more (Ctrl+E is gone): headings, bold, lists, checklists, quotes, code and pictures
+  show as they are while you type. Markdown habits still work: `# ` makes a heading,
+  `- ` a list, `1. ` a numbered list, `[ ] ` a checklist, `> ` a quote, ``` a code block,
+  and `**bold**`, `*italic*`, `` `code` `` and `~~struck~~` format as you close them.
+  Tab and Shift+Tab nest list items; click a checkbox to tick it; Ctrl+click opens a link.
+- Notes are still saved as Markdown, line for line, so the phone and sync read them as
+  before. Copying text out of a note gives its Markdown.
+
 ## [0.19.0] - 2026-09-30
 
 ### Added

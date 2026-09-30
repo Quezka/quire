@@ -6,8 +6,7 @@ import re
 from pathlib import Path
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QMarginsF, QMimeData, QSizeF, QUrl, Qt
-from PySide6.QtGui import QImage, QPageLayout, QPageSize, QPdfWriter, QTextCursor, QTextDocument
-from PySide6.QtWidgets import QTextBrowser
+from PySide6.QtGui import QImage, QPageLayout, QPageSize, QPdfWriter, QTextDocument
 
 from ..application.services import Services
 
@@ -87,14 +86,6 @@ def has_picture(mime: QMimeData) -> bool:
         for url in mime.urls())
 
 
-def image_at(text: str, column: int) -> str | None:
-    """The uid of the picture written at `column` of a line, if any."""
-    for m in IMAGE_LINE.finditer(text):
-        if m.start() <= column <= m.end():
-            return m.group(2)
-    return None
-
-
 def load_picture(services: Services, url: QUrl, width: int) -> QImage | None:
     if url.scheme() != SCHEME:
         return None
@@ -107,33 +98,6 @@ def load_picture(services: Services, url: QUrl, width: int) -> QImage | None:
     if width > 0 and image.width() > width:
         image = image.scaledToWidth(width, Qt.SmoothTransformation)
     return image
-
-
-class NoteBrowser(QTextBrowser):
-    """The note preview, with its pictures."""
-
-    def __init__(self, services: Services, parent=None):
-        super().__init__(parent)
-        self.services = services
-
-    def loadResource(self, kind, url):  # noqa: N802 (Qt naming)
-        if kind == QTextDocument.ImageResource and url.scheme() == SCHEME:
-            image = load_picture(self.services, url, self.viewport().width() - 24)
-            return image if image is not None else QImage()
-        return super().loadResource(kind, url)
-
-    def image_at(self, pos) -> str | None:
-        """The picture under a point of the viewport."""
-        cursor = self.cursorForPosition(pos)
-        after = QTextCursor(cursor)
-        after.movePosition(QTextCursor.NextCharacter)
-        for c in (after, cursor):  # a cursor's format is the character before it
-            fmt = c.charFormat()
-            if fmt.isImageFormat():
-                url = QUrl(fmt.toImageFormat().name())
-                if url.scheme() == SCHEME:
-                    return url.path()
-        return None
 
 
 def note_pdf(services: Services, title: str, body: str, path: str):

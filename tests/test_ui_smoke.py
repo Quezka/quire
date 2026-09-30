@@ -937,9 +937,10 @@ def test_open_note_follows_changes_from_elsewhere(window, services):
     note = services.notes.create("# Draft", None, "")
     page._open(services.notes.note(note.id))
     services.notes.update(note.id, NoteInput("# Draft\n\nAdded on the laptop"))
-    assert page.editor.toPlainText() == "# Draft\n\nAdded on the laptop"
+    assert page.editor.markdown() == "# Draft\n\nAdded on the laptop"
 
-    page.editor.setPlainText("# Draft\n\nMy unsaved words")
+    page.editor.set_markdown("# Draft\n\nMy unsaved words")
+    page._edited()
     services.notes.delete(note.id)  # deleted on the laptop meanwhile
     page.flush()
     assert page.note is not None  # recreated rather than lost
@@ -948,7 +949,7 @@ def test_open_note_follows_changes_from_elsewhere(window, services):
     other = services.notes.create("# Another", None, "")
     page._open(services.notes.note(other.id))
     services.notes.delete(other.id)
-    assert page.note is None and page.editor.toPlainText() == ""
+    assert page.note is None and page.editor.markdown() == ""
 
 
 def test_closing_hides_to_the_tray_and_quit_really_quits(services, app, monkeypatch):

@@ -3,14 +3,13 @@ from __future__ import annotations
 
 from datetime import date
 
-import hashlib
 from pathlib import Path
 
-from PySide6.QtCore import QFileSystemWatcher, QMimeData, QSettings, QStandardPaths, Qt, QTimer
+from PySide6.QtCore import QFileSystemWatcher, QMimeData, QSettings, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
     QComboBox, QCompleter, QFileDialog, QHBoxLayout, QInputDialog, QLineEdit, QListWidget,
-    QListWidgetItem, QMenu, QMessageBox, QStackedWidget, QToolButton,
+    QListWidgetItem, QMenu, QMessageBox, QToolButton,
 )
 
 from ...application.bus import Topic
@@ -23,16 +22,16 @@ from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import confirm, fill_course_combo, select_data
 from ..formatting import plural, relative_timestamp
-from ..markdown_editor import SHORTCUTS, MarkdownEdit
-from ..note_images import OPENABLE, NoteBrowser, note_pdf, picture_from_file, picture_from_mime
+from ..note_editor import SHORTCUTS, NoteEditor
+from ..note_images import OPENABLE, load_picture, note_pdf, picture_from_file, picture_from_mime
 from ..widgets import TwoLineDelegate, scaled_font
 from .common import Card, Page, icon_button, label, primary_button
 from ..i18n import N_, _
 
 PLACEHOLDER = N_(
     "Start typing. The first line becomes the title.\n\n"
-    "Markdown works: # headings, **bold**, *italic*, - lists, - [ ] checklists, `code`.\n"
-    "Enter continues a list; click a checkbox to tick it. Ctrl+E shows the preview."
+    "Type # and a space for a heading, - for a list, [ ] for a checklist, > for a quote; "
+    "**bold**, *italic* and `code` format as you close them. Paste or drop pictures in."
 )
 
 
@@ -104,10 +103,6 @@ class NotesView(Page):
         self.pin = icon_button("pin", _("Pin to top"), checkable=True)
         self.pin.toggled.connect(self._meta_changed)
         self.status = label("", "hint")
-        self.preview_btn = icon_button("eye", _("Preview (Ctrl+E)"), checkable=True)
-        self.preview_btn.toggled.connect(self._toggle_preview)
-        QShortcut(QKeySequence("Ctrl+E"), self, activated=self.preview_btn.toggle,
-                  context=Qt.WidgetWithChildrenShortcut)
         delete = icon_button("trash", _("Delete note"))
         delete.clicked.connect(self.delete_current)
         export = icon_button("download", _("Export as PDF…"))
@@ -120,40 +115,31 @@ class NotesView(Page):
         bar.addWidget(self.pin)
         bar.addStretch()
         bar.addWidget(self.status)
-        bar.addWidget(self.preview_btn)
         bar.addWidget(export)
         bar.addWidget(delete)
 
         font = scaled_font(self, 1.1)
-        self.editor = MarkdownEdit(placeholderText=_(PLACEHOLDER))
+        self.editor = NoteEditor()
+        self.editor.setPlaceholderText(_(PLACEHOLDER))
         self.editor.setObjectName("bare")
         self.editor.setFont(font)
         self.editor.setTabStopDistance(self.editor.fontMetrics().horizontalAdvance(" ") * 4)
         self.editor.textChanged.connect(self._edited)
         self.editor.textChanged.connect(lambda: self._count_words())
         self.editor.picture_handler = self._keep_picture
-        self.editor.picture_tip = self._picture_tip
+        self.editor.picture_loader = lambda url, width: load_picture(services, url, width)
         self.editor.setContextMenuPolicy(Qt.CustomContextMenu)
         self.editor.customContextMenuRequested.connect(self._editor_menu)
-        self.viewer = NoteBrowser(services)
-        self.viewer.setOpenExternalLinks(True)
-        self.viewer.setObjectName("bare")
-        self.viewer.setFont(font)
-        self.viewer.setContextMenuPolicy(Qt.CustomContextMenu)
-        self.viewer.customContextMenuRequested.connect(self._viewer_menu)
         # Diagrams open in Ligature: their files, to take in what Ligature saves.
         self._diagram_files: dict[str, str] = {}  # path -> picture uid
         self._watcher = QFileSystemWatcher(self)
         self._watcher.fileChanged.connect(lambda _p: self._diagrams_changed())
         self._watcher.directoryChanged.connect(lambda _p: self._diagrams_changed())
-        self.stack = QStackedWidget()
-        self.stack.addWidget(self.editor)
-        self.stack.addWidget(self.viewer)
 
         self.right = Card(padding=14)
         self.right.body.addLayout(bar)
         self.right.body.addLayout(self._format_bar())
-        self.right.add(self.stack, 1)
+        self.right.add(self.editor, 1)
 
         body = QHBoxLayout()
         body.setSpacing(16)
@@ -181,12 +167,12 @@ class NotesView(Page):
         heading.setMenu(menu)
         buttons = [heading]
         for name, tip, action in (
-                ("bold", _("Bold"), lambda: e.wrap("**", _("bold"))),
-                ("italic", _("Italic"), lambda: e.wrap("*", _("italic"))),
-                ("list", _("Bulleted list"), lambda: e.toggle_prefix("- ")),
-                ("checklist", _("Checklist"), lambda: e.toggle_prefix("- [ ] ")),
-                ("quote", _("Quote"), lambda: e.toggle_prefix("> ")),
-                ("code", _("Code"), lambda: e.wrap("`", _("code"))),
+                ("bold", _("Bold"), e.toggle_bold),
+                ("italic", _("Italic"), e.toggle_italic),
+                ("list", _("Bulleted list"), lambda: e.toggle_list()),
+                ("checklist", _("Checklist"), lambda: e.toggle_list(checklist=True)),
+                ("quote", _("Quote"), e.toggle_quote),
+                ("code", _("Code"), e.toggle_code),
                 ("image", _("Insert a picture (or paste one, or drop it in)"),
                  self.insert_picture)):
             shortcut = SHORTCUTS.get(name)
@@ -207,7 +193,7 @@ class NotesView(Page):
         return row
 
     def _count_words(self):
-        words = len(self.editor.toPlainText().split())
+        words = len(self.editor.toPlainText().replace("\ufffc", " ").split())
         self.words.setText(plural(words, "word") if words else "")
 
     # ---- list -----------------------------------------------------------
@@ -242,7 +228,7 @@ class NotesView(Page):
             position = self.editor.textCursor().position()
             self._show(fresh)
             cursor = self.editor.textCursor()
-            cursor.setPosition(min(position, len(fresh.body)))
+            cursor.setPosition(min(position, self.editor.document().characterCount() - 1))
             self.editor.setTextCursor(cursor)
 
     def reload_list(self, select_id=None):
@@ -394,7 +380,7 @@ class NotesView(Page):
     def _show(self, note: NoteRecord | None):
         self._loading = True
         self.note = note
-        self.editor.setPlainText(note.body if note else "")
+        self.editor.set_markdown(note.body if note else "")
         select_data(self.course, note.course_id if note else None)
         self._fill_topics(note)
         self.pin.setChecked(note.pinned if note else False)
@@ -404,8 +390,6 @@ class NotesView(Page):
         self.status.setText("")
         self.editor.setPlaceholderText(
             _(PLACEHOLDER) if note else _("Select a note, or press Ctrl+N to start one."))
-        if self.preview_btn.isChecked():
-            self.viewer.setMarkdown(self.editor.toPlainText())
 
     def _fill_topics(self, note: NoteRecord | None, course_id=None):
         """Offer the topics already used in the note's class."""
@@ -446,7 +430,7 @@ class NotesView(Page):
         self._timer.stop()
         if not self._dirty or self.note is None:
             return
-        body, course_id, topic = (self.editor.toPlainText(), self.course.currentData(),
+        body, course_id, topic = (self.editor.markdown(), self.course.currentData(),
                                   self.topic.currentText())
         self._saving = True
         try:
@@ -465,16 +449,6 @@ class NotesView(Page):
             item.setText(self.note.title)
             item.setData(TwoLineDelegate.PINNED, self.note.pinned)
 
-    def _toggle_preview(self, on: bool):
-        if on:
-            self.viewer.clear()  # forget pictures shown before: they may have changed
-            self.viewer.setMarkdown(self.editor.toPlainText())
-        self.stack.setCurrentIndex(1 if on else 0)
-        for button in self.format_buttons:
-            button.setEnabled(not on)
-        if not on:
-            self.editor.setFocus()
-
     def _open(self, note: NoteRecord):
         self.flush()
         for widget in (self.search, self.filter):
@@ -486,7 +460,6 @@ class NotesView(Page):
             widget.blockSignals(False)
         self._show(note)
         self.reload_list(note.id)
-        self.preview_btn.setChecked(False)
         self.editor.setFocus()
         self.editor.moveCursor(QTextCursor.End)
 
@@ -543,24 +516,8 @@ class NotesView(Page):
         QSettings().setValue("notes/picture_folder", str(Path(path).parent))
         markdown = self._keep(picture_from_file(path), Path(path).stem)
         if markdown:
-            if self.preview_btn.isChecked():
-                self.preview_btn.setChecked(False)
-            self.editor.insert_block(markdown)
+            self.editor.insert_picture(markdown)
             self.editor.setFocus()
-
-    def _picture_tip(self, uid: str) -> str:
-        record = self.notes.image(uid)
-        if record is None:
-            return _("This picture hasn't arrived on this computer yet.")
-        image = QImage.fromData(record.data)
-        folder = Path(QStandardPaths.writableLocation(QStandardPaths.CacheLocation)) / "pictures"
-        folder.mkdir(parents=True, exist_ok=True)
-        thumb = folder / f"{uid}-{hashlib.sha1(record.data).hexdigest()[:8]}.png"
-        if not thumb.exists() and not image.isNull():
-            image.scaled(360, 260, Qt.KeepAspectRatio, Qt.SmoothTransformation).save(str(thumb))
-        hint = (_("Right-click to edit the diagram in Ligature.") if record.diagram
-                else _("Ctrl+E shows the note with its pictures."))
-        return f"<img src='{thumb.as_uri()}'><br>{hint}"
 
     def _picture_actions(self, menu: QMenu, uid: str):
         record = self.notes.image(uid)
@@ -584,16 +541,6 @@ class NotesView(Page):
         for action in standard.actions():
             menu.addAction(action)
         menu.exec(self.editor.viewport().mapToGlobal(pos))
-
-    def _viewer_menu(self, pos):
-        menu = QMenu(self)
-        uid = self.viewer.image_at(pos)
-        if uid:
-            self._picture_actions(menu, uid)
-        standard = self.viewer.createStandardContextMenu(pos)
-        for action in standard.actions():
-            menu.addAction(action)
-        menu.exec(self.viewer.viewport().mapToGlobal(pos))
 
     def _copy_picture(self, uid: str):
         record = self.notes.image(uid)
@@ -634,19 +581,15 @@ class NotesView(Page):
         self.status.setText(_("Editing the diagram in Ligature: save there to update it here."))
 
     def _diagrams_changed(self):
-        updated = False
         for path, uid in list(self._diagram_files.items()):
             try:
-                updated |= self.notes.diagram_saved(uid, path)
+                if self.notes.diagram_saved(uid, path):
+                    self.editor.refresh_picture(uid)
+                    self.status.setText(_("Diagram updated from Ligature."))
             except ApplicationError as e:
                 self.status.setText(_(str(e)))
             if Path(path).exists() and path not in self._watcher.files():
                 self._watcher.addPath(path)
-        if updated:
-            self.status.setText(_("Diagram updated from Ligature."))
-            if self.preview_btn.isChecked():
-                self.viewer.clear()
-                self.viewer.setMarkdown(self.editor.toPlainText())
 
     def export_pdf(self):
         if self.note is None:
@@ -661,5 +604,5 @@ class NotesView(Page):
         if not path.lower().endswith(".pdf"):
             path += ".pdf"
         QSettings().setValue("notes/pdf_folder", str(Path(path).parent))
-        note_pdf(self.services, self.note.title, self.editor.toPlainText(), path)
+        note_pdf(self.services, self.note.title, self.editor.markdown(), path)
         self.status.setText(_("Exported to {name}").format(name=Path(path).name))
