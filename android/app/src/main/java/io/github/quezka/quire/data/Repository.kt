@@ -68,6 +68,7 @@ class Repository(
     fun notes(): List<Note> = records.live("note").map(Codec::note)
         .sortedWith(compareByDescending<Note> { it.pinned }.thenByDescending { it.updated })
     fun note(uid: String): Note? = records.get("note", uid)?.let(Codec::note)
+    fun image(uid: String): ByteArray? = records.get("image", uid)?.takeIf { !it.deleted }?.let(Codec::image)
     fun jobs(): List<Job> = records.live("job").map(Codec::job).sortedBy { it.name.lowercase() }
     fun job(uid: String): Job? = records.get("job", uid)?.let(Codec::job)
     fun shifts(): List<Shift> = records.live("shift").mapNotNull(Codec::shift)

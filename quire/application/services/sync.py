@@ -15,7 +15,7 @@ from ..ports import (
 )
 
 TOPICS = {"course": Topic.COURSES, "event": Topic.EVENTS, "task": Topic.TASKS,
-          "note": Topic.NOTES, "journal": Topic.JOURNAL, "job": Topic.WORK, "shift": Topic.WORK,
+          "note": Topic.NOTES, "image": Topic.NOTES, "journal": Topic.JOURNAL, "job": Topic.WORK, "shift": Topic.WORK,
           "focus": Topic.FOCUS}
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PROJECT = re.compile(r"^[a-z0-9][a-z0-9-]{4,28}[a-z0-9]$")

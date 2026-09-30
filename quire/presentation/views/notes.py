@@ -3,15 +3,18 @@ from __future__ import annotations
 
 from datetime import date
 
-from PySide6.QtCore import QSettings, Qt, QTimer
-from PySide6.QtGui import QKeySequence, QShortcut, QTextCursor
+import hashlib
+from pathlib import Path
+
+from PySide6.QtCore import QFileSystemWatcher, QMimeData, QSettings, QStandardPaths, Qt, QTimer
+from PySide6.QtGui import QGuiApplication, QImage, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
-    QComboBox, QCompleter, QHBoxLayout, QInputDialog, QLineEdit, QListWidget, QListWidgetItem,
-    QMenu, QStackedWidget, QTextBrowser, QToolButton,
+    QComboBox, QCompleter, QFileDialog, QHBoxLayout, QInputDialog, QLineEdit, QListWidget,
+    QListWidgetItem, QMenu, QMessageBox, QStackedWidget, QToolButton,
 )
 
 from ...application.bus import Topic
-from ...application.errors import NotFound
+from ...application.errors import ApplicationError, NotFound
 from ...application.dto import NoteSummary
 from ...application.services import Services
 from ...application.inputs import NoteInput
@@ -21,6 +24,7 @@ from ..bridge import ChangeRelay
 from ..dialogs import confirm, fill_course_combo, select_data
 from ..formatting import plural, relative_timestamp
 from ..markdown_editor import SHORTCUTS, MarkdownEdit
+from ..note_images import OPENABLE, NoteBrowser, note_pdf, picture_from_file, picture_from_mime
 from ..widgets import TwoLineDelegate, scaled_font
 from .common import Card, Page, icon_button, label, primary_button
 from ..i18n import N_, _
@@ -106,6 +110,8 @@ class NotesView(Page):
                   context=Qt.WidgetWithChildrenShortcut)
         delete = icon_button("trash", _("Delete note"))
         delete.clicked.connect(self.delete_current)
+        export = icon_button("download", _("Export as PDF…"))
+        export.clicked.connect(self.export_pdf)
 
         bar = QHBoxLayout()
         bar.setSpacing(6)
@@ -115,6 +121,7 @@ class NotesView(Page):
         bar.addStretch()
         bar.addWidget(self.status)
         bar.addWidget(self.preview_btn)
+        bar.addWidget(export)
         bar.addWidget(delete)
 
         font = scaled_font(self, 1.1)
@@ -124,9 +131,21 @@ class NotesView(Page):
         self.editor.setTabStopDistance(self.editor.fontMetrics().horizontalAdvance(" ") * 4)
         self.editor.textChanged.connect(self._edited)
         self.editor.textChanged.connect(lambda: self._count_words())
-        self.viewer = QTextBrowser(openExternalLinks=True)
+        self.editor.picture_handler = self._keep_picture
+        self.editor.picture_tip = self._picture_tip
+        self.editor.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.editor.customContextMenuRequested.connect(self._editor_menu)
+        self.viewer = NoteBrowser(services)
+        self.viewer.setOpenExternalLinks(True)
         self.viewer.setObjectName("bare")
         self.viewer.setFont(font)
+        self.viewer.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.viewer.customContextMenuRequested.connect(self._viewer_menu)
+        # Diagrams open in Ligature: their files, to take in what Ligature saves.
+        self._diagram_files: dict[str, str] = {}  # path -> picture uid
+        self._watcher = QFileSystemWatcher(self)
+        self._watcher.fileChanged.connect(lambda _p: self._diagrams_changed())
+        self._watcher.directoryChanged.connect(lambda _p: self._diagrams_changed())
         self.stack = QStackedWidget()
         self.stack.addWidget(self.editor)
         self.stack.addWidget(self.viewer)
@@ -167,7 +186,9 @@ class NotesView(Page):
                 ("list", _("Bulleted list"), lambda: e.toggle_prefix("- ")),
                 ("checklist", _("Checklist"), lambda: e.toggle_prefix("- [ ] ")),
                 ("quote", _("Quote"), lambda: e.toggle_prefix("> ")),
-                ("code", _("Code"), lambda: e.wrap("`", _("code")))):
+                ("code", _("Code"), lambda: e.wrap("`", _("code"))),
+                ("image", _("Insert a picture (or paste one, or drop it in)"),
+                 self.insert_picture)):
             shortcut = SHORTCUTS.get(name)
             if shortcut is not None:
                 tip += f" ({shortcut.toString(QKeySequence.NativeText)})"
@@ -446,6 +467,7 @@ class NotesView(Page):
 
     def _toggle_preview(self, on: bool):
         if on:
+            self.viewer.clear()  # forget pictures shown before: they may have changed
             self.viewer.setMarkdown(self.editor.toPlainText())
         self.stack.setCurrentIndex(1 if on else 0)
         for button in self.format_buttons:
@@ -491,3 +513,153 @@ class NotesView(Page):
             if self.list.item(r).data(Qt.UserRole) is not None:
                 self.list.setCurrentRow(r)
                 break
+
+    # ---- pictures -------------------------------------------------------
+
+    def _keep(self, picture: tuple[bytes, str] | None, alt: str = "") -> str | None:
+        if picture is None:
+            QMessageBox.warning(self, _("Can't add the picture"),
+                                _("Quire couldn't read that picture."))
+            return None
+        try:
+            return self.notes.add_image(picture[0], picture[1], alt)
+        except ApplicationError as e:
+            QMessageBox.warning(self, _("Can't add the picture"), _(str(e)))
+            return None
+
+    def _keep_picture(self, mime: QMimeData) -> str | None:
+        if self.note is None:
+            return None
+        return self._keep(picture_from_mime(mime), _("Picture"))
+
+    def insert_picture(self):
+        if self.note is None:
+            return
+        folder = QSettings().value("notes/picture_folder", str(Path.home()))
+        path, _chosen = QFileDialog.getOpenFileName(
+            self, _("Insert a picture"), folder, f"{_('Pictures')} ({OPENABLE})")
+        if not path:
+            return
+        QSettings().setValue("notes/picture_folder", str(Path(path).parent))
+        markdown = self._keep(picture_from_file(path), Path(path).stem)
+        if markdown:
+            if self.preview_btn.isChecked():
+                self.preview_btn.setChecked(False)
+            self.editor.insert_block(markdown)
+            self.editor.setFocus()
+
+    def _picture_tip(self, uid: str) -> str:
+        record = self.notes.image(uid)
+        if record is None:
+            return _("This picture hasn't arrived on this computer yet.")
+        image = QImage.fromData(record.data)
+        folder = Path(QStandardPaths.writableLocation(QStandardPaths.CacheLocation)) / "pictures"
+        folder.mkdir(parents=True, exist_ok=True)
+        thumb = folder / f"{uid}-{hashlib.sha1(record.data).hexdigest()[:8]}.png"
+        if not thumb.exists() and not image.isNull():
+            image.scaled(360, 260, Qt.KeepAspectRatio, Qt.SmoothTransformation).save(str(thumb))
+        hint = (_("Right-click to edit the diagram in Ligature.") if record.diagram
+                else _("Ctrl+E shows the note with its pictures."))
+        return f"<img src='{thumb.as_uri()}'><br>{hint}"
+
+    def _picture_actions(self, menu: QMenu, uid: str):
+        record = self.notes.image(uid)
+        if record is None:
+            return
+        if record.diagram:
+            edit = menu.addAction(_("Edit in Ligature"), lambda: self.edit_diagram(uid))
+            if not self.notes.can_edit_diagrams():
+                edit.setEnabled(False)
+                edit.setText(_("Edit in Ligature (install Ligature first)"))
+        menu.addAction(_("Copy picture"), lambda: self._copy_picture(uid))
+        menu.addAction(_("Save picture as…"), lambda: self._save_picture(uid))
+        menu.addSeparator()
+
+    def _editor_menu(self, pos):
+        menu = QMenu(self)
+        uid = self.editor.picture_at(pos)
+        if uid:
+            self._picture_actions(menu, uid)
+        standard = self.editor.createStandardContextMenu(pos)
+        for action in standard.actions():
+            menu.addAction(action)
+        menu.exec(self.editor.viewport().mapToGlobal(pos))
+
+    def _viewer_menu(self, pos):
+        menu = QMenu(self)
+        uid = self.viewer.image_at(pos)
+        if uid:
+            self._picture_actions(menu, uid)
+        standard = self.viewer.createStandardContextMenu(pos)
+        for action in standard.actions():
+            menu.addAction(action)
+        menu.exec(self.viewer.viewport().mapToGlobal(pos))
+
+    def _copy_picture(self, uid: str):
+        record = self.notes.image(uid)
+        if record is None:
+            return
+        mime = QMimeData()
+        if record.mime == "image/png":
+            mime.setData("image/png", record.data)  # keeps a diagram inside it
+        mime.setImageData(QImage.fromData(record.data))
+        QGuiApplication.clipboard().setMimeData(mime)
+
+    def _save_picture(self, uid: str):
+        record = self.notes.image(uid)
+        if record is None:
+            return
+        suffix = {"image/jpeg": ".jpg", "image/gif": ".gif", "image/webp": ".webp"}.get(
+            record.mime, ".png")
+        path, _chosen = QFileDialog.getSaveFileName(
+            self, _("Save picture"), str(Path.home() / f"{_('picture')}{suffix}"),
+            f"{_('Pictures')} (*{suffix})")
+        if path:
+            try:
+                Path(path).write_bytes(record.data)
+            except OSError:
+                QMessageBox.warning(self, _("Save picture"), _("Couldn't save the picture there."))
+
+    def edit_diagram(self, uid: str):
+        self.flush()
+        try:
+            path = self.notes.edit_diagram(uid)
+        except (ApplicationError, OSError) as e:
+            QMessageBox.warning(self, _("Edit in Ligature"), _(str(e)) if isinstance(
+                e, ApplicationError) else _("Ligature couldn't be started."))
+            return
+        self._diagram_files[path] = uid
+        self._watcher.addPath(path)
+        self._watcher.addPath(str(Path(path).parent))  # Ligature replaces the whole file
+        self.status.setText(_("Editing the diagram in Ligature: save there to update it here."))
+
+    def _diagrams_changed(self):
+        updated = False
+        for path, uid in list(self._diagram_files.items()):
+            try:
+                updated |= self.notes.diagram_saved(uid, path)
+            except ApplicationError as e:
+                self.status.setText(_(str(e)))
+            if Path(path).exists() and path not in self._watcher.files():
+                self._watcher.addPath(path)
+        if updated:
+            self.status.setText(_("Diagram updated from Ligature."))
+            if self.preview_btn.isChecked():
+                self.viewer.clear()
+                self.viewer.setMarkdown(self.editor.toPlainText())
+
+    def export_pdf(self):
+        if self.note is None:
+            return
+        self.flush()
+        name = "".join(ch for ch in self.note.title if ch not in '\\/:*?"<>|').strip() or _("Note")
+        folder = QSettings().value("notes/pdf_folder", str(Path.home()))
+        path, _chosen = QFileDialog.getSaveFileName(
+            self, _("Export as PDF"), str(Path(folder) / f"{name}.pdf"), "PDF (*.pdf)")
+        if not path:
+            return
+        if not path.lower().endswith(".pdf"):
+            path += ".pdf"
+        QSettings().setValue("notes/pdf_folder", str(Path(path).parent))
+        note_pdf(self.services, self.note.title, self.editor.toPlainText(), path)
+        self.status.setText(_("Exported to {name}").format(name=Path(path).name))

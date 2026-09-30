@@ -115,6 +115,12 @@ object Codec {
         "external_id" to text(t.externalId),
     ))
 
+    // ---- pictures in notes (added on the desktop; the phone shows them) ----
+
+    fun image(r: SyncRecord): ByteArray? = r.data?.let { d ->
+        runCatching { java.util.Base64.getDecoder().decode(d.str("data")) }.getOrNull()
+    }
+
     // ---- notes ----
 
     fun note(r: SyncRecord): Note {

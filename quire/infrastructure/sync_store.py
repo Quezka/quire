@@ -10,6 +10,7 @@ Records travel as plain dicts that name related records by uid, never by local r
 """
 from __future__ import annotations
 
+import base64
 import json
 import sqlite3
 from contextlib import contextmanager
@@ -41,6 +42,7 @@ SYNCED = (
     Synced("task", "tasks",
            f"CASE WHEN NEW.external_id IS NOT NULL THEN 'ext:' || NEW.external_id"
            f" ELSE {RANDOM_UID} END"),
+    Synced("image", "note_images", RANDOM_UID),  # pictures in notes, before the notes
     Synced("note", "notes", RANDOM_UID),
     Synced("journal", "journal", "'day:' || NEW.day"),
     Synced("shift", "shifts", RANDOM_UID),
@@ -180,6 +182,8 @@ class SqliteSyncStore:
             return {"title": r["title"], "body": r["body"],
                     "course": self._uid("courses", r["course_id"]), "pinned": bool(r["pinned"]),
                     "updated": r["updated"], "topic": r["topic"]}
+        if kind == "image":
+            return {"mime": r["mime"], "data": base64.b64encode(bytes(r["data"])).decode()}
         if kind == "journal":
             return {"day": r["day"], "body": r["body"]}
         if kind == "shift":
@@ -256,6 +260,8 @@ class SqliteSyncStore:
                       "course_id": self._id("courses", d.get("course")),
                       "pinned": int(bool(d.get("pinned"))), "updated": d["updated"],
                       "topic": d.get("topic", "")}
+        elif s.kind == "image":
+            values = {"mime": d["mime"], "data": base64.b64decode(d["data"])}
         elif s.kind == "journal":
             values = {"day": d["day"], "body": d.get("body", "")}
         elif s.kind == "shift":

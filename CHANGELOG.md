@@ -4,6 +4,21 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.19.0] - 2026-09-30
+
+### Added
+- **Pictures in notes.** Paste a picture (a screenshot, or a diagram copied from
+  [Ligature](https://github.com/Quezka/ligature)), drop a picture file onto a note, or use
+  the new picture button. The note shows it in the preview (Ctrl+E), and hovering its line
+  in the editor shows a thumbnail. Pictures sync to your other devices, and the phone
+  shows them in a note's preview too. Big photos are scaled down to fit (up to 700 KB each).
+- **Edit diagrams in Ligature.** Right-click a Ligature diagram in a note and choose
+  *Edit in Ligature*. Save in Ligature and the note updates by itself. Ligature pictures
+  keep the diagram inside them, so nothing is lost on the way.
+- **Export a note as PDF**, pictures included (the new download button beside the preview).
+  A4, ready to print or hand in.
+- Right-click a picture to copy it or save it as a file.
+
 ## [0.18.2] - 2026-09-30
 
 ### Fixed

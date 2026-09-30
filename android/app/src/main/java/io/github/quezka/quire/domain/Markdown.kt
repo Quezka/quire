@@ -8,7 +8,7 @@ object Markdown {
 
     /** The start of a note's text after its title, as plain words. */
     fun snippet(body: String, length: Int = 90): String {
-        val lines = body.lines().map { it.trim() }.filter { it.isNotEmpty() }
+        val lines = withoutImages(body).lines().map { it.trim() }.filter { it.isNotEmpty() }
         var text = lines.drop(1).joinToString(" ")
         text = text.replace(Regex("""(^|\s)#{1,6}\s+"""), "$1")
             .replace(Regex("""[-*+]\s+\[[ xX]\]\s+|(^|(?<=\s))[-*+>]\s+|\*\*|__|`|~~"""), "")

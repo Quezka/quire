@@ -72,6 +72,9 @@ _PATHS = {
     "checklist": '<path d="M3 5l2 2 4-4M3 15l2 2 4-4M13 6h8M13 16h8"/>',
     "code": '<path d="M16 18l6-6-6-6M8 6l-6 6 6 6"/>',
     "quote": '<path d="M3 21c3 0 7-1 7-8V5H3v7h4M14 21c3 0 7-1 7-8V5h-7v7h4"/>',
+    "image": '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/>'
+             '<path d="M21 15l-5-5L5 21"/>',
+    "download": '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
     "bell": '<path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>'
             '<path d="M13.73 21a2 2 0 0 1-3.46 0"/>',
 }

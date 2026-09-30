@@ -1,5 +1,7 @@
 package io.github.quezka.quire.ui
 
+import android.graphics.BitmapFactory
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,6 +18,12 @@ import androidx.compose.material3.Checkbox
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.res.stringResource
+import io.github.quezka.quire.R
+import io.github.quezka.quire.domain.IMAGE_REF
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -136,9 +144,26 @@ private fun inline(text: String): AnnotatedString {
     }
 }
 
-/** The note rendered for reading; tapping a checkbox ticks it ([onToggle] gets the line). */
+/** A picture from a note, decoded once per picture. */
 @Composable
-fun MarkdownPreview(body: String, onToggle: (Int) -> Unit, modifier: Modifier = Modifier) {
+private fun NotePicture(uid: String, alt: String, image: (String) -> ByteArray?) {
+    val bitmap = remember(uid) {
+        image(uid)?.let { BitmapFactory.decodeByteArray(it, 0, it.size) }?.asImageBitmap()
+    }
+    if (bitmap == null) {
+        Text(stringResource(R.string.picture_not_here), color = MaterialTheme.colorScheme.onSurfaceVariant,
+            style = MaterialTheme.typography.bodyMedium)
+    } else {
+        Image(bitmap, alt, Modifier.fillMaxWidth().padding(vertical = 6.dp)
+            .background(Color.White, RoundedCornerShape(8.dp)), contentScale = ContentScale.FillWidth)
+    }
+}
+
+/** The note rendered for reading; tapping a checkbox ticks it ([onToggle] gets the line).
+ *  Pictures come from [image] (by uid). */
+@Composable
+fun MarkdownPreview(body: String, onToggle: (Int) -> Unit, modifier: Modifier = Modifier,
+                    image: (String) -> ByteArray? = { null }) {
     val c = MaterialTheme.colorScheme
     val type = MaterialTheme.typography
     Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -163,6 +188,10 @@ fun MarkdownPreview(body: String, onToggle: (Int) -> Unit, modifier: Modifier = 
                         modifier = Modifier.padding(top = if (index == 0) 0.dp else 8.dp))
                 }
                 line.isBlank() -> Spacer(Modifier.height(6.dp))
+                IMAGE_REF.matchEntire(line.trim()) != null -> {
+                    val m = IMAGE_REF.matchEntire(line.trim())!!
+                    NotePicture(m.groupValues[2], m.groupValues[1], image)
+                }
                 line.trimStart().startsWith(">") -> Row {
                     Box(Modifier.width(3.dp).height(22.dp).background(c.primary.copy(alpha = 0.5f)))
                     Spacer(Modifier.width(10.dp))

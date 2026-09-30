@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 11
+SCHEMA_VERSION = 12
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -50,6 +50,12 @@ CREATE TABLE IF NOT EXISTS notes (
     pinned    INTEGER NOT NULL DEFAULT 0,
     updated   TEXT NOT NULL,
     topic     TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS note_images (
+    id    INTEGER PRIMARY KEY,
+    uid   TEXT,
+    mime  TEXT NOT NULL,
+    data  BLOB NOT NULL
 );
 CREATE TABLE IF NOT EXISTS journal (
     day  TEXT PRIMARY KEY,
@@ -158,8 +164,8 @@ class SqliteDatabase:
         self._add_column("courses", "external_id", "TEXT")
         self._add_column("tasks", "external_id", "TEXT")
         # v4 (register_subjects), v5 (jobs, shifts), v6 (shift_patterns, shift_skips),
-        # v7 (focus_sessions) and v10 (register_items, school_days) add tables, which
-        # SCHEMA creates.
+        # v7 (focus_sessions), v10 (register_items, school_days) and v12 (note_images)
+        # add tables, which SCHEMA creates.
         # v6: share of pay withheld for tax per job.
         self._add_column("jobs", "deductions", "REAL NOT NULL DEFAULT 0")
         # v8: what a focus session was spent on (task title or ad-hoc project).

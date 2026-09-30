@@ -89,3 +89,16 @@ def test_v10_focus_sessions_count_as_complete(tmp_path):
     db = SqliteDatabase(path)
     assert db.conn.execute("SELECT complete FROM focus_sessions").fetchone()["complete"] == 1
     db.close()
+
+
+def test_v11_databases_gain_pictures_for_notes(tmp_path):
+    path = tmp_path / "v11.db"
+    SqliteDatabase(path).close()
+    with sqlite3.connect(path) as conn:
+        conn.executescript("DROP TABLE note_images; PRAGMA user_version = 11;")
+    db = SqliteDatabase(path)
+    db.conn.execute("INSERT INTO note_images (uid, mime, data) VALUES ('ab12', 'image/png', x'00')")
+    row = db.conn.execute("SELECT uid, dirty FROM note_images").fetchone()
+    assert tuple(row) == ("ab12", 1)  # tracked for sync, with the uid it was given
+    assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    db.close()

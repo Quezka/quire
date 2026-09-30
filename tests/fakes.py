@@ -201,3 +201,27 @@ class FakeLoginItem:
             raise OSError("not supported")
         self.on = on
         self.writes += 1
+
+
+class FakeDiagrams:
+    """Ligature, as far as Quire can tell: installed or not, and the files it saved."""
+
+    def __init__(self, installed=True):
+        self.installed = installed
+        self.files: dict[str, bytes] = {}
+        self.opened: list[str] = []
+
+    def available(self):
+        return self.installed
+
+    def is_diagram(self, data):
+        return b"zTXtligature" in data
+
+    def open(self, name, data):
+        path = f"/fake/{name}"
+        self.files[path] = data
+        self.opened.append(path)
+        return path
+
+    def read(self, path):
+        return self.files.get(path)

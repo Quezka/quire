@@ -89,9 +89,15 @@ data class Note(
 }
 
 /** A note's title is its first non-empty line, minus markdown heading marks. */
+/** A picture in a note, as the desktop writes it: ![alt](quire-image:<uid>). */
+val IMAGE_REF = Regex("""!\[([^\]\n]*)\]\(quire-image:([0-9a-f]{8,64})\)""")
+
+/** Text with pictures replaced by their descriptions (for titles and snippets). */
+fun withoutImages(text: String) = IMAGE_REF.replace(text) { it.groupValues[1] }
+
 fun deriveNoteTitle(body: String): String {
     for (line in body.lines()) {
-        val text = line.trim().trimStart('#').trim()
+        val text = withoutImages(line).trim().trimStart('#').trim()
         if (text.isNotEmpty()) return text.take(120)
     }
     return "Untitled"

@@ -22,6 +22,7 @@ TOKEN_URL = "https://securetoken.googleapis.com/v1/token?key={key}"
 FIRESTORE = "https://firestore.googleapis.com/v1"
 PAGE = 300
 BATCH = 400  # Firestore allows 500 writes per commit
+BATCH_BYTES = 6_000_000  # and 10 MiB per request: pictures in notes are big
 
 AUTH_MESSAGES = {
     "EMAIL_EXISTS": "There's already an account with this email: sign in instead.",
@@ -183,10 +184,25 @@ class FirebaseCloud:
 
     def push(self, config, session, records):
         base = f"{self._root(config)}/users/{session.user_id}/records"
-        for start in range(0, len(records), BATCH):
+        for batch in _batches(records):
             writes = [{
                 "update": {"name": f"{base}/{doc_id(r)}", "fields": to_fields(r)},
                 "updateTransforms": [{"fieldPath": "synced", "setToServerValue": "REQUEST_TIME"}],
-            } for r in records[start:start + BATCH]]
+            } for r in batch]
             self._post(f"{FIRESTORE}/{self._root(config)}:commit", {"writes": writes},
                        session.token)
+
+
+def _batches(records):
+    """Groups of records small enough for one commit: at most BATCH writes, and about
+    BATCH_BYTES of data (a group always takes at least one record)."""
+    batch, size = [], 0
+    for r in records:
+        length = len(json.dumps(r.data)) if r.data is not None else 0
+        if batch and (len(batch) >= BATCH or size + length > BATCH_BYTES):
+            yield batch
+            batch, size = [], 0
+        batch.append(r)
+        size += length
+    if batch:
+        yield batch

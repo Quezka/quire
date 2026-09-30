@@ -6,7 +6,7 @@ from pathlib import Path
 from .application.bus import ChangeBus
 from . import HOMEPAGE, __version__
 from .application.ports import (
-    CloudBackend, Clock, CredentialStore, LoginItem, ReleaseFeed, SchoolRegister,
+    CloudBackend, DiagramEditor, Clock, CredentialStore, LoginItem, ReleaseFeed, SchoolRegister,
     UpdateInstaller,
 )
 from .application.services import (
@@ -18,11 +18,12 @@ from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
 from .infrastructure.credentials import KeyringCredentialStore
 from .infrastructure.firebase import FirebaseCloud
+from .infrastructure.ligature import LigatureApp
 from .infrastructure.login_item import platform_login_item
 from .infrastructure.repositories import (
     SqliteCourseRepository, SqliteEventRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
-    SqliteKeyValueStore, SqliteNoteRepository, SqliteSchoolRecordRepository,
+    SqliteImageRepository, SqliteKeyValueStore, SqliteNoteRepository, SqliteSchoolRecordRepository,
     SqliteShiftRepository, SqliteTaskRepository,
 )
 from .infrastructure.sqlite import SqliteDatabase
@@ -38,6 +39,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                    releases: ReleaseFeed | None = None,
                    installer: UpdateInstaller | None = None,
                    login_item: LoginItem | None = None,
+                   diagrams: DiagramEditor | None = None,
                    ) -> tuple[Services, SqliteDatabase]:
     db = SqliteDatabase(db_path)
     clock = clock or SystemClock()
@@ -46,6 +48,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     events = SqliteEventRepository(db)
     tasks = SqliteTaskRepository(db)
     notes = SqliteNoteRepository(db)
+    images = SqliteImageRepository(db)
     journal = SqliteJournalRepository(db)
     jobs = SqliteJobRepository(db)
     shifts = SqliteShiftRepository(db)
@@ -57,7 +60,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         timetable=TimetableService(courses, bus),
         planner=planner,
         tasks=TaskService(tasks, courses, clock, bus),
-        notes=NoteService(notes, courses, clock, bus),
+        notes=NoteService(notes, courses, clock, bus, images, diagrams or LigatureApp()),
         school=SchoolRecordsService(courses, tasks, records, clock, register.name.lower()),
         school_sync=SchoolSyncService(register, credentials or KeyringCredentialStore(),
                                       courses, tasks, records, settings, clock, bus),

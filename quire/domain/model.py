@@ -146,10 +146,53 @@ class Task:
         return DueBucket.LATER
 
 
+# ---- pictures in notes ---------------------------------------------------------------
+
+IMAGE_SCHEME = "quire-image:"
+# A picture travels to other devices as one sync record, and a record must stay well under
+# the cloud's 1 MiB per document once encoded.
+MAX_IMAGE_BYTES = 700_000
+IMAGE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp"}
+IMAGE_REF = re.compile(r"!\[([^\]\n]*)\]\(quire-image:([0-9a-f]{8,64})\)")
+
+
+@dataclass
+class NoteImage:
+    """A picture shown in notes, referenced from Markdown as ![alt](quire-image:<uid>)."""
+
+    uid: str
+    mime: str
+    data: bytes
+    id: int | None = None
+
+    def check(self):
+        if self.mime not in IMAGE_TYPES:
+            raise ValidationError("Notes can show PNG, JPEG, GIF and WebP pictures.")
+        if not self.data:
+            raise ValidationError("That picture is empty.")
+        if len(self.data) > MAX_IMAGE_BYTES:
+            raise ValidationError("That picture is too big to keep in a note (over 700 KB).")
+
+
+def image_markdown(uid: str, alt: str = "") -> str:
+    alt = " ".join(alt.replace("[", "(").replace("]", ")").split())
+    return f"![{alt}]({IMAGE_SCHEME}{uid})"
+
+
+def image_uids(body: str) -> list[str]:
+    """The pictures a note shows, in order (each once)."""
+    return list(dict.fromkeys(m.group(2) for m in IMAGE_REF.finditer(body)))
+
+
+def _without_images(text: str) -> str:
+    return IMAGE_REF.sub(lambda m: m.group(1), text)
+
+
 def derive_note_title(body: str) -> str:
-    """A note's title is its first non-empty line, minus markdown heading marks."""
+    """A note's title is its first non-empty line, minus markdown heading marks (a picture
+    counts by its description)."""
     for line in body.splitlines():
-        text = line.strip().lstrip("#").strip()
+        text = _without_images(line).strip().lstrip("#").strip()
         if text:
             return text[:120]
     return "Untitled"
@@ -157,7 +200,7 @@ def derive_note_title(body: str) -> str:
 
 def note_snippet(body: str, length: int = 90) -> str:
     """The start of a note's text after its title, as plain words: for the notes list."""
-    lines = [line.strip() for line in body.splitlines() if line.strip()]
+    lines = [line.strip() for line in _without_images(body).splitlines() if line.strip()]
     text = " ".join(lines[1:])
     text = re.sub(r"^#{1,6}\s+|(?<=\s)#{1,6}\s+", "", text)
     text = re.sub(r"[-*+]\s+\[[ xX]\]\s+|(?:^|(?<=\s))[-*+>]\s+|\*\*|__|`|~~", "", text)

@@ -96,12 +96,67 @@ class MarkdownHighlighter(QSyntaxHighlighter):
 
 
 class MarkdownEdit(QPlainTextEdit):
-    """QPlainTextEdit with Markdown-aware editing."""
+    """QPlainTextEdit with Markdown-aware editing.
+
+    Pictures pasted or dropped in go to `picture_handler(mime) -> str | None`, which keeps
+    the picture and returns the Markdown line that shows it (None: not a picture);
+    `picture_tip(uid) -> str` gives the tooltip for a picture's line."""
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.highlighter = MarkdownHighlighter(self.document(), self.font())
         self.setMouseTracking(True)
+        self.picture_handler = None
+        self.picture_tip = None
+
+    # ---- pictures ----
+
+    def canInsertFromMimeData(self, source):  # noqa: N802
+        from .note_images import has_picture
+        if self.picture_handler is not None and has_picture(source):
+            return True
+        return super().canInsertFromMimeData(source)
+
+    def insertFromMimeData(self, source):  # noqa: N802
+        from .note_images import has_picture
+        if self.picture_handler is not None and has_picture(source):
+            markdown = self.picture_handler(source)
+            if markdown:
+                self.insert_block(markdown)
+                return
+            if not source.hasText():
+                return
+        super().insertFromMimeData(source)
+
+    def insert_block(self, text: str):
+        """Insert `text` as a paragraph of its own (blank lines around it) at the cursor."""
+        cursor = self.textCursor()
+        block = cursor.block()
+        if cursor.positionInBlock() > 0:
+            before = "\n\n"
+        elif block.previous().isValid() and block.previous().text().strip():
+            before = "\n"
+        else:
+            before = ""
+        cursor.insertText(f"{before}{text}\n\n")
+        self.setTextCursor(cursor)
+        self.ensureCursorVisible()
+
+    def picture_at(self, pos) -> str | None:
+        from .note_images import image_at
+        cursor = self.cursorForPosition(pos)
+        return image_at(cursor.block().text(), cursor.positionInBlock())
+
+    def event(self, event):  # noqa: N802
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.ToolTip and self.picture_tip is not None:
+            from PySide6.QtWidgets import QToolTip
+            uid = self.picture_at(self.viewport().mapFromGlobal(event.globalPos()))
+            if uid:
+                QToolTip.showText(event.globalPos(), self.picture_tip(uid), self)
+                return True
+            QToolTip.hideText()
+        return super().event(event)
 
     def setFont(self, font):  # noqa: N802 (Qt naming)
         super().setFont(font)

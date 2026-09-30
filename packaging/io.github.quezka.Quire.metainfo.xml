@@ -53,6 +53,12 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.19.0" date="2026-09-30">
+      <description>
+        <p>Pictures in notes (pasted, dropped or inserted), diagrams edited in Ligature, and
+          notes exported as PDF.</p>
+      </description>
+    </release>
     <release version="0.18.2" date="2026-09-30">
       <description>
         <p>Noticeboard notices show their text, not only their attachments.</p>

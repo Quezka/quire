@@ -16,7 +16,7 @@ from quire.domain import FocusSession
 from quire.infrastructure.credentials import MemoryCredentialStore
 
 from .conftest import TODAY, FixedClock
-from .fakes import FakeCloud, FakeRegister
+from .fakes import FakeCloud, FakeDiagrams, FakeRegister
 
 CONFIG = ("quire-sync-test", "AIzaSyTESTKEY-0123456789abcdef")
 EMAIL, PASSWORD = "me@example.com", "secret123"
@@ -29,7 +29,8 @@ def shared_cloud():
 
 def device(tmp_path, cloud, name):
     services, db = build_services(tmp_path / f"{name}.db", FixedClock(), FakeRegister(),
-                                  MemoryCredentialStore(), cloud, MemoryCredentialStore())
+                                  MemoryCredentialStore(), cloud, MemoryCredentialStore(),
+                                  diagrams=FakeDiagrams())
     return services, db
 
 

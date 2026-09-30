@@ -82,6 +82,16 @@ class NoteRecord:
 
 
 @dataclass(frozen=True)
+class ImageRecord:
+    """A picture in notes: the bytes to show, and whether Ligature can edit it."""
+
+    uid: str
+    mime: str
+    data: bytes
+    diagram: bool = False
+
+
+@dataclass(frozen=True)
 class PatternRecord:
     """One weekly shift of a job's schedule."""
 

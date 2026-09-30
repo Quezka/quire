@@ -475,7 +475,8 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
                     MarkdownPreview(body, onToggle = { line ->
                         val toggled = Markdown.toggleCheckbox(body, line)
                         field = field.copy(text = toggled); dirty = true
-                    }, Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp))
+                    }, Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
+                        image = repo::image)
                 } else {
                     TextField(field, ::edit, Modifier.fillMaxSize().padding(top = 8.dp),
                         placeholder = { Text(stringResource(R.string.note_hint)) },

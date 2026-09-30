@@ -12,7 +12,8 @@ from typing import Protocol
 from dataclasses import dataclass
 
 from ..domain import (
-    Absence, Book, Course, Event, FocusSession, Grade, Job, Lesson, Note, Notice, SchoolDocument,
+    Absence, Book, Course, Event, FocusSession, Grade, Job, Lesson, Note, NoteImage, Notice,
+    SchoolDocument,
     Shift, Subject, Task, TaskKind,
 )
 
@@ -78,6 +79,28 @@ class NoteRepository(Protocol):
     def add(self, note: Note) -> int: ...
     def update(self, note: Note) -> None: ...
     def delete(self, note_id: int) -> None: ...
+
+
+class ImageRepository(Protocol):
+    """Pictures shown in notes."""
+
+    def get(self, uid: str) -> NoteImage | None: ...
+    def add(self, image: NoteImage) -> int: ...
+    def replace(self, uid: str, mime: str, data: bytes) -> None: ...
+
+
+class DiagramEditor(Protocol):
+    """Ligature, the diagram app, for editing a diagram picture from a note."""
+
+    def available(self) -> bool: ...
+    def is_diagram(self, data: bytes) -> bool:
+        """Whether the picture has a Ligature diagram inside it."""
+        ...
+    def open(self, name: str, data: bytes) -> str:
+        """Put the picture in a file, open it in Ligature, and return the file's path.
+        Ligature saves back into that file."""
+        ...
+    def read(self, path: str) -> bytes | None: ...
 
 
 class JournalRepository(Protocol):

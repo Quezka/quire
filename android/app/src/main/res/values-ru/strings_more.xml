@@ -244,4 +244,5 @@
         <item quantity="many">%d слов</item>
         <item quantity="other">%d слова</item>
     </plurals>
+    <string name="picture_not_here">Эта картинка ещё не пришла на телефон.</string>
 </resources>

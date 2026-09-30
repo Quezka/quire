@@ -89,4 +89,13 @@ class CompatibilityTest {
         assertEquals("kept", (Codec.courseData(Codec.course(records.get("course", course.uid)!!), stored)
             ["future_field"] as JsonPrimitive).content)
     }
+
+    @Test fun desktopPicturesAreRead() {
+        val png = repository().image("5b5bd6f5a5244e0c9d1b7f3e2a1c0d9e")!!
+        assertEquals(0x89.toByte(), png[0])
+        assertEquals("PNG", String(png, 1, 3))
+        assertEquals(null, repository().image("0000000000000000"))
+        assertEquals("Schema", io.github.quezka.quire.domain.deriveNoteTitle(
+            "![](quire-image:5b5bd6f5a5244e0c)\n# Schema\n![ER](quire-image:5b5bd6f5a5244e0c)"))
+    }
 }

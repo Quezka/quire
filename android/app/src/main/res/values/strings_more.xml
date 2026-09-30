@@ -228,4 +228,5 @@
         <item quantity="one">%d word</item>
         <item quantity="other">%d words</item>
     </plurals>
+    <string name="picture_not_here">This picture hasn’t arrived on this phone yet.</string>
 </resources>

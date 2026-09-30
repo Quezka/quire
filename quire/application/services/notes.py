@@ -1,13 +1,16 @@
 from __future__ import annotations
 
+import uuid
 from datetime import date
 
-from ...domain import NotFound, Note, normalize_topic, note_snippet
+from ...domain import (
+    NotFound, Note, NoteImage, image_markdown, image_uids, normalize_topic, note_snippet,
+)
 from ..bus import ChangeBus, Topic
 from ..dto import NoteGroup, NoteSummary
 from ..inputs import NoteInput
-from ..records import NoteRecord, course_record, note_record
-from ..ports import Clock, CourseRepository, NoteRepository
+from ..records import ImageRecord, NoteRecord, course_record, note_record
+from ..ports import Clock, CourseRepository, DiagramEditor, ImageRepository, NoteRepository
 
 
 def class_note_title(course_name: str, day: date) -> str:
@@ -18,11 +21,14 @@ class NoteService:
     """Use cases for markdown notes."""
 
     def __init__(self, notes: NoteRepository, courses: CourseRepository, clock: Clock,
-                 bus: ChangeBus):
+                 bus: ChangeBus, images: ImageRepository | None = None,
+                 diagrams: DiagramEditor | None = None):
         self._notes = notes
         self._courses = courses
         self._clock = clock
         self._bus = bus
+        self._images = images
+        self._diagrams = diagrams
 
     def search(self, text: str = "", course_id: int | None = None) -> list[NoteSummary]:
         """Pinned notes first, then most recently edited."""
@@ -104,3 +110,48 @@ class NoteService:
         title = class_note_title(course.name, day)
         existing = self._notes.find_by_title(title, course_id)
         return note_record(existing) if existing else self.create(f"# {title}\n\n", course_id)
+
+    # ---- pictures ----------------------------------------------------------------------
+
+    def add_image(self, data: bytes, mime: str, alt: str = "") -> str:
+        """Keep a picture for notes; returns the Markdown that shows it, to insert in a note."""
+        image = NoteImage(uuid.uuid4().hex, mime, data)
+        image.check()
+        self._images.add(image)
+        return image_markdown(image.uid, alt)
+
+    def image(self, uid: str) -> ImageRecord | None:
+        image = self._images.get(uid) if self._images else None
+        if image is None:
+            return None
+        diagram = bool(self._diagrams and self._diagrams.is_diagram(image.data))
+        return ImageRecord(image.uid, image.mime, image.data, diagram)
+
+    def images_in(self, body: str) -> list[ImageRecord]:
+        """The pictures a note's text shows (those that have arrived on this device)."""
+        return [r for r in (self.image(uid) for uid in image_uids(body)) if r is not None]
+
+    def can_edit_diagrams(self) -> bool:
+        """Whether Ligature is installed here."""
+        return bool(self._diagrams and self._diagrams.available())
+
+    def edit_diagram(self, uid: str) -> str:
+        """Open a diagram picture in Ligature; returns the file to watch for its saves."""
+        image = self.image(uid)
+        if image is None:
+            raise NotFound("That picture is no longer here.")
+        if not image.diagram:
+            raise NotFound("That picture wasn't made with Ligature.")
+        return self._diagrams.open(f"diagram-{uid[:8]}.png", image.data)
+
+    def diagram_saved(self, uid: str, path: str) -> bool:
+        """Ligature saved the diagram: take the new picture into notes. False if unchanged."""
+        data = self._diagrams.read(path)
+        current = self._images.get(uid)
+        if not data or current is None or data == current.data:
+            return False
+        image = NoteImage(uid, "image/png", data)
+        image.check()
+        self._images.replace(uid, image.mime, image.data)
+        self._bus.publish(Topic.NOTES)
+        return True

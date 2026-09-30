@@ -7,7 +7,8 @@ import json
 
 from ..domain import (
     Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
-    Lesson, Note, Notice, NoticeAttachment, SchoolDocument, Shift, ShiftPattern, Subject, Task,
+    Lesson, Note, NoteImage, Notice, NoticeAttachment, SchoolDocument, Shift, ShiftPattern,
+    Subject, Task,
     TaskKind, TimeRange,
 )
 from .sqlite import SqliteDatabase
@@ -177,6 +178,19 @@ class SqliteTaskRepository(_Repo):
 
     def delete(self, task_id):
         self._write("DELETE FROM tasks WHERE id = ?", task_id)
+
+
+class SqliteImageRepository(_Repo):
+    def get(self, uid):
+        r = self._one("SELECT * FROM note_images WHERE uid = ?", uid)
+        return NoteImage(r["uid"], r["mime"], bytes(r["data"]), r["id"]) if r else None
+
+    def add(self, image: NoteImage) -> int:
+        return self._write("INSERT INTO note_images (uid, mime, data) VALUES (?, ?, ?)",
+                           image.uid, image.mime, image.data)
+
+    def replace(self, uid, mime, data):
+        self._write("UPDATE note_images SET mime = ?, data = ? WHERE uid = ?", mime, data, uid)
 
 
 class SqliteNoteRepository(_Repo):
