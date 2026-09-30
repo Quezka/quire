@@ -245,4 +245,7 @@
         <item quantity="other">%d слова</item>
     </plurals>
     <string name="picture_not_here">Эта картинка ещё не пришла на телефон.</string>
+    <string name="remove_picture">Убрать картинку</string>
+    <string name="indent">Сдвинуть вправо</string>
+    <string name="outdent">Сдвинуть влево</string>
 </resources>

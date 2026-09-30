@@ -45,6 +45,8 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
+import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CameraAlt
@@ -116,6 +118,7 @@ import androidx.core.content.FileProvider
 import io.github.quezka.quire.R
 import io.github.quezka.quire.data.Codec
 import io.github.quezka.quire.data.Repository
+import io.github.quezka.quire.domain.BlockKind
 import io.github.quezka.quire.domain.Markdown
 import io.github.quezka.quire.domain.Note
 import io.github.quezka.quire.domain.deriveNoteTitle
@@ -376,55 +379,42 @@ private fun ScanProgress(busy: Boolean) {
 
 // ---- the editor ----
 
-/** Full-screen editor; saves shortly after typing stops and when leaving. */
+/** Full-screen editor: you write into the formatted note. Saves shortly after typing
+ *  stops and when leaving. */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
     val stored = remember(version) { repo.note(uid) }
-    var field by remember { mutableStateOf(TextFieldValue(stored?.body.orEmpty())) }
+    var dirty by remember { mutableStateOf(false) }
+    val editor = remember(uid) { BlockEditorState(stored?.body.orEmpty()) { dirty = true } }
     var topic by remember { mutableStateOf(stored?.topic.orEmpty()) }
     var courseUid by remember { mutableStateOf(stored?.courseUid) }
     var pinned by remember { mutableStateOf(stored?.pinned ?: false) }
-    var dirty by remember { mutableStateOf(false) }
     var confirming by remember { mutableStateOf(false) }
-    var preview by rememberSaveable { mutableStateOf(false) }
     var overflow by remember { mutableStateOf(false) }
     val courses = remember(version) { repo.courses() }
     val topics = remember(version, courseUid) {
         repo.notes().filter { it.courseUid == courseUid && it.topic.isNotBlank() }.map { it.topic }.distinct().sorted()
     }
-    val body = field.text
+    val body = remember(editor.revision) { editor.markdown() }
 
     fun flush() {
         if (!dirty) return
         val base = repo.note(uid) ?: Note(uid, "")
-        repo.saveNote(base.copy(body = body, topic = topic, courseUid = courseUid, pinned = pinned))
+        repo.saveNote(base.copy(body = editor.markdown(), topic = topic, courseUid = courseUid, pinned = pinned))
         dirty = false
     }
-    fun edit(value: TextFieldValue) {
-        val continued = Markdown.continueList(field.text, value.text, value.selection.start)
-            .takeIf { value.selection.collapsed }
-        field = if (continued != null) TextFieldValue(continued.first, TextRange(continued.second)) else value
-        if (field.text != body) dirty = true
-    }
-    val scanner = rememberScanner { text ->
-        // Put the page's text where the cursor is.
-        val at = field.selection.end.coerceIn(0, field.text.length)
-        val before = field.text.substring(0, at)
-        val insert = (if (before.isEmpty() || before.endsWith("\n\n")) "" else if (before.endsWith("\n")) "\n" else "\n\n") + text + "\n"
-        field = TextFieldValue(before + insert + field.text.substring(at), TextRange(at + insert.length))
-        dirty = true
-        preview = false
-    }
+    // A scanned page's text goes where the cursor is.
+    val scanner = rememberScanner { text -> editor.insertText(text) }
 
     // A sync brought a newer version: show it, unless there are unsaved edits (they win).
     LaunchedEffect(stored) {
-        if (!dirty && stored != null && stored.body != field.text) {
-            field = TextFieldValue(stored.body, TextRange(stored.body.length.coerceAtMost(field.selection.end)))
+        if (!dirty && stored != null && stored.body != editor.markdown()) {
+            editor.load(stored.body)
             topic = stored.topic; courseUid = stored.courseUid; pinned = stored.pinned
         }
     }
-    LaunchedEffect(field.text, topic, courseUid, pinned, dirty) { if (dirty) { delay(800); flush() } }
+    LaunchedEffect(editor.revision, topic, courseUid, pinned, dirty) { if (dirty) { delay(800); flush() } }
     DisposableEffect(uid) { onDispose { flush() } }
     BackHandler { flush(); close() }
 
@@ -438,12 +428,6 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
                     }
                 },
                 actions = {
-                    IconButton(onClick = { preview = !preview }) {
-                        AnimatedContent(preview, label = "mode") { on ->
-                            Icon(if (on) Icons.Filled.Edit else Icons.Filled.Visibility,
-                                stringResource(if (on) R.string.edit_note else R.string.preview))
-                        }
-                    }
                     IconButton(onClick = { pinned = !pinned; dirty = true }) {
                         Icon(if (pinned) Icons.Filled.PushPin else Icons.Outlined.PushPin,
                             stringResource(if (pinned) R.string.unpin else R.string.pin))
@@ -468,29 +452,10 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
                 Box(Modifier.weight(1f)) { CoursePicker(courses, courseUid) { courseUid = it; dirty = true } }
                 TopicField(topic, topics, Modifier.weight(1f)) { topic = it; dirty = true }
             }
-            AnimatedContent(preview, Modifier.weight(1f), transitionSpec = {
-                fadeIn(androidx.compose.animation.core.tween(Motion.MEDIUM)).togetherWith(fadeOut(androidx.compose.animation.core.tween(Motion.SHORT)))
-            }, label = "preview") { reading ->
-                if (reading) {
-                    MarkdownPreview(body, onToggle = { line ->
-                        val toggled = Markdown.toggleCheckbox(body, line)
-                        field = field.copy(text = toggled); dirty = true
-                    }, Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(20.dp),
-                        image = repo::image)
-                } else {
-                    TextField(field, ::edit, Modifier.fillMaxSize().padding(top = 8.dp),
-                        placeholder = { Text(stringResource(R.string.note_hint)) },
-                        visualTransformation = markdownStyling(),
-                        textStyle = MaterialTheme.typography.bodyLarge,
-                        keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
-                        colors = TextFieldDefaults.colors(
-                            focusedContainerColor = Color.Transparent, unfocusedContainerColor = Color.Transparent,
-                            focusedIndicatorColor = Color.Transparent, unfocusedIndicatorColor = Color.Transparent))
-                }
-            }
-            AnimatedVisibility(!preview, enter = expandVertically() + fadeIn(), exit = shrinkVertically() + fadeOut()) {
-                FormatBar(field, words = body.split(Regex("\\s+")).count { it.isNotBlank() }) { field = it; dirty = true }
-            }
+            BlockEditor(editor, repo::image, stringResource(R.string.note_hint),
+                Modifier.weight(1f).fillMaxWidth().verticalScroll(rememberScrollState())
+                    .padding(horizontal = 20.dp, vertical = 12.dp))
+            FormatBar(editor)
         }
         ScanProgress(scanner.busy)
     }
@@ -515,31 +480,26 @@ private fun TopicField(topic: String, suggestions: List<String>, modifier: Modif
     }
 }
 
-/** Formatting buttons above the keyboard. */
+/** Formatting buttons above the keyboard; they act on the line being edited. */
 @Composable
-private fun FormatBar(field: TextFieldValue, words: Int, change: (TextFieldValue) -> Unit) {
+private fun FormatBar(editor: BlockEditorState) {
     val context = LocalContext.current
-    fun wrap(marker: String, placeholder: Int) {
-        val (text, s, e) = Markdown.wrap(field.text, field.selection.min, field.selection.max, marker, context.getString(placeholder))
-        change(TextFieldValue(text, TextRange(s, e)))
-    }
-    fun prefix(p: String) {
-        val (text, cursor) = Markdown.togglePrefix(field.text, field.selection.min, field.selection.max, p)
-        change(TextFieldValue(text, TextRange(cursor)))
-    }
     Column {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)
             .horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
-            FormatButton(Icons.Filled.Title, R.string.heading) { prefix("## ") }
-            FormatButton(Icons.Filled.FormatBold, R.string.bold) { wrap("**", R.string.bold_placeholder) }
-            FormatButton(Icons.Filled.FormatItalic, R.string.italic) { wrap("*", R.string.italic_placeholder) }
-            FormatButton(Icons.AutoMirrored.Filled.FormatListBulleted, R.string.bulleted_list) { prefix("- ") }
-            FormatButton(Icons.Filled.ChecklistRtl, R.string.checklist) { prefix("- [ ] ") }
-            FormatButton(Icons.Filled.FormatQuote, R.string.quote) { prefix("> ") }
-            FormatButton(Icons.Filled.Code, R.string.code) { wrap("`", R.string.code_placeholder) }
+            FormatButton(Icons.Filled.Title, R.string.heading) { editor.setKind(BlockKind.HEADING, 2) }
+            FormatButton(Icons.Filled.FormatBold, R.string.bold) { editor.wrap("**", context.getString(R.string.bold_placeholder)) }
+            FormatButton(Icons.Filled.FormatItalic, R.string.italic) { editor.wrap("*", context.getString(R.string.italic_placeholder)) }
+            FormatButton(Icons.AutoMirrored.Filled.FormatListBulleted, R.string.bulleted_list) { editor.setKind(BlockKind.BULLET) }
+            FormatButton(Icons.Filled.ChecklistRtl, R.string.checklist) { editor.setKind(BlockKind.CHECK) }
+            FormatButton(Icons.AutoMirrored.Filled.FormatIndentIncrease, R.string.indent) { editor.indent(true) }
+            FormatButton(Icons.AutoMirrored.Filled.FormatIndentDecrease, R.string.outdent) { editor.indent(false) }
+            FormatButton(Icons.Filled.FormatQuote, R.string.quote) { editor.setKind(BlockKind.QUOTE, 1) }
+            FormatButton(Icons.Filled.Code, R.string.code) { editor.wrap("`", context.getString(R.string.code_placeholder)) }
             Spacer(Modifier.width(12.dp))
+            val words = editor.words
             if (words > 0) Text(pluralStringResource(R.plurals.words, words, words),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 12.dp))

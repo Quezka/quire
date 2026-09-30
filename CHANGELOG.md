@@ -4,6 +4,19 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.21.0] - 2026-09-30
+
+### Changed
+- **Phone: notes are edited formatted too**, like on the computer. The preview button is
+  gone: headings, lists, checkboxes (tap to tick), quotes, code and pictures show as you
+  write. The line you're typing in shows its Markdown marks faded, so you can still see
+  and fix `**bold**` or a link; the other lines show just the formatting.
+- Typing `# `, `- `, `1. `, `[ ] `, `> ` or ``` at the start of a line formats it; Enter
+  continues a list (Enter on an empty item ends it); Backspace at the start of a line
+  turns it back into text, then joins it to the line above.
+- New buttons to nest list items and bring them back out. Tap a picture to select it and
+  remove it. Scanned pages go where the cursor is.
+
 ## [0.20.0] - 2026-09-30
 
 ### Changed
