@@ -17,14 +17,14 @@ from ...application.errors import ApplicationError, NotFound
 from ...application.dto import NoteSummary
 from ...application.services import Services
 from ...application.inputs import NoteInput
-from ...application.records import NoteRecord
+from ...application.records import CourseRecord, NotebookRecord, NoteRecord
 from .. import icons, theme
 from ..bridge import ChangeRelay
-from ..dialogs import confirm, fill_course_combo, select_data
+from ..dialogs import NotebookDialog, confirm, select_data
 from ..formatting import plural, relative_timestamp
 from ..note_editor import SHORTCUTS, NoteEditor
 from ..note_images import OPENABLE, load_picture, note_pdf, picture_from_file, picture_from_mime
-from ..widgets import TwoLineDelegate, scaled_font
+from ..widgets import TwoLineDelegate, color_icon, scaled_font
 from .common import Card, Page, icon_button, label, primary_button
 from ..i18n import N_, _
 
@@ -33,6 +33,45 @@ PLACEHOLDER = N_(
     "Type # and a space for a heading, - for a list, [ ] for a checklist, > for a quote; "
     "**bold**, *italic* and `code` format as you close them. Paste or drop pictures in."
 )
+
+
+NEW_NOTEBOOK = "new-notebook"
+
+
+def home_data(course_id: int | None, notebook_id: int | None = None) -> str | None:
+    """What a picker stores for "filed in this class / notebook" (None: nowhere)."""
+    if course_id is not None:
+        return f"c:{course_id}"
+    return f"n:{notebook_id}" if notebook_id is not None else None
+
+
+def split_home(data) -> tuple[int | None, int | None]:
+    """(course_id, notebook_id) from a picker's data."""
+    if isinstance(data, str) and data[:2] == "c:":
+        return int(data[2:]), None
+    if isinstance(data, str) and data[:2] == "n:":
+        return None, int(data[2:])
+    return None, None
+
+
+def fill_home_combo(combo: QComboBox, courses: list[CourseRecord],
+                    notebooks: list[NotebookRecord], none_label: str, new_label: str | None = None):
+    """(Re)populate a class-or-notebook picker, keeping the current choice if it still exists."""
+    current = combo.currentData()
+    combo.blockSignals(True)
+    combo.clear()
+    combo.addItem(none_label, None)
+    for c in courses:
+        combo.addItem(color_icon(c.color), c.name, home_data(c.id))
+    if notebooks:
+        combo.insertSeparator(combo.count())
+        for n in notebooks:
+            combo.addItem(color_icon(n.color), n.name, home_data(None, n.id))
+    if new_label:
+        combo.insertSeparator(combo.count())
+        combo.addItem(new_label, NEW_NOTEBOOK)
+    select_data(combo, current if current != NEW_NOTEBOOK else None)
+    combo.blockSignals(False)
 
 
 class NotesView(Page):
@@ -59,7 +98,10 @@ class NotesView(Page):
         self.search.textChanged.connect(lambda: self.reload_list())
         self.filter = QComboBox()
         self.filter.currentIndexChanged.connect(lambda: self.reload_list())
-        self.group_btn = icon_button("layers", _("Group by class and topic"), checkable=True)
+        self.notebook_btn = icon_button("book", _("New notebook…"))
+        self.notebook_btn.clicked.connect(lambda: self.new_notebook())
+        self.group_btn = icon_button("layers", _("Group by class, notebook and topic"),
+                                     checkable=True)
         self.group_btn.setChecked(QSettings().value("notes/grouped", False, type=bool))
         self.group_btn.toggled.connect(self._grouping_toggled)
         self._collapsed: set[tuple] = set()
@@ -77,6 +119,7 @@ class NotesView(Page):
         filters = QHBoxLayout()
         filters.setSpacing(6)
         filters.addWidget(self.filter, 1)
+        filters.addWidget(self.notebook_btn)
         filters.addWidget(self.group_btn)
         left = Card(padding=12)
         left.setFixedWidth(310)
@@ -92,7 +135,7 @@ class NotesView(Page):
         self.topic.setMinimumWidth(170)
         self.topic.setInsertPolicy(QComboBox.NoInsert)
         self.topic.lineEdit().setPlaceholderText(_("No topic"))
-        self.topic.setToolTip(_("Topic within the class, e.g. a chapter or unit"))
+        self.topic.setToolTip(_("Topic within the class or notebook, e.g. a chapter or unit"))
         self.topic.completer().setCaseSensitivity(Qt.CaseInsensitive)
         self.topic.completer().setCompletionMode(QCompleter.PopupCompletion)
         self.topic.activated.connect(lambda _i: self._topic_changed())
@@ -200,10 +243,16 @@ class NotesView(Page):
 
     def _fill_course_combos(self):
         courses = self.services.timetable.courses()
-        fill_course_combo(self.filter, courses, _("All notes"))
+        notebooks = self.notes.notebooks()
+        fill_home_combo(self.filter, courses, notebooks, _("All notes"))
         self._loading = True
-        fill_course_combo(self.course, courses, _("No course"))
+        fill_home_combo(self.course, courses, notebooks, _("No class or notebook"),
+                        _("New notebook…"))
         self._loading = False
+
+    def _scope(self) -> tuple[int | None, int | None]:
+        """(course_id, notebook_id) the list is filtered to; both None shows everything."""
+        return split_home(self.filter.currentData())
 
     def _changed(self, topic: Topic):
         if topic is Topic.COURSES:
@@ -211,6 +260,7 @@ class NotesView(Page):
             self.reload_list()
         elif topic is Topic.NOTES and not self._saving:
             # Someone else changed notes (e.g. a sync); our own autosaves are skipped.
+            self._fill_course_combos()  # notebooks may have come or gone
             self._refresh_open_note()
             self.reload_list()
 
@@ -223,8 +273,9 @@ class NotesView(Page):
         except NotFound:  # deleted elsewhere
             self._show(None)
             return
-        shown = (self.note.body, self.note.course_id, self.note.pinned, self.note.topic)
-        if (fresh.body, fresh.course_id, fresh.pinned, fresh.topic) != shown:
+        shown = (self.note.body, self.note.course_id, self.note.pinned, self.note.topic,
+                 self.note.notebook_id)
+        if (fresh.body, fresh.course_id, fresh.pinned, fresh.topic, fresh.notebook_id) != shown:
             position = self.editor.textCursor().position()
             self._show(fresh)
             cursor = self.editor.textCursor()
@@ -233,36 +284,37 @@ class NotesView(Page):
 
     def reload_list(self, select_id=None):
         select_id = select_id or (self.note.id if self.note else None)
-        text, course_id = self.search.text(), self.filter.currentData()
+        text = self.search.text()
+        course_id, notebook_id = self._scope()
+        filtered = course_id is not None or notebook_id is not None
         today = self.services.planner.today()
         self.list.blockSignals(True)
         self.list.clear()
         count = 0
         if self.group_btn.isChecked():
-            groups = self.notes.grouped(text, course_id)
-            per_course: dict = {}
-            for g in groups:
-                key = g.course.id if g.course else None
-                per_course.setdefault(key, []).append(g)
-            for key, course_groups in per_course.items():
-                course = course_groups[0].course
-                course_hidden = False
-                if course_id is None:  # a single filtered course needs no heading
-                    course_hidden = ("course", key) in self._collapsed
-                    self._add_header(1, course.name if course else _("No class"), ("course", key),
-                                     sum(len(g.notes) for g in course_groups),
-                                     course.color if course else None, course_hidden)
-                indent = 12 if course_id is None else 0
-                only_loose = len(course_groups) == 1 and not course_groups[0].topic
-                for g in course_groups:
-                    topic_hidden = course_hidden
+            per_home: dict = {}
+            for g in self.notes.grouped(text, course_id, notebook_id):
+                per_home.setdefault(self._home_of(g), []).append(g)
+            for home, home_groups in per_home.items():
+                first = home_groups[0]
+                home_hidden = False
+                if not filtered:  # a single filtered class or notebook needs no heading
+                    home_hidden = ("home", home) in self._collapsed
+                    owner = first.course or first.notebook
+                    self._add_header(1, owner.name if owner else _("Not filed"), ("home", home),
+                                     sum(len(g.notes) for g in home_groups),
+                                     owner.color if owner else None, home_hidden)
+                indent = 0 if filtered else 12
+                only_loose = len(home_groups) == 1 and not home_groups[0].topic
+                for g in home_groups:
+                    topic_hidden = home_hidden
                     if not only_loose:
-                        topic_key = ("topic", key, g.topic)
+                        topic_key = ("topic", home, g.topic)
                         collapsed = topic_key in self._collapsed
-                        if not course_hidden:
+                        if not home_hidden:
                             self._add_header(2, g.topic or _("No topic"), topic_key, len(g.notes),
                                              None, collapsed, indent)
-                        topic_hidden = course_hidden or collapsed
+                        topic_hidden = home_hidden or collapsed
                         indent_notes = indent + 16
                     else:
                         indent_notes = indent
@@ -271,19 +323,27 @@ class NotesView(Page):
                         if not topic_hidden:
                             self._add_note(summary, today, select_id, indent_notes)
         else:
-            for summary in self.notes.search(text, course_id):
+            for summary in self.notes.search(text, course_id, notebook_id):
                 count += 1
                 self._add_note(summary, today, select_id, 0)
         self.list.blockSignals(False)
         self.subtitle.setText(_("{notes} found").format(notes=plural(count, "note"))
                               if text.strip() else plural(count, "note"))
 
+    @staticmethod
+    def _home_of(group) -> tuple:
+        """("course", id), ("notebook", id), or ("course", None) for notes filed nowhere."""
+        if group.notebook is not None:
+            return ("notebook", group.notebook.id)
+        return ("course", group.course.id if group.course else None)
+
     def _add_note(self, summary: NoteSummary, today: date, select_id, indent: int):
         item = QListWidgetItem(summary.title)
         item.setData(Qt.UserRole, summary.id)
         grouped = self.group_btn.isChecked()
         item.setData(TwoLineDelegate.META, self._meta(summary, today, with_course=not grouped))
-        item.setData(TwoLineDelegate.COLOR, summary.course.color if summary.course else None)
+        owner = summary.course or summary.notebook
+        item.setData(TwoLineDelegate.COLOR, owner.color if owner else None)
         item.setData(TwoLineDelegate.PINNED, summary.pinned)
         item.setData(TwoLineDelegate.INDENT, indent)
         self.list.addItem(item)
@@ -327,34 +387,77 @@ class NotesView(Page):
         key = item.data(Qt.UserRole + 20)
         menu = QMenu(self)
         if key and key[0] == "topic":
-            _kind, course_id, topic = key
+            _kind, home, topic = key
             new = menu.addAction(_("New note in this topic"))
             rename = menu.addAction(_("Rename topic…")) if topic else None
             chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+            course_id, notebook_id = self._ids_of(home)
             if chosen is new:
-                self._open(self.notes.create("", course_id, topic))
+                self._open(self.notes.create("", course_id, topic, notebook_id))
             elif chosen is not None and chosen is rename:
-                self._rename_topic(course_id, topic)
-        elif key and key[0] == "course":
-            new = menu.addAction(_("New note in this class"))
-            if menu.exec(self.list.viewport().mapToGlobal(pos)) is new:
-                self._open(self.notes.create("", key[1]))
+                self._rename_topic(course_id, notebook_id, topic)
+        elif key and key[0] == "home":
+            home = key[1]
+            course_id, notebook_id = self._ids_of(home)
+            new = menu.addAction(_("New note in this notebook") if notebook_id is not None
+                                 else _("New note in this class"))
+            edit = menu.addAction(_("Edit notebook…")) if notebook_id is not None else None
+            chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+            if chosen is new:
+                self._open(self.notes.create("", course_id, "", notebook_id))
+            elif chosen is not None and chosen is edit:
+                self.edit_notebook(notebook_id)
         elif item.data(Qt.UserRole) is not None:
             delete = menu.addAction(_("Delete note"))
             if menu.exec(self.list.viewport().mapToGlobal(pos)) is delete:
                 self.list.setCurrentItem(item)
                 self.delete_current()
 
-    def _rename_topic(self, course_id, topic: str):
+    @staticmethod
+    def _ids_of(home: tuple) -> tuple[int | None, int | None]:
+        kind, ident = home
+        return (ident, None) if kind == "course" else (None, ident)
+
+    def _rename_topic(self, course_id, notebook_id, topic: str):
         new, ok = QInputDialog.getText(self, _("Rename topic"),
                                        _("New name (use an existing name to merge):"), text=topic)
         if not ok:
             return
         self.flush()
-        self.notes.rename_topic(course_id, topic, new)
+        self.notes.rename_topic(course_id, topic, new, notebook_id)
         if self.note is not None:
             self.note = self.notes.note(self.note.id)
             self._fill_topics(self.note)
+        self.reload_list()
+
+    # ---- notebooks ------------------------------------------------------
+
+    def new_notebook(self, show: bool = True) -> NotebookRecord | None:
+        """Ask for a new notebook. `show` switches the list to it, so the next note goes in."""
+        dialog = NotebookDialog(self.services, parent=self)
+        if not dialog.exec() or dialog.result is None:
+            return None
+        self._fill_course_combos()
+        if show:
+            select_data(self.filter, home_data(None, dialog.result.id))
+        return dialog.result
+
+    def edit_notebook(self, notebook_id: int):
+        book = next((n for n in self.notes.notebooks() if n.id == notebook_id), None)
+        if book is None:
+            return
+        self.flush()
+        dialog = NotebookDialog(self.services, book, self)
+        if not dialog.exec():
+            return
+        if dialog.deleted:
+            if self.filter.currentData() == home_data(None, notebook_id):
+                self.filter.setCurrentIndex(0)
+            if self.note is not None:
+                self.note = self.notes.note(self.note.id)
+        self._fill_course_combos()
+        if self.note is not None:
+            select_data(self.course, home_data(self.note.course_id, self.note.notebook_id))
         self.reload_list()
 
     @staticmethod
@@ -362,6 +465,8 @@ class NotesView(Page):
         meta = relative_timestamp(summary.updated, today)
         if with_course and summary.course:
             meta += f" · {summary.course.name}"
+        elif with_course and summary.notebook:
+            meta += f" · {summary.notebook.name}"
         if with_course and summary.topic:
             meta += f" · {summary.topic}"
         if summary.snippet:
@@ -381,7 +486,7 @@ class NotesView(Page):
         self._loading = True
         self.note = note
         self.editor.set_markdown(note.body if note else "")
-        select_data(self.course, note.course_id if note else None)
+        select_data(self.course, home_data(note.course_id, note.notebook_id) if note else None)
         self._fill_topics(note)
         self.pin.setChecked(note.pinned if note else False)
         self._loading = False
@@ -391,12 +496,15 @@ class NotesView(Page):
         self.editor.setPlaceholderText(
             _(PLACEHOLDER) if note else _("Select a note, or press Ctrl+N to start one."))
 
-    def _fill_topics(self, note: NoteRecord | None, course_id=None):
-        """Offer the topics already used in the note's class."""
+    def _fill_topics(self, note: NoteRecord | None, home=None):
+        """Offer the topics already used in the note's class or notebook."""
         was_loading, self._loading = self._loading, True
-        course = course_id if course_id is not None or note is None else note.course_id
+        if home is not None:
+            course_id, notebook_id = split_home(home)
+        else:
+            course_id, notebook_id = (note.course_id, note.notebook_id) if note else (None, None)
         self.topic.clear()
-        self.topic.addItems(self.notes.topics(course))
+        self.topic.addItems(self.notes.topics(course_id, notebook_id))
         self.topic.setEditText(note.topic if note else "")
         self._loading = was_loading
 
@@ -419,10 +527,19 @@ class NotesView(Page):
     def _meta_changed(self):
         if self._loading or self.note is None:
             return
+        if self.course.currentData() == NEW_NOTEBOOK:  # "New notebook…" at the end of the list
+            book = self.new_notebook(show=False)
+            self._loading = True
+            select_data(self.course, home_data(self.note.course_id, self.note.notebook_id)
+                        if book is None else home_data(None, book.id))
+            self._loading = False
+            if book is None:
+                return
         self._dirty = True
-        course_changed = self.course.currentData() != self.note.course_id
+        home_before = home_data(self.note.course_id, self.note.notebook_id)
+        home_changed = self.course.currentData() != home_before
         self.flush()
-        if course_changed:
+        if home_changed:
             self._fill_topics(self.note)
         self.reload_list()
 
@@ -430,15 +547,15 @@ class NotesView(Page):
         self._timer.stop()
         if not self._dirty or self.note is None:
             return
-        body, course_id, topic = (self.editor.markdown(), self.course.currentData(),
-                                  self.topic.currentText())
+        body, topic = self.editor.markdown(), self.topic.currentText()
+        course_id, notebook_id = split_home(self.course.currentData())
         self._saving = True
         try:
             self.note = self.notes.update(self.note.id, NoteInput(
-                body, course_id, self.pin.isChecked(), topic))
+                body, course_id, self.pin.isChecked(), topic, notebook_id))
         except NotFound:
             # Deleted on another computer while being edited here: keep the text.
-            self.note = self.notes.create(body, course_id, topic)
+            self.note = self.notes.create(body, course_id, topic, notebook_id)
             self.reload_list(self.note.id)
         finally:
             self._saving = False
@@ -454,7 +571,7 @@ class NotesView(Page):
         for widget in (self.search, self.filter):
             widget.blockSignals(True)
         self.search.clear()
-        if note.course_id is not None and self.filter.currentData() not in (None, note.course_id):
+        if self.filter.currentData() not in (None, home_data(note.course_id, note.notebook_id)):
             self.filter.setCurrentIndex(0)
         for widget in (self.search, self.filter):
             widget.blockSignals(False)
@@ -466,7 +583,8 @@ class NotesView(Page):
     # ---- actions --------------------------------------------------------
 
     def new_note(self):
-        self._open(self.notes.create("", self.filter.currentData()))
+        course_id, notebook_id = self._scope()
+        self._open(self.notes.create("", course_id, "", notebook_id))
 
     def open_class_note(self, course_id: int, day: date):
         self._open(self.notes.class_note(course_id, day))

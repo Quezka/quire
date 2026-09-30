@@ -54,6 +54,13 @@ class NoteInput:
     course_id: int | None = None
     pinned: bool = False
     topic: str = ""
+    notebook_id: int | None = None  # instead of a class: one or the other
+
+
+@dataclass(frozen=True)
+class NotebookInput:
+    name: str
+    color: str = "#8a8f98"
 
 
 @dataclass(frozen=True)

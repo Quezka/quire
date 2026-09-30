@@ -11,7 +11,7 @@ from datetime import date, datetime
 
 from ..domain import (
     Absence, AbsenceKind, Book, DocumentKind, Notice, SchoolDocument,
-    Course, Event, Grade, Job, Lesson, Note, Shift, ShiftPattern, Subject, Task, TaskKind,
+    Course, Event, Grade, Job, Lesson, Note, Notebook, Shift, ShiftPattern, Subject, Task, TaskKind,
     TimeRange,
 )
 from ..domain.focus import FocusSettings, Phase
@@ -79,6 +79,15 @@ class NoteRecord:
     pinned: bool
     topic: str
     updated: datetime | None
+    notebook_id: int | None = None
+
+
+@dataclass(frozen=True)
+class NotebookRecord:
+    id: int
+    name: str
+    color: str
+    notes: int  # how many notes are filed in it
 
 
 @dataclass(frozen=True)
@@ -278,6 +287,10 @@ def course_record(c: Course) -> CourseRecord:
                         c.external_id)
 
 
+def notebook_record(n: Notebook, notes: int = 0) -> NotebookRecord:
+    return NotebookRecord(n.id, n.name, n.color, notes)
+
+
 def event_record(e: Event) -> EventRecord:
     return EventRecord(e.id, e.day, span(e.time), e.title, e.details, e.color)
 
@@ -288,7 +301,8 @@ def task_record(t: Task) -> TaskRecord:
 
 
 def note_record(n: Note) -> NoteRecord:
-    return NoteRecord(n.id, n.title, n.body, n.course_id, n.pinned, n.topic, n.updated)
+    return NoteRecord(n.id, n.title, n.body, n.course_id, n.pinned, n.topic, n.updated,
+                      n.notebook_id)
 
 
 def pattern_record(p: ShiftPattern) -> PatternRecord:

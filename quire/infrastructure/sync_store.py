@@ -43,6 +43,7 @@ SYNCED = (
            f"CASE WHEN NEW.external_id IS NOT NULL THEN 'ext:' || NEW.external_id"
            f" ELSE {RANDOM_UID} END"),
     Synced("image", "note_images", RANDOM_UID),  # pictures in notes, before the notes
+    Synced("notebook", "notebooks", RANDOM_UID),  # groups of notes, before the notes
     Synced("note", "notes", RANDOM_UID),
     Synced("journal", "journal", "'day:' || NEW.day"),
     Synced("shift", "shifts", RANDOM_UID),
@@ -178,10 +179,13 @@ class SqliteSyncStore:
                     "course": self._uid("courses", r["course_id"]), "due": r["due"],
                     "done": bool(r["done"]), "details": r["details"],
                     "external_id": r["external_id"]}
+        if kind == "notebook":
+            return {"name": r["name"], "color": r["color"]}
         if kind == "note":
             return {"title": r["title"], "body": r["body"],
                     "course": self._uid("courses", r["course_id"]), "pinned": bool(r["pinned"]),
-                    "updated": r["updated"], "topic": r["topic"]}
+                    "updated": r["updated"], "topic": r["topic"],
+                    "notebook": self._uid("notebooks", r["notebook_id"])}
         if kind == "image":
             return {"mime": r["mime"], "data": base64.b64encode(bytes(r["data"])).decode()}
         if kind == "journal":
@@ -255,11 +259,16 @@ class SqliteSyncStore:
                       "course_id": self._id("courses", d.get("course")), "due": d.get("due"),
                       "done": int(bool(d.get("done"))), "details": d.get("details", ""),
                       "external_id": d.get("external_id")}
+        elif s.kind == "notebook":
+            values = {"name": d["name"], "color": d.get("color", "#8a8f98")}
         elif s.kind == "note":
             values = {"title": d.get("title", "Untitled"), "body": d.get("body", ""),
                       "course_id": self._id("courses", d.get("course")),
                       "pinned": int(bool(d.get("pinned"))), "updated": d["updated"],
-                      "topic": d.get("topic", "")}
+                      "topic": d.get("topic", ""),
+                      # The phone may set a class on a note that's in a notebook: class wins.
+                      "notebook_id": None if d.get("course") else
+                      self._id("notebooks", d.get("notebook"))}
         elif s.kind == "image":
             values = {"mime": d["mime"], "data": base64.b64decode(d["data"])}
         elif s.kind == "journal":

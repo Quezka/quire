@@ -36,8 +36,15 @@ you own.
   - **Topics** split a class's notes into chapters or units (e.g. Biology → *Cell biology*,
     *Genetics*). Type one in the tag box in the note's toolbar; topics you've already used in
     that class are suggested, and different capitalisation is merged into one spelling.
-  - The **group** button next to the class filter shows notes under their class and topic.
-    Click a heading to collapse it. Right-click a topic to rename it (a rename into an
+  - **Notebooks** group notes that aren't a class: Ideas, Trips, a project. Make one with the
+    book button next to the filter (or **New notebook…** in a note's picker), give it a
+    name and a colour, and file notes in it from the same picker you use for classes. A note
+    is in a class *or* a notebook. Topics work inside notebooks too. Right-click a
+    notebook's heading to add a note or to rename, recolour or delete it (its notes stay,
+    filed nowhere). Notebooks sync between your devices; the phone keeps them intact but
+    doesn't show them yet.
+  - The **group** button next to the filter shows notes under their class or notebook and
+    topic. Click a heading to collapse it. Right-click a topic to rename it (a rename into an
     existing name merges the two) or to start a new note in it.
 - **Work**: add your jobs, with an optional gross hourly rate and a tax & deductions
   percentage (presets for Italian occasional work and employee contributions). Give each

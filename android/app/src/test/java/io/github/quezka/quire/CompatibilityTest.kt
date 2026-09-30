@@ -54,7 +54,7 @@ class CompatibilityTest {
         assertTrue(tasks.any { it.done })
 
         val notes = repo.notes()
-        assertEquals(5, notes.size)
+        assertEquals(6, notes.size) // five filed in classes or nowhere, one in a notebook
         assertTrue(notes.first().pinned) // "Ideas" is pinned on the desktop
         assertTrue(notes.any { it.topic == "Cell biology" && it.courseUid != null })
 
@@ -88,6 +88,24 @@ class CompatibilityTest {
         val stored = records.get("course", course.uid)!!.data!!
         assertEquals("kept", (Codec.courseData(Codec.course(records.get("course", course.uid)!!), stored)
             ["future_field"] as JsonPrimitive).content)
+    }
+
+    @Test fun notesInDesktopNotebooksStayThereWhenEditedOnThePhone() {
+        // The phone doesn't show notebooks yet, but it must read them and never drop them.
+        val records = Records(MemoryRowStore())
+        records.apply(desktopRecords())
+        val repo = Repository(records, today = { today })
+        val notebook = desktopRecords().first { it.kind == "notebook" }
+        val record = desktopRecords().first {
+            it.kind == "note" && (it.data!!["notebook"] as? JsonPrimitive)?.content == notebook.uid
+        }
+        val note = repo.notes().first { it.uid == record.uid }
+        assertEquals("Museum trip", note.title)
+        assertEquals(null, note.courseUid)
+        repo.saveNote(note.copy(body = note.body + "- Sunscreen\n"))
+        val saved = records.get("note", note.uid)!!.data!!
+        assertEquals(notebook.uid, (saved["notebook"] as JsonPrimitive).content)
+        assertEquals(record.data!!.keys, saved.keys)
     }
 
     @Test fun desktopPicturesAreRead() {

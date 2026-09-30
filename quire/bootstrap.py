@@ -23,7 +23,7 @@ from .infrastructure.login_item import platform_login_item
 from .infrastructure.repositories import (
     SqliteCourseRepository, SqliteEventRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
-    SqliteImageRepository, SqliteKeyValueStore, SqliteNoteRepository, SqliteSchoolRecordRepository,
+    SqliteImageRepository, SqliteKeyValueStore, SqliteNotebookRepository, SqliteNoteRepository, SqliteSchoolRecordRepository,
     SqliteShiftRepository, SqliteTaskRepository,
 )
 from .infrastructure.sqlite import SqliteDatabase
@@ -48,6 +48,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     events = SqliteEventRepository(db)
     tasks = SqliteTaskRepository(db)
     notes = SqliteNoteRepository(db)
+    notebooks = SqliteNotebookRepository(db)
     images = SqliteImageRepository(db)
     journal = SqliteJournalRepository(db)
     jobs = SqliteJobRepository(db)
@@ -60,7 +61,8 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         timetable=TimetableService(courses, bus),
         planner=planner,
         tasks=TaskService(tasks, courses, clock, bus),
-        notes=NoteService(notes, courses, clock, bus, images, diagrams or LigatureApp()),
+        notes=NoteService(notes, courses, clock, bus, images, diagrams or LigatureApp(),
+                          notebooks),
         school=SchoolRecordsService(courses, tasks, records, clock, register.name.lower()),
         school_sync=SchoolSyncService(register, credentials or KeyringCredentialStore(),
                                       courses, tasks, records, settings, clock, bus),

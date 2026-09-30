@@ -102,3 +102,26 @@ def test_v11_databases_gain_pictures_for_notes(tmp_path):
     assert tuple(row) == ("ab12", 1)  # tracked for sync, with the uid it was given
     assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     db.close()
+
+
+def test_v12_databases_gain_notebooks(tmp_path):
+    path = tmp_path / "v12.db"
+    SqliteDatabase(path).close()
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            DROP TABLE notebooks;
+            ALTER TABLE notes DROP COLUMN notebook_id;
+            INSERT INTO notes (title, body, updated) VALUES ('Old', '# Old', '2026-01-01T10:00:00');
+            PRAGMA user_version = 12;
+        """)
+    db = SqliteDatabase(path)
+    assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    note = db.conn.execute("SELECT title, notebook_id FROM notes").fetchone()
+    assert tuple(note) == ("Old", None)  # kept, filed in no notebook
+    db.conn.execute("INSERT INTO notebooks (name) VALUES ('Ideas')")
+    row = db.conn.execute("SELECT name, color, dirty FROM notebooks").fetchone()
+    assert tuple(row) == ("Ideas", "#8a8f98", 1)  # tracked for sync from the start
+    db.conn.execute("UPDATE notes SET notebook_id = 1")
+    db.conn.execute("DELETE FROM notebooks")  # deleting a notebook unfiles its notes
+    assert db.conn.execute("SELECT notebook_id FROM notes").fetchone()[0] is None
+    db.close()

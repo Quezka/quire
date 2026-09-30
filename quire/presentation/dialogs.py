@@ -15,12 +15,13 @@ from PySide6.QtWidgets import (
 from ..application.services import Services
 from ..application.errors import DomainError
 from ..application.inputs import (
-    CourseInput, EventInput, JobInput, PatternInput, ShiftInput, SlotInput, TaskInput,
+    CourseInput, EventInput, JobInput, NotebookInput, PatternInput, ShiftInput, SlotInput,
+    TaskInput,
 )
-from ..application.records import CourseRecord
+from ..application.records import CourseRecord, NotebookRecord
 from ..application.types import EVERY_DAY, WORK_DAYS, TaskKind
 from .formatting import (
-    KIND_LABELS, fmt_days, long_date, fmt_duration, fmt_min, fmt_range, money, pay_text,
+    KIND_LABELS, fmt_days, long_date, fmt_duration, fmt_min, fmt_range, money, pay_text, plural,
 )
 from .preferences import preferences
 from .widgets import (
@@ -278,6 +279,56 @@ class CoursesDialog(QDialog):
     def _edit(self, item):
         if item and CourseDialog(self.services, item.data(Qt.UserRole), self).exec():
             self._reload()
+
+
+class NotebookDialog(QDialog):
+    """A notebook: a group of notes that isn't a class. New, or rename/recolour/delete."""
+
+    def __init__(self, services: Services, notebook: NotebookRecord | None = None, parent=None):
+        super().__init__(parent)
+        self.services = services
+        self.notebook = notebook
+        self.result: NotebookRecord | None = None  # the saved notebook (None if deleted)
+        self.deleted = False
+        self.setWindowTitle(_("Edit notebook") if notebook else _("New notebook"))
+        self.setMinimumWidth(400)
+        self.name = QLineEdit(objectName="titleEdit", placeholderText=_("e.g. Ideas, Trips, Project X"))
+        used = {n.color for n in services.notes.notebooks()}
+        self.color = ColorButton(notebook.color if notebook else
+                                 next((c for c in PALETTE if c not in used), PALETTE[0]))
+        if notebook:
+            self.name.setText(notebook.name)
+        form = QFormLayout()
+        form.addRow(_("Colour"), self.color)
+        hint = QLabel(_("Notebooks group notes that don't belong to a class."), objectName="hint")
+        hint.setWordWrap(True)
+        layout = QVBoxLayout(self)
+        layout.setSpacing(12)
+        layout.addWidget(self.name)
+        layout.addLayout(form)
+        layout.addWidget(hint)
+        layout.addWidget(_buttons(self, self._save, self._delete if notebook else None,
+                                  _("Delete notebook")))
+
+    def _save(self):
+        data = NotebookInput(self.name.text(), self.color.color())
+
+        def save():
+            self.result = (self.services.notes.update_notebook(self.notebook.id, data)
+                           if self.notebook else self.services.notes.create_notebook(data))
+
+        if attempt(self, save):
+            self.accept()
+
+    def _delete(self):
+        notes = self.notebook.notes
+        if not confirm(self, _("Delete notebook"), _(
+                "Delete the notebook “{name}”? Its {notes} stay, but aren't in any notebook.").format(
+                    name=self.notebook.name, notes=plural(notes, "note"))):
+            return
+        self.services.notes.delete_notebook(self.notebook.id)
+        self.deleted = True
+        self.accept()
 
 
 class EventDialog(QDialog):

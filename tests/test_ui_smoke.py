@@ -146,7 +146,7 @@ def test_notes_group_by_topic(window, services, app):
     rows = [notes.list.item(i) for i in range(notes.list.count())]  # the list was rebuilt
     first = next(r for r in rows if r.data(Qt.UserRole) is not None)
     notes.list.setCurrentItem(first)
-    notes.course.setCurrentIndex(notes.course.findData(bio.id))
+    notes.course.setCurrentIndex(notes.course.findData(f"c:{bio.id}"))
     notes.topic.setEditText("genetics")
     notes._topic_changed()
     assert notes.note.topic == "Genetics"  # adopted the existing spelling
@@ -155,6 +155,78 @@ def test_notes_group_by_topic(window, services, app):
     notes.group_btn.setChecked(False)
     assert not any(notes.list.item(i).data(TwoLineDelegate.HEADER)
                    for i in range(notes.list.count()))
+
+
+def test_notebooks_group_notes_outside_classes(window, services, app):
+    from quire.application.inputs import NotebookInput
+    from quire.presentation.views.notes import home_data
+    from quire.presentation.widgets import TwoLineDelegate
+
+    notes = window.notes
+    window.show_page(window.stack.indexOf(notes))
+    ideas = services.notes.create_notebook(NotebookInput("Ideas", "#f76b15"))
+    app.processEvents()
+    assert notes.filter.findData(home_data(None, ideas.id)) >= 0  # the pickers learned of it
+    assert notes.course.findData(home_data(None, ideas.id)) >= 0
+    assert notes.course.findData("new-notebook") >= 0
+
+    # New notes go where the list is filtered to.
+    notes.filter.setCurrentIndex(notes.filter.findData(home_data(None, ideas.id)))
+    notes.new_note()
+    assert notes.note.notebook_id == ideas.id and notes.note.course_id is None
+    assert notes.course.currentData() == home_data(None, ideas.id)
+    assert [n.id for n in services.notes.search(notebook_id=ideas.id)] == [notes.note.id]
+
+    # Grouped, the notebook gets its own heading with its colour; unfiled notes come last.
+    notes.filter.setCurrentIndex(0)
+    notes.group_btn.setChecked(True)
+    app.processEvents()
+    headers = [(r.text(), r.data(TwoLineDelegate.COLOR)) for r in
+               (notes.list.item(i) for i in range(notes.list.count()))
+               if r.data(TwoLineDelegate.HEADER) == 1]
+    assert ("Ideas", "#f76b15") in headers
+    assert [name for name, _c in headers].index("Ideas") > [
+        name for name, _c in headers].index("Biology")
+
+    # Moving the open note to a class empties the notebook again.
+    bio = next(c for c in services.timetable.courses() if c.name == "Biology")
+    notes.course.setCurrentIndex(notes.course.findData(home_data(bio.id)))
+    assert notes.note.course_id == bio.id and notes.note.notebook_id is None
+    assert next(n for n in services.notes.notebooks() if n.name == "Ideas").notes == 0
+    assert not window.grab().isNull()
+
+
+def test_notebook_dialog_creates_renames_and_deletes(window, services, app, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    from quire.presentation.dialogs import NotebookDialog
+    warnings = []
+    monkeypatch.setattr(QMessageBox, "warning", lambda *args: warnings.append(args[2]))
+
+    dialog = NotebookDialog(services)
+    dialog.name.setText("Hiking")
+    dialog.color.setColor("#30a46c")
+    dialog._save()
+    assert dialog.result.name == "Hiking"
+    book = next(n for n in services.notes.notebooks() if n.name == "Hiking")
+    assert book.color == "#30a46c"
+
+    edit = NotebookDialog(services, book)
+    assert edit.name.text() == "Hiking"
+    edit.name.setText("Travel")
+    edit._save()
+    assert "Travel" in [n.name for n in services.notes.notebooks()]
+
+    blank = NotebookDialog(services)
+    blank.name.setText("  ")
+    blank._save()  # refused with a message, not a crash
+    assert blank.result is None and warnings == ["Give the notebook a name."]
+
+    monkeypatch.setattr(QMessageBox, "question", lambda *args: QMessageBox.Yes)
+    gone = NotebookDialog(services, next(n for n in services.notes.notebooks()
+                                         if n.name == "Travel"))
+    gone._delete()
+    assert gone.deleted and "Travel" not in [n.name for n in services.notes.notebooks()]
 
 
 def test_course_dialog_links_subject_and_keeps_link_on_save(window, services, register):

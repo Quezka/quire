@@ -7,7 +7,7 @@ import json
 
 from ..domain import (
     Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
-    Lesson, Note, NoteImage, Notice, NoticeAttachment, SchoolDocument, Shift, ShiftPattern,
+    Lesson, Note, Notebook, NoteImage, Notice, NoticeAttachment, SchoolDocument, Shift, ShiftPattern,
     Subject, Task,
     TaskKind, TimeRange,
 )
@@ -193,14 +193,39 @@ class SqliteImageRepository(_Repo):
         self._write("UPDATE note_images SET mime = ?, data = ? WHERE uid = ?", mime, data, uid)
 
 
+class SqliteNotebookRepository(_Repo):
+    @staticmethod
+    def _notebook(r) -> Notebook:
+        return Notebook(r["name"], r["color"], r["id"])
+
+    def list(self) -> list[Notebook]:
+        return [self._notebook(r) for r in self._all("SELECT * FROM notebooks ORDER BY name")]
+
+    def get(self, notebook_id):
+        r = self._one("SELECT * FROM notebooks WHERE id = ?", notebook_id)
+        return self._notebook(r) if r else None
+
+    def add(self, n: Notebook) -> int:
+        return self._write("INSERT INTO notebooks (name, color) VALUES (?, ?)", n.name, n.color)
+
+    def update(self, n: Notebook):
+        self._write("UPDATE notebooks SET name = ?, color = ? WHERE id = ?", n.name, n.color, n.id)
+
+    def delete(self, notebook_id):
+        self._write("DELETE FROM notebooks WHERE id = ?", notebook_id)  # its notes stay, unfiled
+
+    def note_count(self, notebook_id) -> int:
+        return self._one("SELECT COUNT(*) FROM notes WHERE notebook_id = ?", notebook_id)[0]
+
+
 class SqliteNoteRepository(_Repo):
     @staticmethod
     def _note(r) -> Note:
         return Note(r["body"], r["course_id"], bool(r["pinned"]),
                     datetime.fromisoformat(r["updated"]) if r["updated"] else None, r["id"],
-                    r["topic"])
+                    r["topic"], r["notebook_id"])
 
-    def search(self, text="", course_id=None):
+    def search(self, text="", course_id=None, notebook_id=None):
         where, args = [], []
         if text:
             escaped = text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
@@ -209,6 +234,9 @@ class SqliteNoteRepository(_Repo):
         if course_id is not None:
             where.append("course_id = ?")
             args.append(course_id)
+        if notebook_id is not None:
+            where.append("notebook_id = ?")
+            args.append(notebook_id)
         sql = "SELECT * FROM notes" + (" WHERE " + " AND ".join(where) if where else "")
         return [self._note(r) for r in
                 self._all(sql + " ORDER BY pinned DESC, updated DESC, id DESC", *args)]
@@ -222,16 +250,17 @@ class SqliteNoteRepository(_Repo):
         r = self._one("SELECT * FROM notes WHERE id = ?", note_id)
         return self._note(r) if r else None
 
-    def topics(self, course_id):
+    def topics(self, course_id, notebook_id=None):
         return [r["topic"] for r in self._all(
-            "SELECT DISTINCT topic FROM notes WHERE course_id IS ? AND topic != ''", course_id)]
+            "SELECT DISTINCT topic FROM notes WHERE course_id IS ? AND notebook_id IS ?"
+            " AND topic != ''", course_id, notebook_id)]
 
-    def rename_topic(self, course_id, old, new):
+    def rename_topic(self, course_id, old, new, notebook_id=None):
         # Leaves `updated` alone: refiling isn't editing.
         with self._conn:
             return self._conn.execute(
-                "UPDATE notes SET topic = ? WHERE course_id IS ? AND topic = ?",
-                (new, course_id, old)).rowcount
+                "UPDATE notes SET topic = ? WHERE course_id IS ? AND notebook_id IS ?"
+                " AND topic = ?", (new, course_id, notebook_id, old)).rowcount
 
     @staticmethod
     def _updated(n: Note) -> str:
@@ -239,15 +268,16 @@ class SqliteNoteRepository(_Repo):
 
     def add(self, n: Note) -> int:
         return self._write(
-            "INSERT INTO notes (title, body, course_id, pinned, updated, topic)"
-            " VALUES (?, ?, ?, ?, ?, ?)",
-            n.title, n.body, n.course_id, int(n.pinned), self._updated(n), n.topic)
+            "INSERT INTO notes (title, body, course_id, pinned, updated, topic, notebook_id)"
+            " VALUES (?, ?, ?, ?, ?, ?, ?)",
+            n.title, n.body, n.course_id, int(n.pinned), self._updated(n), n.topic, n.notebook_id)
 
     def update(self, n: Note):
         self._write(
             "UPDATE notes SET title = ?, body = ?, course_id = ?, pinned = ?, updated = ?,"
-            " topic = ? WHERE id = ?",
-            n.title, n.body, n.course_id, int(n.pinned), self._updated(n), n.topic, n.id)
+            " topic = ?, notebook_id = ? WHERE id = ?",
+            n.title, n.body, n.course_id, int(n.pinned), self._updated(n), n.topic,
+            n.notebook_id, n.id)
 
     def delete(self, note_id):
         self._write("DELETE FROM notes WHERE id = ?", note_id)

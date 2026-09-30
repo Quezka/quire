@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 12
+SCHEMA_VERSION = 13
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -41,6 +41,11 @@ CREATE TABLE IF NOT EXISTS tasks (
     done      INTEGER NOT NULL DEFAULT 0,
     details   TEXT NOT NULL DEFAULT '',
     external_id TEXT
+);
+CREATE TABLE IF NOT EXISTS notebooks (
+    id    INTEGER PRIMARY KEY,
+    name  TEXT NOT NULL,
+    color TEXT NOT NULL DEFAULT '#8a8f98'
 );
 CREATE TABLE IF NOT EXISTS notes (
     id        INTEGER PRIMARY KEY,
@@ -164,7 +169,8 @@ class SqliteDatabase:
         self._add_column("courses", "external_id", "TEXT")
         self._add_column("tasks", "external_id", "TEXT")
         # v4 (register_subjects), v5 (jobs, shifts), v6 (shift_patterns, shift_skips),
-        # v7 (focus_sessions), v10 (register_items, school_days) and v12 (note_images)
+        # v7 (focus_sessions), v10 (register_items, school_days), v12 (note_images) and
+        # v13 (notebooks)
         # add tables, which SCHEMA creates.
         # v6: share of pay withheld for tax per job.
         self._add_column("jobs", "deductions", "REAL NOT NULL DEFAULT 0")
@@ -174,6 +180,9 @@ class SqliteDatabase:
         self._add_column("focus_sessions", "complete", "INTEGER NOT NULL DEFAULT 1")
         # v3: topics group notes within a course.
         self._add_column("notes", "topic", "TEXT NOT NULL DEFAULT ''")
+        # v13: notebooks, groups of notes that aren't classes (table made by SCHEMA).
+        self._add_column("notes", "notebook_id",
+                         "INTEGER REFERENCES notebooks(id) ON DELETE SET NULL")
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
                           " ON tasks(external_id) WHERE external_id IS NOT NULL")
         # v9: change tracking for sync between devices (ids, timestamps, tombstones).

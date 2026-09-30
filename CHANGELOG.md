@@ -4,6 +4,23 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.22.0] - 2026-09-30
+
+### Added
+- **Notebooks: groups of notes that aren't classes.** Make one (Ideas, Trips, a project) with
+  the new book button next to the notes filter, or with **New notebook…** at the bottom of a
+  note's class picker. Notebooks have a name and a colour, sit next to your classes in the
+  filter and the picker, and get their own heading in the grouped list (classes first, then
+  notebooks, then notes filed nowhere). Topics work inside notebooks too.
+- Right-click a notebook's heading to add a note to it, or to rename, recolour or delete it.
+  Deleting a notebook keeps its notes; they just aren't filed anywhere.
+- Notebooks sync between your devices. The phone keeps them and the notes in them intact
+  when you edit on it, but doesn't show them yet; a note you give a class on the phone
+  leaves its notebook.
+
+### Changed
+- The heading for notes filed nowhere is now "Not filed" (it was "No class").
+
 ## [0.21.0] - 2026-09-30
 
 ### Changed

@@ -7,8 +7,10 @@ import pytest
 
 from quire.application.bus import Topic
 from quire.application.errors import CloudAuthError, SyncError, SyncNotSetUp, ValidationError
+from quire.application.ports import SyncRecord
 from quire.application.inputs import (
-    CourseInput, EventInput, JobInput, NoteInput, PatternInput, ShiftInput, SlotInput, TaskInput,
+    CourseInput, EventInput, JobInput, NotebookInput, NoteInput, PatternInput, ShiftInput,
+    SlotInput, TaskInput,
 )
 from quire.application.types import TaskKind
 from quire.bootstrap import build_services
@@ -350,3 +352,49 @@ def test_focus_sessions_from_older_apps_count_as_finished(tmp_path, pair, shared
     c.sync.sync()
     assert c.focus.stats().today_sessions == 1
     db_c.close()
+
+
+def test_notebooks_and_the_notes_in_them_reach_the_other_device(pair):
+    a, b = pair
+    ideas = a.notes.create_notebook(NotebookInput("Ideas", "#f76b15")).id
+    a.notes.create("# Game idea", topic="Apps", notebook_id=ideas)
+    assert a.sync.sync().sent >= 2
+    assert b.sync.sync().received >= 2
+
+    (book,) = b.notes.notebooks()
+    assert (book.name, book.color, book.notes) == ("Ideas", "#f76b15", 1)
+    (note,) = b.notes.search()
+    assert note.notebook.id == book.id and note.course is None and note.topic == "Apps"
+
+    tick()
+    b.notes.update_notebook(book.id, NotebookInput("Projects", "#30a46c"))
+    b.sync.sync()
+    a.sync.sync()
+    assert [(n.name, n.color) for n in a.notes.notebooks()] == [("Projects", "#30a46c")]
+
+    tick()
+    a.notes.delete_notebook(ideas)
+    a.sync.sync()
+    b.sync.sync()
+    assert b.notes.notebooks() == []
+    assert b.notes.search()[0].notebook is None  # the note stays, unfiled
+
+
+def test_a_class_set_on_the_phone_takes_a_note_out_of_its_notebook(pair):
+    a, b = pair
+    ideas = a.notes.create_notebook(NotebookInput("Ideas")).id
+    a.timetable.save_course(None, CourseInput("Maths"))
+    a.notes.create("# Note", notebook_id=ideas)
+    a.sync.sync()
+    b.sync.sync()
+
+    # A phone edit keeps the note's old "notebook" field while it sets "course".
+    store = b.sync._store
+    row = store._conn.execute("SELECT * FROM notes").fetchone()
+    (course_uid,) = store._conn.execute("SELECT uid FROM courses").fetchone()
+    data = store._export("note", row)
+    assert data["notebook"] is not None
+    store.apply([SyncRecord("note", row["uid"], "9999-01-01T00:00:00.000Z", False,
+                            {**data, "course": course_uid})])
+    (note,) = b.notes.search()
+    assert note.course is not None and note.notebook is None

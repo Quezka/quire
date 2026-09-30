@@ -5,7 +5,9 @@ import pytest
 from quire.application.bus import Topic
 from quire.application.dto import ItemKind
 from quire.application.errors import NotFound, ValidationError
-from quire.application.inputs import CourseInput, EventInput, NoteInput, SlotInput, TaskInput
+from quire.application.inputs import (
+    CourseInput, EventInput, NotebookInput, NoteInput, SlotInput, TaskInput,
+)
 from quire.application.types import DueBucket, TaskKind
 
 from .conftest import TODAY
@@ -248,3 +250,98 @@ def test_use_cases_hand_out_read_only_records(services):
     task = services.tasks.task(task_id)
     with pytest.raises(AttributeError):
         task.title = "changed"
+
+
+# ---- notebooks: groups of notes that aren't classes --------------------------------------
+
+def test_notebooks_are_created_renamed_and_listed(services):
+    seen = []
+    services.bus.subscribe(seen.append)
+    ideas = services.notes.create_notebook(NotebookInput("  Ideas ", "#f76b15"))
+    trips = services.notes.create_notebook(NotebookInput("Trips"))
+    assert (ideas.name, ideas.color) == ("Ideas", "#f76b15")
+    assert [n.name for n in services.notes.notebooks()] == ["Ideas", "Trips"]
+    services.notes.update_notebook(trips.id, NotebookInput("Travel", "#30a46c"))
+    assert [(n.name, n.color) for n in services.notes.notebooks()] == [
+        ("Ideas", "#f76b15"), ("Travel", "#30a46c")]
+    assert Topic.NOTES in seen
+    with pytest.raises(ValidationError):
+        services.notes.create_notebook(NotebookInput("   "))
+    with pytest.raises(NotFound):
+        services.notes.update_notebook(999, NotebookInput("x"))
+
+
+def test_a_note_can_be_filed_in_a_notebook_instead_of_a_class(services):
+    ideas = services.notes.create_notebook(NotebookInput("Ideas")).id
+    maths = add_course(services)
+    note = services.notes.create("# Idea", notebook_id=ideas)
+    assert note.notebook_id == ideas and note.course_id is None
+    assert [n.id for n in services.notes.search(notebook_id=ideas)] == [note.id]
+    assert services.notes.search(course_id=maths) == []
+    summary = services.notes.search()[0]
+    assert summary.notebook.name == "Ideas" and summary.course is None
+    assert services.notes.notebooks()[0].notes == 1
+
+    moved = services.notes.update(note.id, NoteInput(note.body, course_id=maths))
+    assert (moved.course_id, moved.notebook_id) == (maths, None)
+    back = services.notes.update(note.id, NoteInput(note.body, notebook_id=ideas))
+    assert (back.course_id, back.notebook_id) == (None, ideas)
+
+
+def test_a_note_cannot_be_in_a_class_and_a_notebook(services):
+    ideas = services.notes.create_notebook(NotebookInput("Ideas")).id
+    maths = add_course(services)
+    with pytest.raises(ValidationError):
+        services.notes.create("# both", maths, notebook_id=ideas)
+    note = services.notes.create("# n")
+    with pytest.raises(ValidationError):
+        services.notes.update(note.id, NoteInput("# n", maths, notebook_id=ideas))
+    with pytest.raises(NotFound):
+        services.notes.create("# nowhere", notebook_id=999)
+
+
+def test_deleting_a_notebook_keeps_its_notes_unfiled(services):
+    ideas = services.notes.create_notebook(NotebookInput("Ideas")).id
+    note = services.notes.create("# keep me", notebook_id=ideas, topic="Apps")
+    services.notes.delete_notebook(ideas)
+    assert services.notes.notebooks() == []
+    kept = services.notes.note(note.id)
+    assert kept.notebook_id is None and kept.body == "# keep me"
+
+
+def test_notes_group_classes_first_then_notebooks_then_the_rest(services):
+    bio = add_course(services, "Biology")
+    zoo = services.notes.create_notebook(NotebookInput("Zoo trips")).id
+    ideas = services.notes.create_notebook(NotebookInput("Ideas")).id
+    notes = services.notes
+    notes.create("# Cells", bio, "Cell biology")
+    notes.create("# App", topic="ignored-in-none")
+    notes.create("# Otters", topic="Otters", notebook_id=zoo)
+    notes.create("# Pandas", topic="Pandas", notebook_id=zoo)
+    notes.create("# Game", notebook_id=ideas)
+
+    groups = notes.grouped()
+    home = lambda g: (g.course.name if g.course else g.notebook.name if g.notebook else None)
+    assert [(home(g), g.topic) for g in groups] == [
+        ("Biology", "Cell biology"), ("Ideas", ""), ("Zoo trips", "Otters"),
+        ("Zoo trips", "Pandas"), (None, "ignored-in-none")]
+    assert {home(g) for g in notes.grouped(notebook_id=zoo)} == {"Zoo trips"}
+
+
+def test_topics_belong_to_their_notebook(services):
+    zoo = services.notes.create_notebook(NotebookInput("Zoo")).id
+    ideas = services.notes.create_notebook(NotebookInput("Ideas")).id
+    bio = add_course(services, "Biology")
+    services.notes.create("# a", topic="Otters", notebook_id=zoo)
+    services.notes.create("# b", topic="Apps", notebook_id=ideas)
+    services.notes.create("# c", bio, "Cells")
+    assert services.notes.topics(None, zoo) == ["Otters"]
+    assert services.notes.topics(None, ideas) == ["Apps"]
+    assert services.notes.topics(bio) == ["Cells"]
+    assert services.notes.topics(None) == []
+    # reusing a topic's spelling works inside a notebook, and renaming stays inside it
+    again = services.notes.create("# d", topic="otters", notebook_id=zoo)
+    assert again.topic == "Otters"
+    other = services.notes.create("# e", topic="Otters", notebook_id=ideas)
+    assert services.notes.rename_topic(None, "Otters", "Sea otters", zoo) == 2
+    assert services.notes.note(other.id).topic == "Otters"

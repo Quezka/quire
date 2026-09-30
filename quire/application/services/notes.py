@@ -4,13 +4,18 @@ import uuid
 from datetime import date
 
 from ...domain import (
-    NotFound, Note, NoteImage, image_markdown, image_uids, normalize_topic, note_snippet,
+    NotFound, Note, Notebook, NoteImage, ValidationError, image_markdown, image_uids,
+    normalize_topic, note_snippet,
 )
 from ..bus import ChangeBus, Topic
 from ..dto import NoteGroup, NoteSummary
-from ..inputs import NoteInput
-from ..records import ImageRecord, NoteRecord, course_record, note_record
-from ..ports import Clock, CourseRepository, DiagramEditor, ImageRepository, NoteRepository
+from ..inputs import NoteInput, NotebookInput
+from ..records import (
+    ImageRecord, NotebookRecord, NoteRecord, course_record, note_record, notebook_record,
+)
+from ..ports import (
+    Clock, CourseRepository, DiagramEditor, ImageRepository, NotebookRepository, NoteRepository,
+)
 
 
 def class_note_title(course_name: str, day: date) -> str:
@@ -22,47 +27,58 @@ class NoteService:
 
     def __init__(self, notes: NoteRepository, courses: CourseRepository, clock: Clock,
                  bus: ChangeBus, images: ImageRepository | None = None,
-                 diagrams: DiagramEditor | None = None):
+                 diagrams: DiagramEditor | None = None,
+                 notebooks: NotebookRepository | None = None):
         self._notes = notes
+        self._notebooks = notebooks
         self._courses = courses
         self._clock = clock
         self._bus = bus
         self._images = images
         self._diagrams = diagrams
 
-    def search(self, text: str = "", course_id: int | None = None) -> list[NoteSummary]:
+    def search(self, text: str = "", course_id: int | None = None,
+               notebook_id: int | None = None) -> list[NoteSummary]:
         """Pinned notes first, then most recently edited."""
         by_id = {c.id: course_record(c) for c in self._courses.list()}
+        books = {b.id: notebook_record(b) for b in self._notebooks.list()}
         return [NoteSummary(n.id, n.title, n.pinned, n.updated, by_id.get(n.course_id), n.topic,
-                            note_snippet(n.body))
-                for n in self._notes.search(text.strip(), course_id)]
+                            note_snippet(n.body), books.get(n.notebook_id))
+                for n in self._notes.search(text.strip(), course_id, notebook_id)]
 
-    def grouped(self, text: str = "", course_id: int | None = None) -> list[NoteGroup]:
-        """Notes grouped by course, then topic.
+    def grouped(self, text: str = "", course_id: int | None = None,
+                notebook_id: int | None = None) -> list[NoteGroup]:
+        """Notes grouped by class or notebook, then topic.
 
-        Courses and topics are alphabetical; notes without a course or topic come last
-        in their level. Within a group notes keep the pinned-then-recent order.
+        Classes come first, then notebooks, then notes filed in neither; each alphabetical.
+        Within a level, notes without a topic come last, and notes keep the
+        pinned-then-recent order.
         """
         groups: dict[tuple, list[NoteSummary]] = {}
-        for summary in self.search(text, course_id):
-            course = summary.course
-            key = (course is None, course.name.casefold() if course else "",
-                   course.id if course else None, summary.topic == "",
-                   summary.topic.casefold())
+        for summary in self.search(text, course_id, notebook_id):
+            course, book = summary.course, summary.notebook
+            if course is not None:
+                home = (0, course.name.casefold(), course.id)
+            elif book is not None:
+                home = (1, book.name.casefold(), book.id)
+            else:
+                home = (2, "", 0)
+            key = (*home, summary.topic == "", summary.topic.casefold())
             groups.setdefault(key, []).append(summary)
-        return [NoteGroup(notes[0].course, notes[0].topic, tuple(notes))
+        return [NoteGroup(notes[0].course, notes[0].topic, tuple(notes), notes[0].notebook)
                 for _, notes in sorted(groups.items(), key=lambda kv: kv[0])]
 
-    def topics(self, course_id: int | None) -> list[str]:
-        """Topics already used in a course, to suggest when filing a note."""
-        return sorted(self._notes.topics(course_id), key=str.casefold)
+    def topics(self, course_id: int | None, notebook_id: int | None = None) -> list[str]:
+        """Topics already used in a class or notebook, to suggest when filing a note."""
+        return sorted(self._notes.topics(course_id, notebook_id), key=str.casefold)
 
-    def rename_topic(self, course_id: int | None, old: str, new: str) -> int:
-        """Rename (or merge into another) topic for every note in a course."""
+    def rename_topic(self, course_id: int | None, old: str, new: str,
+                     notebook_id: int | None = None) -> int:
+        """Rename (or merge into another) topic for every note in a class or notebook."""
         old, new = normalize_topic(old), normalize_topic(new)
         if not old or old == new:
             return 0
-        changed = self._notes.rename_topic(course_id, old, new)
+        changed = self._notes.rename_topic(course_id, old, new, notebook_id)
         self._bus.publish(Topic.NOTES)
         return changed
 
@@ -75,15 +91,25 @@ class NoteService:
     def note(self, note_id: int) -> NoteRecord:
         return note_record(self._note(note_id))
 
-    def _canonical_topic(self, course_id: int | None, topic: str) -> str:
+    def _canonical_topic(self, course_id: int | None, topic: str,
+                         notebook_id: int | None = None) -> str:
         """Reuse an existing topic's spelling when only the letter case differs."""
         topic = normalize_topic(topic)
-        existing = {t.casefold(): t for t in self._notes.topics(course_id)}
+        existing = {t.casefold(): t for t in self._notes.topics(course_id, notebook_id)}
         return existing.get(topic.casefold(), topic)
 
-    def create(self, body: str = "", course_id: int | None = None, topic: str = "") -> NoteRecord:
+    def _check_home(self, course_id: int | None, notebook_id: int | None):
+        if course_id is not None and notebook_id is not None:
+            raise ValidationError("A note goes in a class or in a notebook, not both.")
+        if notebook_id is not None and self._notebooks.get(notebook_id) is None:
+            raise NotFound(f"Notebook {notebook_id} does not exist.")
+
+    def create(self, body: str = "", course_id: int | None = None, topic: str = "",
+               notebook_id: int | None = None) -> NoteRecord:
+        self._check_home(course_id, notebook_id)
         note = Note(body=body, course_id=course_id, updated=self._clock.now(),
-                    topic=self._canonical_topic(course_id, topic))
+                    topic=self._canonical_topic(course_id, topic, notebook_id),
+                    notebook_id=notebook_id)
         note.id = self._notes.add(note)
         self._bus.publish(Topic.NOTES)
         return note_record(note)
@@ -91,8 +117,10 @@ class NoteService:
     def update(self, note_id: int, data: NoteInput) -> NoteRecord:
         """Save an edit; returns the note as stored (e.g. with the topic's canonical spelling)."""
         note = self._note(note_id)
+        self._check_home(data.course_id, data.notebook_id)
         note.body, note.course_id, note.pinned = data.body, data.course_id, data.pinned
-        note.topic = self._canonical_topic(data.course_id, data.topic)
+        note.notebook_id = data.notebook_id
+        note.topic = self._canonical_topic(data.course_id, data.topic, data.notebook_id)
         note.updated = self._clock.now()
         self._notes.update(note)
         self._bus.publish(Topic.NOTES)
@@ -110,6 +138,34 @@ class NoteService:
         title = class_note_title(course.name, day)
         existing = self._notes.find_by_title(title, course_id)
         return note_record(existing) if existing else self.create(f"# {title}\n\n", course_id)
+
+    # ---- notebooks: groups of notes that aren't classes ----------------------------------
+
+    def notebooks(self) -> list[NotebookRecord]:
+        return [notebook_record(b, self._notebooks.note_count(b.id))
+                for b in self._notebooks.list()]
+
+    def create_notebook(self, data: NotebookInput) -> NotebookRecord:
+        book = Notebook(data.name.strip(), data.color)
+        book.validate()
+        book.id = self._notebooks.add(book)
+        self._bus.publish(Topic.NOTES)
+        return notebook_record(book)
+
+    def update_notebook(self, notebook_id: int, data: NotebookInput) -> NotebookRecord:
+        book = self._notebooks.get(notebook_id)
+        if book is None:
+            raise NotFound(f"Notebook {notebook_id} does not exist.")
+        book.name, book.color = data.name.strip(), data.color
+        book.validate()
+        self._notebooks.update(book)
+        self._bus.publish(Topic.NOTES)
+        return notebook_record(book, self._notebooks.note_count(notebook_id))
+
+    def delete_notebook(self, notebook_id: int) -> None:
+        """Delete a notebook; its notes stay, filed nowhere."""
+        self._notebooks.delete(notebook_id)
+        self._bus.publish(Topic.NOTES)
 
     # ---- pictures ----------------------------------------------------------------------
 

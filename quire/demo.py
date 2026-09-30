@@ -4,7 +4,8 @@ from __future__ import annotations
 from datetime import timedelta
 
 from .application.inputs import (
-    CourseInput, EventInput, JobInput, NoteInput, PatternInput, ShiftInput, SlotInput, TaskInput,
+    CourseInput, EventInput, JobInput, NotebookInput, NoteInput, PatternInput, ShiftInput,
+    SlotInput, TaskInput,
 )
 from .application.services import Services
 from .application.types import TaskKind
@@ -85,6 +86,9 @@ def seed(services: Services):
     ideas = notes.create("# Ideas\n\nThings I want to try this term:\n\n"
                          "- Pomodoro for maths homework\n- Join the robotics club\n")
     notes.update(ideas.id, NoteInput(ideas.body, pinned=True))
+    trips = notes.create_notebook(NotebookInput("Trips", "#12a594"))  # not a class
+    notes.create("# Museum trip\n\n- Bring the permission slip\n- Meet at 8:15 at the gate\n",
+                 topic="School", notebook_id=trips.id)
     planner.save_journal(today, "Remember to bring the permission slip for the museum trip.")
 
     work = services.work

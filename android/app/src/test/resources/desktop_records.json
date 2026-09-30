@@ -375,6 +375,16 @@
   }
  },
  {
+  "kind": "notebook",
+  "uid": "624cf3d5632650b9540518363f855d62",
+  "modified": "2026-09-30T21:36:43.004Z",
+  "deleted": false,
+  "data": {
+   "name": "Trips",
+   "color": "#12a594"
+  }
+ },
+ {
   "kind": "note",
   "uid": "1b77af65e406dd79999c4f3042a3c2b3",
   "modified": "2026-09-28T05:36:24.046Z",
@@ -385,7 +395,8 @@
    "course": "2ea2a9d328e5dda749054cea74fc7e5c",
    "pinned": false,
    "updated": "2026-09-23T12:00:00",
-   "topic": "Cell biology"
+   "topic": "Cell biology",
+   "notebook": null
   }
  },
  {
@@ -399,7 +410,8 @@
    "course": "2ea2a9d328e5dda749054cea74fc7e5c",
    "pinned": false,
    "updated": "2026-09-23T12:00:00",
-   "topic": "Cell biology"
+   "topic": "Cell biology",
+   "notebook": null
   }
  },
  {
@@ -413,7 +425,8 @@
    "course": "2ea2a9d328e5dda749054cea74fc7e5c",
    "pinned": false,
    "updated": "2026-09-23T12:00:00",
-   "topic": "Genetics"
+   "topic": "Genetics",
+   "notebook": null
   }
  },
  {
@@ -427,7 +440,8 @@
    "course": "a97f383fefbc0329a34e35dd69dcdd04",
    "pinned": false,
    "updated": "2026-09-23T12:00:00",
-   "topic": "Frankenstein"
+   "topic": "Frankenstein",
+   "notebook": null
   }
  },
  {
@@ -441,7 +455,23 @@
    "course": null,
    "pinned": true,
    "updated": "2026-09-23T12:00:00",
-   "topic": ""
+   "topic": "",
+   "notebook": null
+  }
+ },
+ {
+  "kind": "note",
+  "uid": "1e9c0e98f06f8f3353e7db3c29e5bc8c",
+  "modified": "2026-09-30T21:36:43.004Z",
+  "deleted": false,
+  "data": {
+   "title": "Museum trip",
+   "body": "# Museum trip\n\n- Bring the permission slip\n- Meet at 8:15 at the gate\n",
+   "course": null,
+   "pinned": false,
+   "updated": "2026-09-23T12:00:00",
+   "topic": "School",
+   "notebook": "624cf3d5632650b9540518363f855d62"
   }
  },
  {

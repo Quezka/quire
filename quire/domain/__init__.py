@@ -3,7 +3,7 @@ from .errors import DomainError, NotFound, ValidationError
 from .focus import FocusSession, FocusSettings, Phase, PhaseEnded, PomodoroTimer
 from .model import (
     COURSE_COLORS, EVERY_DAY, IMAGE_SCHEME, MAX_IMAGE_BYTES, PASS_MARK, UPCOMING_DAYS, WORK_DAYS, ClassSlot, Course, DueBucket, Event, Grade, Job, Lesson, Note,
-    NoteImage, Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange, average, derive_note_title,
+    NoteImage, Notebook, Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange, average, derive_note_title,
     image_markdown, image_uids, net_pay, normalize_topic, note_snippet, reschedule, work_shifts,
 )
 from .register import (
@@ -14,7 +14,7 @@ from .register import (
 __all__ = [
     "FocusSession", "FocusSettings", "Phase", "PhaseEnded", "PomodoroTimer",
     "DomainError", "NotFound", "ValidationError", "COURSE_COLORS", "EVERY_DAY", "PASS_MARK", "UPCOMING_DAYS", "WORK_DAYS", "ClassSlot", "Course",
-    "DueBucket", "Event", "Grade", "Job", "Lesson", "Note", "Shift", "ShiftPattern", "Subject", "Task", "TaskKind", "TimeRange", "average",
+    "DueBucket", "Event", "Grade", "Job", "Lesson", "Note", "Notebook", "Shift", "ShiftPattern", "Subject", "Task", "TaskKind", "TimeRange", "average",
     "derive_note_title", "note_snippet", "IMAGE_SCHEME", "MAX_IMAGE_BYTES", "NoteImage",
     "image_markdown", "image_uids", "net_pay", "normalize_topic", "reschedule", "work_shifts",
     "ABSENCE_LIMIT", "GRADE_MAX", "GRADE_MIN", "Absence", "AbsenceKind", "Book", "DocumentKind",

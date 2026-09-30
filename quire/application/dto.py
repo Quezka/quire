@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 
-from .records import CourseRecord, JobRecord, ShiftRecord, TaskRecord, TimeSpan
+from .records import CourseRecord, JobRecord, NotebookRecord, ShiftRecord, TaskRecord, TimeSpan
 from .types import DueBucket
 
 
@@ -96,15 +96,17 @@ class NoteSummary:
     course: CourseRecord | None
     topic: str = ""
     snippet: str = ""  # the start of the text after the title
+    notebook: NotebookRecord | None = None
 
 
 @dataclass(frozen=True)
 class NoteGroup:
-    """Notes sharing a course and topic, for the grouped notes list."""
+    """Notes sharing a class (or notebook) and topic, for the grouped notes list."""
 
     course: CourseRecord | None
     topic: str  # "" for notes without a topic
     notes: tuple[NoteSummary, ...]
+    notebook: NotebookRecord | None = None
 
 
 @dataclass(frozen=True)

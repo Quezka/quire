@@ -226,10 +226,24 @@ class Note:
     updated: datetime | None = None
     id: int | None = None
     topic: str = ""  # e.g. "Cell respiration" within Biology; "" means ungrouped
+    notebook_id: int | None = None  # a note is filed in a class (course_id) or a notebook
 
     @property
     def title(self) -> str:
         return derive_note_title(self.body)
+
+
+@dataclass
+class Notebook:
+    """A group of notes that isn't a class: "Ideas", "Trips", a project."""
+
+    name: str
+    color: str = "#8a8f98"
+    id: int | None = None
+
+    def validate(self):
+        if not self.name.strip():
+            raise ValidationError("Give the notebook a name.")
 
 
 @dataclass
