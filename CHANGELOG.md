@@ -4,6 +4,13 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.24.0] - 2026-10-01
+
+### Added
+- **Edit a notebook from the notes list.** With a notebook chosen in the filter, a pencil
+  button appears beside it: rename the notebook, recolour it, or delete it (its notes stay,
+  filed nowhere). It used to be reachable only by right-clicking a heading in grouped view.
+
 ## [0.23.0] - 2026-09-30
 
 ### Added

@@ -171,7 +171,9 @@ def test_notebooks_group_notes_outside_classes(window, services, app):
     assert notes.course.findData("new-notebook") >= 0
 
     # New notes go where the list is filtered to.
+    assert notes.edit_notebook_btn.isHidden()  # nothing to edit while showing all notes
     notes.filter.setCurrentIndex(notes.filter.findData(home_data(None, ideas.id)))
+    assert not notes.edit_notebook_btn.isHidden()  # a notebook is selected: it can be edited
     notes.new_note()
     assert notes.note.notebook_id == ideas.id and notes.note.course_id is None
     assert notes.course.currentData() == home_data(None, ideas.id)
@@ -179,6 +181,7 @@ def test_notebooks_group_notes_outside_classes(window, services, app):
 
     # Grouped, the notebook gets its own heading with its colour; unfiled notes come last.
     notes.filter.setCurrentIndex(0)
+    assert notes.edit_notebook_btn.isHidden()
     notes.group_btn.setChecked(True)
     app.processEvents()
     headers = [(r.text(), r.data(TwoLineDelegate.COLOR)) for r in

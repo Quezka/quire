@@ -100,6 +100,9 @@ class NotesView(Page):
         self.filter.currentIndexChanged.connect(lambda: self.reload_list())
         self.notebook_btn = icon_button("book", _("New notebook…"))
         self.notebook_btn.clicked.connect(lambda: self.new_notebook())
+        self.edit_notebook_btn = icon_button("edit", _("Edit notebook…"))
+        self.edit_notebook_btn.clicked.connect(self._edit_scoped_notebook)
+        self.edit_notebook_btn.setVisible(False)  # only while a notebook is selected
         self.group_btn = icon_button("layers", _("Group by class, notebook and topic"),
                                      checkable=True)
         self.group_btn.setChecked(QSettings().value("notes/grouped", False, type=bool))
@@ -119,6 +122,7 @@ class NotesView(Page):
         filters = QHBoxLayout()
         filters.setSpacing(6)
         filters.addWidget(self.filter, 1)
+        filters.addWidget(self.edit_notebook_btn)
         filters.addWidget(self.notebook_btn)
         filters.addWidget(self.group_btn)
         left = Card(padding=12)
@@ -254,6 +258,11 @@ class NotesView(Page):
         """(course_id, notebook_id) the list is filtered to; both None shows everything."""
         return split_home(self.filter.currentData())
 
+    def _edit_scoped_notebook(self):
+        notebook_id = self._scope()[1]
+        if notebook_id is not None:
+            self.edit_notebook(notebook_id)
+
     def _changed(self, topic: Topic):
         if topic is Topic.COURSES:
             self._fill_course_combos()
@@ -287,6 +296,7 @@ class NotesView(Page):
         text = self.search.text()
         course_id, notebook_id = self._scope()
         filtered = course_id is not None or notebook_id is not None
+        self.edit_notebook_btn.setVisible(notebook_id is not None)
         today = self.services.planner.today()
         self.list.blockSignals(True)
         self.list.clear()
