@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.26.0] - 2026-10-02
+
+### Added
+- Pressing Enter in a one-line box now finishes with it: the cursor stops blinking and the box lets go of the focus.
+
 ## [0.25.1] - 2026-10-02
 
 ### Fixed

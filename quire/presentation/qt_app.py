@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from .. import APP_ID
 from ..application.services import Services
-from . import fit, i18n, theme, uiscale
+from . import fit, i18n, leave_on_enter, theme, uiscale
 from .icons import APP_ICON
 
 
@@ -19,6 +19,7 @@ def create_application(argv: list[str]) -> QApplication:
     app = QApplication.instance() or QApplication(argv)
     fit.install(app)  # any dialog taller than the screen scrolls
     app.setStyle("Fusion")
+    leave_on_enter.install(app)  # Enter in a one-line box lets go of it
     app.setWindowIcon(QIcon(str(APP_ICON)))
     i18n.install(app=app)  # before any window is built: texts are translated as they're made
     theme.install(app)
