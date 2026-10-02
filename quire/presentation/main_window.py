@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 
 from .. import DEVELOPER, HOMEPAGE, __version__
 from ..application.services import Services
+from .fit import clamp_window
 from . import theme
 from .bridge import ChangeRelay
 from .dialogs import CoursesDialog, EventDialog, JobsDialog, ShiftDialog, TaskDialog
@@ -91,8 +92,7 @@ class MainWindow(QMainWindow):
             tray.show_requested.connect(self.bring_back)
             tray.quit_requested.connect(self.quit_app)
         self.setWindowTitle(_("Quire"))
-        self.resize(1240, 800)
-        self.setMinimumSize(980, 620)
+        clamp_window(self, 1240, 800, 980, 620)
 
         relay = ChangeRelay(services.bus, self)
         self.today = TodayView(services, relay)

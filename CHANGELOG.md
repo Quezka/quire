@@ -4,6 +4,15 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.25.0] - 2026-10-02
+
+### Added
+- **Interface size.** Settings has a new "Interface size" choice (Automatic, 80%–130%). Automatic
+  makes everything a little smaller on small screens such as a 1366x768 laptop. It applies
+  after a restart.
+- The window never opens bigger than the screen, and Settings (or any dialog taller than the
+  screen) scrolls instead of running off the bottom.
+
 ## [0.24.0] - 2026-10-01
 
 ### Added

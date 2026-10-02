@@ -14,6 +14,8 @@ from ..application.services import ReminderSettings, Services
 from . import theme
 from .formatting import money
 from .notify import play_chime
+from . import uiscale
+from .fit import scrollable
 from .i18n import LANGUAGES, chosen_language, language, resolve, set_chosen_language
 from .preferences import CURRENCIES, preferences
 from .i18n import _
@@ -75,6 +77,15 @@ class SettingsDialog(QDialog):
         language_row.addWidget(self.language, 1)
         language_row.addWidget(self.restart)
         self.restart.setVisible(False)
+
+        self.scale = QComboBox()
+        for choice in uiscale.CHOICES:
+            self.scale.addItem(_("Automatic") if choice == "auto" else f"{choice}%", choice)
+        self.scale.setCurrentIndex(max(self.scale.findData(uiscale.chosen()), 0))
+        self.scale.currentIndexChanged.connect(lambda _row: self._scale_picked())
+        self.scale_hint = QLabel(objectName="hint")
+        self.scale_hint.setWordWrap(True)
+        self._language_changed = self._scale_changed = False
 
         reminders = services.reminders.settings()
         self.remind = QComboBox()
@@ -168,6 +179,8 @@ class SettingsDialog(QDialog):
         form.addRow(_("Appearance"), self.appearance)
         form.addRow(_("Language"), language_row)
         form.addRow("", self.language_hint)
+        form.addRow(_("Interface size"), self.scale)
+        form.addRow("", self.scale_hint)
         form.addRow(self._section(_("Money")))
         form.addRow(_("Currency"), self.currency)
         form.addRow("", self.sample)
@@ -209,6 +222,7 @@ class SettingsDialog(QDialog):
         layout.addLayout(columns)
         layout.addStretch()
         layout.addLayout(bottom)
+        scrollable(self)
 
     @staticmethod
     def _section(text: str) -> QLabel:
@@ -217,10 +231,17 @@ class SettingsDialog(QDialog):
     def _language_picked(self):
         code = self.language.currentData()
         set_chosen_language(code)
-        changed = resolve(code) != language()
+        changed = self._language_changed = resolve(code) != language()
         self.language_hint.setText(_("Quire needs to restart to switch language.")
                                    if changed else "")
-        self.restart.setVisible(changed)
+        self.restart.setVisible(changed or self._scale_changed)
+
+    def _scale_picked(self):
+        uiscale.set_chosen(self.scale.currentData())
+        self._scale_changed = True
+        self.scale_hint.setText(_("Applies after a restart. Automatic makes everything a little "
+                                  "smaller on small screens."))
+        self.restart.setVisible(True)
 
     def _reminders_changed(self, save: bool = True):
         on = self.remind.currentData() is not None

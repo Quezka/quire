@@ -1,6 +1,9 @@
+import os
 from datetime import date, datetime
 
 import pytest
+
+os.environ.setdefault("QT_SCALE_FACTOR", "1")  # tests measure pixels: no automatic scaling
 
 from quire.bootstrap import build_services
 from quire.infrastructure.credentials import MemoryCredentialStore
@@ -71,3 +74,15 @@ def services(clock, register, credentials, cloud, releases, installer, login_ite
                                   diagrams)
     yield services
     db.close()
+
+
+@pytest.fixture(autouse=True)
+def full_hd_screen(monkeypatch):
+    """The headless test screen is tiny; windows are clamped to the screen, so pretend it is
+    a normal one (the clamp itself is tested in test_uiscale)."""
+    try:
+        from PySide6.QtCore import QRect
+        from quire.presentation import fit
+    except ImportError:
+        return
+    monkeypatch.setattr(fit, "available", lambda widget=None: QRect(0, 0, 1920, 1040))

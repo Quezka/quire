@@ -37,6 +37,9 @@ PLURALS = {
 }
 
 MESSAGES = {
+    'Interface size': 'Размер интерфейса',
+    'Automatic': 'Автоматически',
+    'Applies after a restart. Automatic makes everything a little smaller on small screens.': 'Применяется после перезапуска. Автоматический режим делает всё немного меньше на маленьких экранах.',
     # ---- navigation, pages ------------------------------------------------------
     "Today": "Сегодня",
     "Tomorrow": "Завтра",
