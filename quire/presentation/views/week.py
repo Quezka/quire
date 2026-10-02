@@ -49,6 +49,7 @@ class WeekView(Page):
         self.grid = TimeGrid()
         self.grid.blockActivated.connect(self._block_activated)
         self.grid.emptyActivated.connect(self._empty_activated)
+        self.grid.swiped.connect(lambda step: self.set_week(self.anchor + timedelta(days=7 * step)))
         self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scroll.setWidget(self.grid)

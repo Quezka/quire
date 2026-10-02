@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.27.0] - 2026-10-02
+
+### Added
+- **Two-finger swipe on the touchpad:** swipe sideways on Today to change day and on Week to change week. It triggers sooner and ignores slight vertical drift.
+
 ## [0.26.0] - 2026-10-02
 
 ### Added

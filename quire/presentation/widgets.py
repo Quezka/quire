@@ -180,6 +180,7 @@ class TimeGrid(QWidget):
     blockActivated = Signal(object, QPoint)  # payload, global position
     emptyActivated = Signal(int, int)  # column, minute (snapped to 15)
     zoomRequested = Signal(float, float)  # factor, y in grid coordinates to keep in place
+    swiped = Signal(int)  # +1 / -1: two-finger touchpad swipe to the next / previous page
 
     GUTTER = 58
     PAD = 10
@@ -189,6 +190,9 @@ class TimeGrid(QWidget):
 
     def __init__(self, parent=None):
         super().__init__(parent)
+        self._swipe_sum = 0
+        self._swipe_done = False
+        self._swipe_idle = QTimer(self, singleShot=True, interval=250, timeout=self._swipe_end)
         self.hour_height = self.DEFAULT_HOUR
         self.column_count = 1
         self.blocks: list[Block] = []
@@ -416,8 +420,31 @@ class TimeGrid(QWidget):
         if e.modifiers() & Qt.ControlModifier and e.angleDelta().y():
             self.zoomRequested.emit(1.0015 ** e.angleDelta().y(), e.position().y())
             e.accept()
+        elif (abs(e.angleDelta().x()) > abs(e.angleDelta().y()) * 0.6
+              or (self._swipe_idle.isActive() and e.angleDelta().x())):
+            self._swipe(e.angleDelta().x())  # sideways two-finger scroll; mostly-sideways counts
+            e.accept()
+        elif self._swipe_idle.isActive():
+            e.accept()  # vertical wobble in the middle of a swipe must not scroll the day
         else:
             super().wheelEvent(e)
+
+    SWIPE_DISTANCE = 100  # wheel units (120 = one notch) before a swipe counts
+
+    def _swipe(self, dx: int):
+        # One page per gesture: momentum events keep arriving after the fingers
+        # lift, so stay quiet until the stream has paused.
+        self._swipe_idle.start()
+        if self._swipe_done:
+            return
+        self._swipe_sum += dx
+        if abs(self._swipe_sum) >= self.SWIPE_DISTANCE:
+            self._swipe_done = True
+            self.swiped.emit(1 if self._swipe_sum < 0 else -1)  # fingers left = forward
+
+    def _swipe_end(self):
+        self._swipe_sum = 0
+        self._swipe_done = False
 
     def mouseDoubleClickEvent(self, e):
         pos = e.position()

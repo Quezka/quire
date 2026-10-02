@@ -67,6 +67,7 @@ class TodayView(Page):
         self.grid = TimeGrid()
         self.grid.blockActivated.connect(self._block_activated)
         self.grid.emptyActivated.connect(self._empty_activated)
+        self.grid.swiped.connect(lambda step: self.set_day(self.day + timedelta(days=step)))
         self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setWidget(self.grid)
         self.zoom = TimelineZoom(self.grid, self.scroll, "today", self)
