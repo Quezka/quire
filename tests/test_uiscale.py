@@ -96,3 +96,25 @@ print("ok")
     done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
                           timeout=60)
     assert done.stdout.strip().endswith("ok"), done.stdout + done.stderr
+
+
+def test_the_screen_probe_keeps_the_app_names():
+    """The desktop file name groups a window with its dock icon; the probe used to wipe it."""
+    import subprocess
+    import sys
+    code = """
+import os
+os.environ["QT_QPA_PLATFORM"] = "offscreen"
+os.environ.pop("QT_SCALE_FACTOR", None)
+from PySide6.QtWidgets import QApplication
+from quire.presentation import uiscale
+QApplication.setApplicationName("Name")
+QApplication.setOrganizationName("Org")
+QApplication.setDesktopFileName("io.example.Name")
+uiscale.apply_before_app()
+app = QApplication([])
+print(app.applicationName(), app.organizationName(), app.desktopFileName())
+"""
+    done = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True,
+                          timeout=60)
+    assert done.stdout.strip().endswith("Name Org io.example.Name"), done.stdout + done.stderr

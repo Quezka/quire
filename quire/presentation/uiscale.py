@@ -34,9 +34,14 @@ def factor(choice: str, screen_height: int | None) -> float:
 def _screen_height() -> int | None:
     """The main screen's height, asked of a throwaway application (the real one can't be
     created until the scale is known)."""
+    from PySide6.QtCore import QCoreApplication
     from PySide6.QtGui import QGuiApplication
     if QGuiApplication.instance() is not None:
         return None
+    # Tearing the probe down forgets the names set before it, and the desktop file name is
+    # what the desktop uses to put a window under its dock icon: put them back.
+    names = (QCoreApplication.applicationName(), QCoreApplication.organizationName(),
+             QGuiApplication.desktopFileName())
     probe = QGuiApplication([])
     try:
         screen = probe.primaryScreen()
@@ -45,6 +50,9 @@ def _screen_height() -> int | None:
         probe.shutdown()
         del probe
         gc.collect()
+        QCoreApplication.setApplicationName(names[0])
+        QCoreApplication.setOrganizationName(names[1])
+        QGuiApplication.setDesktopFileName(names[2])
 
 
 def apply_before_app():
