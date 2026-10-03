@@ -93,6 +93,7 @@ def test_everything_reaches_the_other_device(pair):
     assert b.planner.journal(TODAY) == "Good day"
     (b_job,) = b.work.jobs()
     assert (b_job.hourly_rate, b_job.deductions, len(b_job.weekly)) == (9.0, 10.0, 1)
+    assert (b_job.pay_mode, b_job.tax_model, b_job.mensilities) == ("hourly", "flat", 13)
     shifts = b.work.shifts_between(TODAY, TODAY + timedelta(days=7))
     assert {(s.shift.day, s.shift.start) for s in shifts} >= {(TODAY, 12 * 60)}
     assert (TODAY + timedelta(days=2), 18 * 60) not in {(s.shift.day, s.shift.start)
@@ -398,3 +399,19 @@ def test_a_class_set_on_the_phone_takes_a_note_out_of_its_notebook(pair):
                             {**data, "course": course_uid})])
     (note,) = b.notes.search()
     assert note.course is not None and note.notebook is None
+
+
+def test_monthly_pay_settings_sync_between_devices(pair):
+    from datetime import date
+
+    a, b = pair
+    a.work.save_job(None, JobInput(
+        "Office", pay_mode="monthly", monthly_pay=446.23, mensilities=13,
+        contract_start=date(2026, 9, 1), contract_end=date(2027, 2, 26), tax_model="italy",
+        inps=9.19, addizionali=1.5, fixed_term=True, cuneo=True))
+    a.sync.sync()
+    b.sync.sync()
+    (job,) = b.work.jobs()
+    assert (job.pay_mode, job.monthly_pay, job.mensilities) == ("monthly", 446.23, 13)
+    assert (job.contract_start, job.contract_end) == (date(2026, 9, 1), date(2027, 2, 26))
+    assert (job.tax_model, job.inps, job.addizionali, job.cuneo) == ("italy", 9.19, 1.5, True)

@@ -3,14 +3,16 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from ...domain import (
-    Job, NotFound, Shift, ShiftPattern, TimeRange, ValidationError, net_pay, reschedule,
-    work_shifts,
+    Job, NotFound, Payslip, Shift, ShiftPattern, TimeRange, ValidationError, monthly_gross,
+    monthly_share, reschedule, take_home, work_shifts, year_payslips,
 )
 from ..bus import ChangeBus, Topic
 from ..dto import AgendaItem, ItemKind, JobTotal, ShiftItem, ShiftPreview, WorkSummary
 from ..inputs import JobInput, PatternInput, ShiftInput
 from ..ports import Clock, JobRepository, ShiftRepository
-from ..records import JobRecord, ShiftRecord, job_record, shift_record, span
+from ..records import (
+    JobRecord, PayslipRecord, ShiftRecord, job_record, payslip_record, shift_record, span,
+)
 
 MAX_REPEAT_WEEKS = 52
 
@@ -53,6 +55,11 @@ class WorkService:
         job = Job(data.name) if job_id is None else self._job(job_id)
         job.name, job.color = data.name.strip(), data.color
         job.hourly_rate, job.deductions = data.hourly_rate, data.deductions
+        job.pay_mode, job.monthly_pay, job.mensilities = (data.pay_mode, data.monthly_pay,
+                                                         data.mensilities)
+        job.contract_start, job.contract_end = data.contract_start, data.contract_end
+        job.tax_model, job.inps, job.addizionali = data.tax_model, data.inps, data.addizionali
+        job.fixed_term, job.cuneo = data.fixed_term, data.cuneo
         if weekly is not None:
             wanted = [ShiftPattern.between(p.weekday, p.start, p.end, p.break_minutes)
                       for p in weekly]
@@ -90,9 +97,9 @@ class WorkService:
         """Paid time and pay of a shift being edited (nothing is saved or validated)."""
         shift = self._from_input(data)
         job = self._jobs.get(data.job_id)
-        gross = shift.pay(job.hourly_rate if job else None)
+        gross = self._shift_pay(job, shift)
         return ShiftPreview(shift.duration, shift.paid_minutes, shift.ends_next_day, gross,
-                            net_pay(gross, job.deductions if job else 0.0))
+                            self._shift_net(job, shift, gross, {}))
 
     def save_shift(self, shift_id: int | None, data: ShiftInput, repeat_weeks: int = 0,
                    replaces: tuple[int, date, int] | None = None) -> list[int]:
@@ -162,6 +169,47 @@ class WorkService:
         self._shifts.delete(shift_id)
         self._bus.publish(Topic.WORK)
 
+    # ---- pay ----------------------------------------------------------------------
+
+    @staticmethod
+    def _shift_pay(job: Job | None, shift: Shift) -> float | None:
+        """Gross pay of one shift: only hourly jobs pay by the shift."""
+        if job is None or job.pay_mode != "hourly":
+            return None
+        return shift.pay(job.hourly_rate)
+
+    def _slips(self, job: Job, year: int, cache: dict) -> list[Payslip]:
+        """The year's twelve payslips of a job (worked out once per request)."""
+        key = (job.id, year)
+        if key not in cache:
+            first, last = date(year, 1, 1), date(year, 12, 31)
+            terms = job.terms
+            if terms.pay_mode == "monthly":
+                grosses, worked = [monthly_gross(terms, year, m) for m in range(1, 13)], None
+            else:
+                shifts = [s for s in work_shifts([job], self._shifts.starting_between(first, last),
+                                                 self._shifts.skipped(first, last), first, last)
+                          if s.job_id == job.id and s.day.year == year]
+                totals = [0.0] * 12
+                for s in shifts:
+                    totals[s.day.month - 1] += s.pay(job.hourly_rate) or 0.0
+                grosses = [(round(t, 2), 0.0) for t in totals]
+                worked = [s.day for s in shifts]
+            cache[key] = year_payslips(terms, year, grosses, worked)
+        return cache[key]
+
+    def _shift_net(self, job: Job | None, shift: Shift, gross: float | None,
+                   cache: dict) -> float | None:
+        if gross is None or job is None:
+            return gross
+        return take_home(job.terms, self._slips(job, shift.day.year, cache)[shift.day.month - 1],
+                         gross)
+
+    def payslips(self, job_id: int, year: int) -> list[PayslipRecord]:
+        """The months of `year` in which the job pays something."""
+        job = self._job(job_id)
+        return [payslip_record(p) for p in self._slips(job, year, {}) if p.gross > 0]
+
     def shifts_between(self, first: date, last: date) -> list[ShiftItem]:
         """One-off shifts and weekly-schedule occurrences starting on first..last."""
         jobs = self._jobs.list()
@@ -170,12 +218,12 @@ class WorkService:
         records = {j.id: job_record(j, today) for j in jobs}
         shifts = work_shifts(jobs, self._shifts.starting_between(first, last),
                              self._shifts.skipped(first, last), first, last)
-        items = []
+        items, cache = [], {}
         for s in shifts:
             job = by_id.get(s.job_id)
-            gross = s.pay(job.hourly_rate if job else None)
+            gross = self._shift_pay(job, s)
             items.append(ShiftItem(shift_record(s), records.get(s.job_id), gross,
-                                   net_pay(gross, job.deductions if job else 0.0)))
+                                   self._shift_net(job, s, gross, cache)))
         return items
 
     def upcoming(self, days: int = 28) -> list[ShiftItem]:
@@ -187,21 +235,49 @@ class WorkService:
                                                      today + timedelta(days=days))
                 if (item.shift.day - today).days * 1440 + item.shift.end > minute]
 
+    def _pay_between(self, job: Job, items: list[ShiftItem], first: date, last: date,
+                     cache: dict) -> tuple[float | None, float | None]:
+        """Gross and take-home pay of a job over first..last."""
+        terms = job.terms
+        if terms.pay_mode == "monthly":
+            if terms.monthly_pay is None:
+                return None, None
+            gross = net = 0.0
+            year, month = first.year, first.month
+            while (year, month) <= (last.year, last.month):
+                g, n = monthly_share(terms, self._slips(job, year, cache)[month - 1], first, last)
+                gross, net = gross + g, net + n
+                year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+            return round(gross, 2), round(net, 2)
+        if any(i.pay is None for i in items):
+            return None, None
+        by_month: dict[tuple[int, int], float] = {}
+        for i in items:
+            key = (i.shift.day.year, i.shift.day.month)
+            by_month[key] = by_month.get(key, 0.0) + i.pay
+        net = sum(take_home(terms, self._slips(job, y, cache)[m - 1], g)
+                  for (y, m), g in by_month.items())
+        return round(sum(by_month.values()), 2), round(net, 2)
+
     def summary(self, first: date, last: date) -> WorkSummary:
         """Paid hours and estimated pay for shifts starting in [first, last]."""
         items = self.shifts_between(first, last)
+        jobs = {j.id: j for j in self._jobs.list()}
         per_job: dict[int, list[ShiftItem]] = {}
         for item in items:
             per_job.setdefault(item.shift.job_id, []).append(item)
-        totals = []
-        for job_items in per_job.values():
-            pays = [i.pay for i in job_items]
-            nets = [i.net for i in job_items]
-            unknown = any(p is None for p in pays)
-            totals.append(JobTotal(
-                job_items[0].job, sum(i.shift.paid_minutes for i in job_items),
-                None if unknown else round(sum(pays), 2),
-                None if unknown else round(sum(nets), 2)))
+        for job in jobs.values():  # a monthly job is paid even in a week without shifts
+            if job.pay_mode == "monthly" and job.monthly_pay is not None:
+                per_job.setdefault(job.id, [])
+        cache, totals = {}, []
+        for job_id, job_items in per_job.items():
+            job = jobs.get(job_id)
+            gross, net = self._pay_between(job, job_items, first, last, cache) if job else (
+                None, None)
+            totals.append(JobTotal(job_items[0].job if job_items else job_record(
+                job, self._clock.today()), sum(i.shift.paid_minutes for i in job_items),
+                gross, net))
+        totals = [t for t in totals if t.minutes or t.pay]
         totals.sort(key=lambda t: t.job.name.casefold() if t.job else "")
         gross = [t.pay for t in totals if t.pay is not None]
         net = [t.net for t in totals if t.net is not None]

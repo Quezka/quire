@@ -45,8 +45,10 @@ you own.
   - The **group** button next to the filter shows notes under their class or notebook and
     topic. Click a heading to collapse it. Right-click a topic to rename it (a rename into an
     existing name merges the two) or to start a new note in it.
-- **Work**: add your jobs, with an optional gross hourly rate and a tax & deductions
-  percentage (presets for Italian occasional work and employee contributions). Give each
+- **Work**: add your jobs, paid **by the hour** or a **fixed monthly pay** (with 12, 13 or
+  14 payments and optional contract dates). Take-home pay follows the Italian rules for an
+  employee (INPS, IRPEF with the work detrazione, surtax, tredicesima, TFR), or a flat
+  percentage if you prefer; **Payslips** in the job editor shows it month by month. Give each
   job a **weekly schedule** so its regular shifts show up every week in Today and Week,
   right next to your classes.
   - Late shifts can run past midnight, e.g. 18:00–01:00.

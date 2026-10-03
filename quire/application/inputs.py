@@ -69,6 +69,16 @@ class JobInput:
     color: str = "#0090ff"
     hourly_rate: float | None = None
     deductions: float = 0.0
+    pay_mode: str = "hourly"
+    monthly_pay: float | None = None
+    mensilities: int = 13
+    contract_start: date | None = None
+    contract_end: date | None = None
+    tax_model: str = "flat"
+    inps: float = 9.19
+    addizionali: float = 0.0
+    fixed_term: bool = True
+    cuneo: bool = False
 
 
 @dataclass(frozen=True)

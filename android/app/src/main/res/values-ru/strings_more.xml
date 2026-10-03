@@ -259,4 +259,27 @@
     <string name="widget_empty">Ничего не предстоит.</string>
     <string name="add_task">Добавить задачу</string>
     <string name="mark_done">Отметить выполненным</string>
+    <string name="pay_by_hour">Почасовая</string>
+    <string name="pay_monthly">Помесячная</string>
+    <string name="monthly_pay">Оплата в месяц, до налогов</string>
+    <string name="payments_a_year">%1$d в год</string>
+    <string name="contract_has_dates">У договора есть даты</string>
+    <string name="tax_italy">Работник в Италии</string>
+    <string name="tax_flat">Один процент</string>
+    <string name="inps_percent">INPS (%)</string>
+    <string name="surtax_percent">Налог региона и коммуны (%)</string>
+    <string name="cuneo_bonus">Бонус при низком доходе (cuneo fiscale)</string>
+    <string name="pay_estimate_help">Сумма «на руки» примерная: расчёт идёт по итальянским правилам для наёмного работника, а реальные удержания зависят от договора и вашего общего дохода за год.</string>
+    <string name="payslips">Расчётные листки</string>
+    <string name="payslips_none">В этом году эта работа пока ничего не приносит.</string>
+    <string name="payslips_help">Это оценка. Год считается целиком и распределяется по месяцам. TFR откладывается для вас и не входит в сумму «на руки». Месяц засчитывается в tredicesima, если вы работаете в нём не меньше 15 дней.</string>
+    <string name="payslip_gross">до вычетов %1$s</string>
+    <string name="payslip_contributions">взносы %1$s</string>
+    <string name="payslip_irpef">IRPEF %1$s</string>
+    <string name="payslip_surtax">надбавки %1$s</string>
+    <string name="payslip_bonus">бонус +%1$s</string>
+    <string name="payslip_extra">13-я/14-я %1$s</string>
+    <string name="payslip_tfr">TFR %1$s</string>
+    <string name="pay_per_month">%1$s × %2$d в год</string>
+    <string name="close">Закрыть</string>
 </resources>

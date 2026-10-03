@@ -61,8 +61,15 @@ class CompatibilityTest {
         assertTrue(notes.any { it.topic == "Cell biology" && it.courseUid != null })
 
         assertEquals("Remember the permission slip", repo.journal(today))
-        assertEquals(2, repo.jobs().size)
+        assertEquals(3, repo.jobs().size)
         assertTrue(repo.jobs().any { it.patterns.isNotEmpty() && it.hourlyRate == 8.5 })
+        val office = repo.jobs().first { it.name == "Office" } // paid monthly, taxed the Italian way
+        assertEquals("monthly", office.payMode)
+        assertEquals(446.23, office.monthlyPay!!, 0.0)
+        assertEquals(LocalDate.of(2027, 2, 26), office.contractEnd)
+        assertEquals("italy", office.taxModel)
+        assertEquals(13, office.mensilities)
+        assertEquals("flat", repo.jobs().first { it.name == "Maths tutoring" }.taxModel)
     }
 
     @Test fun todayLooksLikeTheDesktopsToday() {

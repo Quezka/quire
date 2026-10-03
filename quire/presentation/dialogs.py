@@ -9,7 +9,7 @@ from PySide6.QtWidgets import (
     QAbstractItemView, QCheckBox, QComboBox, QDateEdit, QDialog, QDialogButtonBox,
     QFormLayout, QHBoxLayout, QHeaderView, QLabel, QLineEdit, QListWidget,
     QListWidgetItem, QMenu, QMessageBox, QPlainTextEdit, QPushButton, QTableWidget,
-    QTimeEdit, QVBoxLayout,
+    QTableWidgetItem, QTimeEdit, QVBoxLayout,
 )
 
 from ..application.services import Services
@@ -28,7 +28,7 @@ from .widgets import (
     PALETTE, AmountEdit, ColorButton, DaysPicker, SpinBox, color_icon, min_to_qtime,
     qtime_to_min,
 )
-from .i18n import N_, _, weekday_name, weekday_names
+from .i18n import N_, _, month_name, weekday_name, weekday_names
 
 
 def to_qdate(d: date) -> QDate:
@@ -558,10 +558,57 @@ class JobDialog(QDialog):
         used = {j.color for j in self.work.jobs()}
         self.color = ColorButton(next((c for c in reversed(PALETTE) if c not in used), PALETTE[-2]))
         currency = preferences().currency_symbol()
+        self.pay_mode = QComboBox()
+        self.pay_mode.addItem(_("By the hour"), "hourly")
+        self.pay_mode.addItem(_("Fixed monthly pay"), "monthly")
         self.rate = AmountEdit(placeholderText=_("e.g. 8.50 (optional)"))
         rate_row = QHBoxLayout()
         rate_row.addWidget(self.rate, 1)
         rate_row.addWidget(QLabel(_("{currency} per hour, before tax").format(currency=currency)))
+        self.monthly = AmountEdit(placeholderText=_("e.g. 446.23 (optional)"))
+        self.mensilities = QComboBox()
+        for count, text in ((12, N_("12 payments a year")),
+                            (13, N_("13 payments (with tredicesima)")),
+                            (14, N_("14 payments (tredicesima and quattordicesima)"))):
+            self.mensilities.addItem(_(text), count)
+        select_data(self.mensilities, 13)
+        monthly_row = QHBoxLayout()
+        monthly_row.addWidget(self.monthly, 1)
+        monthly_row.addWidget(QLabel(_("{currency} per payment, before tax").format(
+            currency=currency)))
+
+        self.has_contract = QCheckBox(_("The contract has dates"))
+        self.contract_start = QDateEdit(calendarPopup=True)
+        self.contract_end = QDateEdit(calendarPopup=True)
+        for edit in (self.contract_start, self.contract_end):
+            edit.setDisplayFormat("d MMM yyyy")
+        today = date.today()
+        self.contract_start.setDate(to_qdate(today))
+        self.contract_end.setDate(to_qdate(today + timedelta(days=180)))
+        contract_row = QHBoxLayout()
+        contract_row.addWidget(self.contract_start)
+        contract_row.addWidget(QLabel(_("to")))
+        contract_row.addWidget(self.contract_end)
+        contract_row.addStretch()
+        self.has_contract.toggled.connect(self._pay_changed)
+
+        self.tax_model = QComboBox()
+        self.tax_model.addItem(_("Italian employee (INPS + IRPEF)"), "italy")
+        self.tax_model.addItem(_("Flat percentage"), "flat")
+        self.inps = AmountEdit(placeholderText="9.19")
+        self.inps.setMaximumWidth(90)
+        self.addizionali = AmountEdit(placeholderText="0")
+        self.addizionali.setMaximumWidth(90)
+        italy_row = QHBoxLayout()
+        italy_row.addWidget(QLabel(_("INPS")))
+        italy_row.addWidget(self.inps)
+        italy_row.addWidget(QLabel("%"))
+        italy_row.addSpacing(12)
+        italy_row.addWidget(QLabel(_("Regional + municipal tax")))
+        italy_row.addWidget(self.addizionali)
+        italy_row.addWidget(QLabel("%"))
+        italy_row.addStretch()
+        self.cuneo = QCheckBox(_("Low-income bonus (cuneo fiscale)"))
 
         self.preset = QComboBox()
         for text, value in DEDUCTION_PRESETS:
@@ -574,15 +621,29 @@ class JobDialog(QDialog):
         deduction_row.addWidget(QLabel("%"))
         self.preset.currentIndexChanged.connect(self._preset_picked)
         self.deductions.textEdited.connect(self._deductions_typed)
+        self.pay_mode.currentIndexChanged.connect(self._pay_changed)
+        self.tax_model.currentIndexChanged.connect(self._pay_changed)
 
-        form = QFormLayout()
+        self.form = form = QFormLayout()
         form.addRow(_("Name"), self.name)
         form.addRow(_("Colour"), self.color)
-        form.addRow(_("Hourly pay"), rate_row)
-        form.addRow(_("Tax & deductions"), deduction_row)
-        hint = QLabel(_("Take-home pay is an estimate: what's really withheld depends on your contract and your total income for the year."), objectName="hint")
+        form.addRow(_("Pay"), self.pay_mode)
+        self._rows = {"hourly": self._row(form, _("Hourly pay"), rate_row),
+                      "monthly": self._row(form, _("Monthly pay"), monthly_row),
+                      "payments": self._row(form, _("Payments"), self.mensilities),
+                      "contract": self._row(form, _("Contract"), self.has_contract),
+                      "dates": self._row(form, "", contract_row)}
+        form.addRow(_("Tax & deductions"), self.tax_model)
+        self._rows["italy"] = self._row(form, "", italy_row)
+        self._rows["cuneo"] = self._row(form, "", self.cuneo)
+        self._rows["flat"] = self._row(form, "", deduction_row)
+        hint = QLabel(_("Take-home pay is an estimate: it follows the Italian rules for an employee, but what's really withheld depends on your contract and your total income for the year."), objectName="hint")
         hint.setWordWrap(True)
         form.addRow("", hint)
+        self.payslips = QPushButton(_("Payslips…"))
+        self.payslips.clicked.connect(lambda: PayslipsDialog(self.services, self.job_id, self).exec())
+        self.payslips.setVisible(job_id is not None)
+        form.addRow("", self.payslips)
 
         self.table = QTableWidget(0, 4)
         self.table.setHorizontalHeaderLabels([_("Days"), _("Start"), _("End"), _("Unpaid break")])
@@ -618,6 +679,18 @@ class JobDialog(QDialog):
             self.color.setColor(job.color)
             self.rate.setAmount(job.hourly_rate)
             self._set_deductions(job.deductions)
+            select_data(self.pay_mode, job.pay_mode)
+            self.monthly.setAmount(job.monthly_pay)
+            select_data(self.mensilities, job.mensilities)
+            self.has_contract.setChecked(bool(job.contract_start or job.contract_end))
+            if job.contract_start:
+                self.contract_start.setDate(to_qdate(job.contract_start))
+            if job.contract_end:
+                self.contract_end.setDate(to_qdate(job.contract_end))
+            select_data(self.tax_model, job.tax_model)
+            self.inps.setText(f"{job.inps:g}")
+            self.addizionali.setText(f"{job.addizionali:g}" if job.addizionali else "")
+            self.cuneo.setChecked(job.cuneo)
             # One row per time slot, with every day it repeats on.
             rows: dict[tuple, list[int]] = {}
             for p in job.weekly:
@@ -626,6 +699,27 @@ class JobDialog(QDialog):
                 self._add_row(days, start, (start + duration) % (24 * 60), pause)
         else:
             self._set_deductions(0.0)
+            select_data(self.tax_model, "italy")  # new jobs start with the Italian rules
+            self.inps.setText("9.19")
+        self._pay_changed()
+
+    # ---- pay -----------------------------------------------------------------------
+
+    @staticmethod
+    def _row(form: QFormLayout, label: str, field) -> int:
+        """Add a row that can be shown or hidden; returns its index."""
+        form.addRow(label, field)
+        return form.rowCount() - 1
+
+    def _pay_changed(self):
+        hourly = self.pay_mode.currentData() == "hourly"
+        italy = self.tax_model.currentData() == "italy"
+        dated = self.has_contract.isChecked()
+        show = {"hourly": hourly, "monthly": not hourly, "payments": not hourly,
+                "contract": True, "dates": dated, "italy": italy, "cuneo": italy,
+                "flat": not italy}
+        for name, visible in show.items():
+            self.form.setRowVisible(self._rows[name], visible)
 
     # ---- deductions ---------------------------------------------------------------
 
@@ -693,15 +787,24 @@ class JobDialog(QDialog):
     def _save(self):
         try:
             rate = self.rate.amount()
+            monthly = self.monthly.amount()
             deductions = self.deductions.amount() or 0.0
+            inps = self.inps.amount()
+            addizionali = self.addizionali.amount() or 0.0
         except ValueError:
             QMessageBox.warning(self, _("Check the numbers"),
-                                _("Type the hourly pay and deductions as numbers, like 8.50 or 8,50. Leave the pay empty if you don't want to track it."))
+                                _("Type the pay, contributions and deductions as numbers, like 8.50 or 8,50. Leave the pay empty if you don't want to track it."))
             return
         weekly = self._schedule()
         if weekly is None:
             return
-        data = JobInput(self.name.text(), self.color.color(), rate, deductions)
+        dated = self.has_contract.isChecked()
+        start = self.contract_start.date().toPython() if dated else None
+        end = self.contract_end.date().toPython() if dated else None
+        data = JobInput(self.name.text(), self.color.color(), rate, deductions,
+                        self.pay_mode.currentData(), monthly, self.mensilities.currentData(),
+                        start, end, self.tax_model.currentData(), 9.19 if inps is None else inps,
+                        addizionali, fixed_term=dated, cuneo=self.cuneo.isChecked())
 
         def save():
             self.job_id = self.work.save_job(self.job_id, data, weekly=weekly)
@@ -713,6 +816,64 @@ class JobDialog(QDialog):
         if confirm(self, _("Delete job"), _("Delete this job, its weekly schedule and all of its shifts?")):
             self.work.delete_job(self.job_id)
             self.accept()
+
+
+class PayslipsDialog(QDialog):
+    """A job's pay month by month, worked out like a payslip."""
+
+    COLUMNS = (N_("Month"), N_("Gross"), N_("Contributions"), N_("IRPEF"), N_("Surtax"),
+               N_("Bonus"), N_("Net"), N_("TFR"))
+
+    def __init__(self, services: Services, job_id: int, parent=None):
+        super().__init__(parent)
+        self.work = services.work
+        self.job_id = job_id
+        self.setWindowTitle(_("Payslips"))
+        self.setMinimumSize(760, 420)
+        self.year = SpinBox(minimum=2000, maximum=2100)
+        self.year.setValue(date.today().year)
+        self.year.valueChanged.connect(self._reload)
+        top = QHBoxLayout()
+        top.addWidget(QLabel(_("Year")))
+        top.addWidget(self.year)
+        top.addStretch()
+        self.table = QTableWidget(0, len(self.COLUMNS))
+        self.table.setHorizontalHeaderLabels([_(c) for c in self.COLUMNS])
+        self.table.verticalHeader().hide()
+        self.table.setEditTriggers(QAbstractItemView.NoEditTriggers)
+        header = self.table.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(0, QHeaderView.Stretch)
+        self.empty = QLabel(_("This job pays nothing in this year yet."), objectName="hint")
+        note = QLabel(_("Estimates. The year is worked out as a whole (IRPEF after the employee detrazione for the days worked) and spread over the months. The TFR is set aside for you and isn't part of the net pay. A tredicesima counts a month when you work at least 15 days of it."), objectName="hint")
+        note.setWordWrap(True)
+        close = QDialogButtonBox(QDialogButtonBox.Close)
+        close.rejected.connect(self.accept)
+        layout = QVBoxLayout(self)
+        layout.addLayout(top)
+        layout.addWidget(self.table, 1)
+        layout.addWidget(self.empty)
+        layout.addWidget(note)
+        layout.addWidget(close)
+        self._reload()
+
+    def _reload(self):
+        slips = self.work.payslips(self.job_id, self.year.value())
+        self.empty.setVisible(not slips)
+        self.table.setVisible(bool(slips))
+        self.table.setRowCount(0)
+        rows = [(month_name(date(s.year, s.month, 1)), s.gross, s.contributions, s.irpef,
+                 s.addizionali, s.bonus, s.net, s.tfr) for s in slips]
+        if len(rows) > 1:
+            rows.append((_("Total"), *(round(sum(r[i] for r in rows), 2) for i in range(1, 8))))
+        for values in rows:
+            row = self.table.rowCount()
+            self.table.insertRow(row)
+            for col, value in enumerate(values):
+                item = QTableWidgetItem(value if col == 0 else money(value))
+                if col:
+                    item.setTextAlignment(Qt.AlignRight | Qt.AlignVCenter)
+                self.table.setItem(row, col, item)
 
 
 class JobsDialog(QDialog):
@@ -745,9 +906,12 @@ class JobsDialog(QDialog):
         self.list.clear()
         for job in self.services.work.jobs():
             details = []
-            if job.hourly_rate:
+            if job.pay_mode == "monthly" and job.monthly_pay:
+                details.append(_("{amount} × {count} a year").format(
+                    amount=money(job.monthly_pay), count=job.mensilities))
+            elif job.pay_mode == "hourly" and job.hourly_rate:
                 rate = _("{amount} / hour").format(amount=money(job.hourly_rate))
-                if job.deductions:
+                if job.tax_model == "flat" and job.deductions:
                     rate += f" (−{job.deductions:g}%)"
                 details.append(rate)
             slots: dict[tuple, list[int]] = {}

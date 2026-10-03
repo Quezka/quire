@@ -243,4 +243,27 @@
     <string name="widget_empty">Nothing coming up.</string>
     <string name="add_task">Add a task</string>
     <string name="mark_done">Mark done</string>
+    <string name="pay_by_hour">By the hour</string>
+    <string name="pay_monthly">Monthly pay</string>
+    <string name="monthly_pay">Monthly pay, before tax</string>
+    <string name="payments_a_year">%1$d a year</string>
+    <string name="contract_has_dates">The contract has dates</string>
+    <string name="tax_italy">Italian employee</string>
+    <string name="tax_flat">Flat percentage</string>
+    <string name="inps_percent">INPS (%)</string>
+    <string name="surtax_percent">Regional + municipal tax (%)</string>
+    <string name="cuneo_bonus">Low-income bonus (cuneo fiscale)</string>
+    <string name="pay_estimate_help">Take-home pay is an estimate: it follows the Italian rules for an employee, but what\'s really withheld depends on your contract and your total income for the year.</string>
+    <string name="payslips">Payslips</string>
+    <string name="payslips_none">This job pays nothing in this year yet.</string>
+    <string name="payslips_help">Estimates. The year is worked out as a whole and spread over the months. The TFR is set aside for you and isn\'t part of the net pay. A tredicesima counts a month when you work at least 15 days of it.</string>
+    <string name="payslip_gross">gross %1$s</string>
+    <string name="payslip_contributions">contributions %1$s</string>
+    <string name="payslip_irpef">IRPEF %1$s</string>
+    <string name="payslip_surtax">surtax %1$s</string>
+    <string name="payslip_bonus">bonus +%1$s</string>
+    <string name="payslip_extra">13th/14th %1$s</string>
+    <string name="payslip_tfr">TFR %1$s</string>
+    <string name="pay_per_month">%1$s × %2$d a year</string>
+    <string name="close">Close</string>
 </resources>

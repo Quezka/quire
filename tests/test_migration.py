@@ -125,3 +125,23 @@ def test_v12_databases_gain_notebooks(tmp_path):
     db.conn.execute("DELETE FROM notebooks")  # deleting a notebook unfiles its notes
     assert db.conn.execute("SELECT notebook_id FROM notes").fetchone()[0] is None
     db.close()
+
+
+def test_v13_jobs_gain_monthly_pay_and_the_italian_tax_model(tmp_path):
+    path = tmp_path / "v13.db"
+    SqliteDatabase(path).close()
+    with sqlite3.connect(path) as conn:
+        for column in ("pay_mode", "monthly_pay", "mensilities", "contract_start",
+                       "contract_end", "tax_model", "inps", "addizionali", "fixed_term",
+                       "cuneo"):
+            conn.execute(f"ALTER TABLE jobs DROP COLUMN {column}")
+        conn.execute("INSERT INTO jobs (name, hourly_rate, deductions) VALUES ('Old', 9, 20)")
+        conn.execute("PRAGMA user_version = 13")
+    db = SqliteDatabase(path)
+    row = db.conn.execute("SELECT * FROM jobs").fetchone()
+    assert (row["name"], row["deductions"]) == ("Old", 20)  # kept as it was
+    assert (row["pay_mode"], row["tax_model"], row["mensilities"], row["inps"]) == (
+        "hourly", "flat", 13, 9.19)  # an old job keeps its flat percentage
+    assert row["monthly_pay"] is None and row["contract_start"] is None
+    assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    db.close()

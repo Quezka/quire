@@ -403,6 +403,8 @@ def test_job_dialog_weekly_schedule_and_tax_preset(window, services, app):
     dialog.show()
     dialog.name.setText("Gelateria")
     dialog.rate.setText("9,50")
+    assert dialog.tax_model.currentData() == "italy"  # the default for a new job
+    dialog.tax_model.setCurrentIndex(1)  # flat percentage
     dialog.preset.setCurrentIndex(1)  # occasional work, 20%
     assert dialog.deductions.text() == "20"
     dialog._add_row()  # defaults to Mon-Fri
@@ -420,6 +422,40 @@ def test_job_dialog_weekly_schedule_and_tax_preset(window, services, app):
     again.deductions.setText("12.5")
     again._deductions_typed()
     assert again.preset.currentText() == "Custom…"
+
+
+def test_monthly_job_with_contract_dates_and_payslips(window, services, app):
+    from datetime import date
+
+    from quire.presentation.dialogs import PayslipsDialog
+
+    dialog = JobDialog(services, parent=window)
+    dialog.show()
+    assert dialog.rate.isVisibleTo(dialog) and not dialog.monthly.isVisibleTo(dialog)
+    dialog.name.setText("Office")
+    dialog.pay_mode.setCurrentIndex(1)  # fixed monthly pay
+    assert dialog.monthly.isVisibleTo(dialog) and not dialog.rate.isVisibleTo(dialog)
+    dialog.monthly.setText("446,23")
+    dialog.has_contract.setChecked(True)
+    assert dialog.contract_start.isVisibleTo(dialog)
+    dialog.contract_start.setDate(dialog.contract_start.date().fromString("2026-09-01", "yyyy-MM-dd"))
+    dialog.contract_end.setDate(dialog.contract_end.date().fromString("2027-02-26", "yyyy-MM-dd"))
+    dialog.inps.setText("9.19")
+    dialog._save()
+
+    job = next(j for j in services.work.jobs() if j.name == "Office")
+    assert (job.pay_mode, job.monthly_pay, job.mensilities, job.tax_model) == (
+        "monthly", 446.23, 13, "italy")
+    assert (job.contract_start, job.contract_end) == (date(2026, 9, 1), date(2027, 2, 26))
+
+    again = JobDialog(services, job.id, window)
+    assert again.pay_mode.currentData() == "monthly" and again.has_contract.isChecked()
+    payslips = PayslipsDialog(services, job.id, window)
+    payslips.year.setValue(2026)
+    assert payslips.table.rowCount() == 5  # four months and the total
+    assert payslips.table.item(3, 0).text() != "" and payslips.table.isVisibleTo(payslips)
+    payslips.year.setValue(2030)
+    assert payslips.table.rowCount() == 0 and payslips.empty.isVisibleTo(payslips)
 
 
 def test_regular_shift_menu_skip_and_change(window, services, app, monkeypatch):

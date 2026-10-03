@@ -38,6 +38,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TimePicker
@@ -57,6 +58,7 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import io.github.quezka.quire.R
 import io.github.quezka.quire.data.Codec
@@ -73,12 +75,12 @@ import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Work
 import io.github.quezka.quire.domain.durationBetween
-import io.github.quezka.quire.domain.netPay
 import io.github.quezka.quire.domain.pay
 import io.github.quezka.quire.domain.paidMinutes
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.Month
 import java.time.ZoneOffset
 import java.time.format.TextStyle
 import java.util.Locale
@@ -309,11 +311,11 @@ fun ShiftEditor(repo: Repository, uid: String?, day: LocalDate, replaces: Agenda
         val context = LocalContext.current
         if (problem != null) Text(workMessage(context, problem), color = MaterialTheme.colorScheme.error)
         else {
-            val gross = preview.pay(job?.hourlyRate)
+            val gross = preview.pay(job)
             val parts = buildList {
                 add(context.getString(R.string.paid_time, hoursText(preview.paidMinutes)))
                 if (preview.end > MINUTES_PER_DAY) add(context.getString(R.string.ends_next_day))
-                gross?.let { add(context.getString(R.string.pay_estimate, money(it), money(netPay(it, job?.deductions ?: 0.0)!!))) }
+                gross?.let { add(context.getString(R.string.pay_estimate, money(it), money(if (job == null) it else repo.shiftNet(job, preview, it)))) }
             }
             Hint(parts.joinToString(" · "))
         }
@@ -334,19 +336,38 @@ fun JobEditor(repo: Repository, uid: String?, close: () -> Unit) {
     var color by remember { mutableStateOf(existing?.color ?: "#0090ff") }
     var rate by remember { mutableStateOf(existing?.hourlyRate?.let(::plainNumber).orEmpty()) }
     var deductions by remember { mutableStateOf(existing?.deductions?.takeIf { it > 0 }?.let(::plainNumber).orEmpty()) }
+    var payMode by remember { mutableStateOf(existing?.payMode ?: "hourly") }
+    var monthly by remember { mutableStateOf(existing?.monthlyPay?.let(::plainNumber).orEmpty()) }
+    var mensilities by remember { mutableStateOf(existing?.mensilities ?: 13) }
+    var dated by remember { mutableStateOf(existing?.let { it.contractStart != null || it.contractEnd != null } ?: false) }
+    var contractStart by remember { mutableStateOf(existing?.contractStart ?: repo.today()) }
+    var contractEnd by remember { mutableStateOf(existing?.contractEnd ?: repo.today().plusDays(180)) }
+    var taxModel by remember { mutableStateOf(existing?.taxModel ?: "italy") } // new jobs start with the Italian rules
+    var inps by remember { mutableStateOf(plainNumber(existing?.inps ?: 9.19)) }
+    var addizionali by remember { mutableStateOf(existing?.addizionali?.takeIf { it > 0 }?.let(::plainNumber).orEmpty()) }
+    var cuneo by remember { mutableStateOf(existing?.cuneo ?: false) }
+    var payslips by remember { mutableStateOf(false) }
     val weekly = remember { mutableStateListOf<ShiftPattern>().apply {
         existing?.let { addAll(Work.activeSchedule(it, repo.today())) }
     } }
     var confirmDelete by remember { mutableStateOf(false) }
     val rateValue = rate.replace(',', '.').toDoubleOrNull()
     val deductionValue = deductions.replace(',', '.').toDoubleOrNull() ?: 0.0
+    val monthlyValue = monthly.replace(',', '.').toDoubleOrNull()
+    val inpsValue = inps.replace(',', '.').toDoubleOrNull() ?: 9.19
+    val surtaxValue = addizionali.replace(',', '.').toDoubleOrNull() ?: 0.0
     val valid = name.isNotBlank() && (rate.isBlank() || (rateValue != null && rateValue >= 0)) &&
-        deductionValue in 0.0..100.0 && weekly.all { Work.problem(it.start, it.duration, it.breakMinutes) == null }
+        (monthly.isBlank() || (monthlyValue != null && monthlyValue >= 0)) &&
+        deductionValue in 0.0..99.99 && inpsValue in 0.0..99.99 && surtaxValue in 0.0..99.99 &&
+        !(dated && contractEnd < contractStart) && weekly.all { Work.problem(it.start, it.duration, it.breakMinutes) == null }
 
     EditorSheet(stringResource(if (existing == null) R.string.new_job else R.string.edit_job), close, valid,
         onSave = {
             val base = existing ?: Job(Codec.newUid(), "")
-            repo.saveJob(base.copy(name = name, color = color, hourlyRate = rateValue, deductions = deductionValue),
+            repo.saveJob(base.copy(name = name, color = color, hourlyRate = rateValue, deductions = deductionValue,
+                payMode = payMode, monthlyPay = monthlyValue, mensilities = mensilities,
+                contractStart = if (dated) contractStart else null, contractEnd = if (dated) contractEnd else null,
+                taxModel = taxModel, inps = inpsValue, addizionali = surtaxValue, fixedTerm = dated, cuneo = cuneo),
                 weekly.toList())
             close()
         },
@@ -354,13 +375,55 @@ fun JobEditor(repo: Repository, uid: String?, close: () -> Unit) {
         OutlinedTextField(name, { name = it }, Modifier.fillMaxWidth(), label = { Text(stringResource(R.string.job_name)) })
         ColorPicker(color) { color = it }
         Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            OutlinedTextField(rate, { rate = it }, Modifier.weight(1f), singleLine = true,
+            FilterChip(payMode == "hourly", { payMode = "hourly" }, { Text(stringResource(R.string.pay_by_hour)) })
+            FilterChip(payMode == "monthly", { payMode = "monthly" }, { Text(stringResource(R.string.pay_monthly)) })
+        }
+        if (payMode == "hourly") {
+            OutlinedTextField(rate, { rate = it }, Modifier.fillMaxWidth(), singleLine = true,
                 label = { Text(stringResource(R.string.hourly_rate)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-            OutlinedTextField(deductions, { deductions = it }, Modifier.weight(1f), singleLine = true,
+        } else {
+            OutlinedTextField(monthly, { monthly = it }, Modifier.fillMaxWidth(), singleLine = true,
+                label = { Text(stringResource(R.string.monthly_pay)) },
+                keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                for (n in 12..14) FilterChip(mensilities == n, { mensilities = n },
+                    { Text(stringResource(R.string.payments_a_year, n)) })
+            }
+        }
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.contract_has_dates), Modifier.weight(1f))
+            Switch(dated, { dated = it })
+        }
+        if (dated) Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+            DateButton(contractStart, repo.today(), { contractStart = it })
+            Text(stringResource(R.string.to))
+            DateButton(contractEnd, repo.today(), { contractEnd = it })
+        }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            FilterChip(taxModel == "italy", { taxModel = "italy" }, { Text(stringResource(R.string.tax_italy)) })
+            FilterChip(taxModel == "flat", { taxModel = "flat" }, { Text(stringResource(R.string.tax_flat)) })
+        }
+        if (taxModel == "italy") {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                OutlinedTextField(inps, { inps = it }, Modifier.weight(1f), singleLine = true,
+                    label = { Text(stringResource(R.string.inps_percent)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+                OutlinedTextField(addizionali, { addizionali = it }, Modifier.weight(1f), singleLine = true,
+                    label = { Text(stringResource(R.string.surtax_percent)) },
+                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
+            }
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                Text(stringResource(R.string.cuneo_bonus), Modifier.weight(1f))
+                Switch(cuneo, { cuneo = it })
+            }
+        } else {
+            OutlinedTextField(deductions, { deductions = it }, Modifier.fillMaxWidth(), singleLine = true,
                 label = { Text(stringResource(R.string.deductions_percent)) },
                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
         }
+        Hint(stringResource(R.string.pay_estimate_help))
+        if (existing != null) OutlinedButton(onClick = { payslips = true }) { Text(stringResource(R.string.payslips)) }
         SectionTitle(stringResource(R.string.weekly_schedule))
         Hint(stringResource(R.string.weekly_schedule_help))
         for ((i, p) in weekly.withIndex()) {
@@ -382,9 +445,47 @@ fun JobEditor(repo: Repository, uid: String?, close: () -> Unit) {
             Text(stringResource(R.string.add_weekly_shift))
         }
     }
+    if (payslips && existing != null) PayslipsDialog(repo, existing) { payslips = false }
     if (confirmDelete && existing != null) ConfirmDialog(stringResource(R.string.delete_job_question, existing.name),
         stringResource(R.string.delete), onConfirm = { repo.deleteJob(existing.uid); close() },
         onDismiss = { confirmDelete = false })
+}
+
+/** A job's pay month by month, worked out like a payslip. */
+@Composable
+fun PayslipsDialog(repo: Repository, job: Job, close: () -> Unit) {
+    var year by remember { mutableStateOf(repo.today().year) }
+    val slips = remember(year) { repo.payslips(job, year) }
+    AlertDialog(onDismissRequest = close,
+        title = { Text(stringResource(R.string.payslips)) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    TextButton(onClick = { year -= 1 }) { Text("‹") }
+                    Text(year.toString(), Modifier.weight(1f), textAlign = TextAlign.Center, fontWeight = FontWeight.SemiBold)
+                    TextButton(onClick = { year += 1 }) { Text("›") }
+                }
+                if (slips.isEmpty()) Hint(stringResource(R.string.payslips_none))
+                for (p in slips) Column {
+                    Row {
+                        Text(Month.of(p.month).getDisplayName(TextStyle.FULL_STANDALONE, Locale.getDefault())
+                            .replaceFirstChar { it.uppercase() }, Modifier.weight(1f), fontWeight = FontWeight.SemiBold)
+                        Text(money(p.net), fontWeight = FontWeight.SemiBold)
+                    }
+                    val parts = listOfNotNull(
+                        stringResource(R.string.payslip_gross, money(p.gross)),
+                        stringResource(R.string.payslip_contributions, money(p.contributions)),
+                        if (p.irpef > 0) stringResource(R.string.payslip_irpef, money(p.irpef)) else null,
+                        if (p.addizionali > 0) stringResource(R.string.payslip_surtax, money(p.addizionali)) else null,
+                        if (p.bonus > 0) stringResource(R.string.payslip_bonus, money(p.bonus)) else null,
+                        if (p.extra > 0) stringResource(R.string.payslip_extra, money(p.extra)) else null,
+                        stringResource(R.string.payslip_tfr, money(p.tfr)))
+                    Hint(parts.joinToString(" · "))
+                }
+                Hint(stringResource(R.string.payslips_help))
+            }
+        },
+        confirmButton = { TextButton(onClick = close) { Text(stringResource(R.string.close)) } })
 }
 
 // ---- courses ----

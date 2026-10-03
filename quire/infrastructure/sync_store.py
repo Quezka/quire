@@ -169,7 +169,12 @@ class SqliteSyncStore:
                          (r["id"],))
             skips = q("SELECT day, start_min FROM shift_skips WHERE job_id = ?", (r["id"],))
             return {"name": r["name"], "color": r["color"], "hourly_rate": r["hourly_rate"],
-                    "deductions": r["deductions"], "patterns": [list(p) for p in patterns],
+                    "deductions": r["deductions"], "pay_mode": r["pay_mode"],
+                    "monthly_pay": r["monthly_pay"], "mensilities": r["mensilities"],
+                    "contract_start": r["contract_start"], "contract_end": r["contract_end"],
+                    "tax_model": r["tax_model"], "inps": r["inps"],
+                    "addizionali": r["addizionali"], "fixed_term": bool(r["fixed_term"]),
+                    "cuneo": bool(r["cuneo"]), "patterns": [list(p) for p in patterns],
                     "skips": [list(s) for s in skips]}
         if kind == "event":
             return {"day": r["day"], "start": r["start_min"], "end": r["end_min"],
@@ -249,7 +254,15 @@ class SqliteSyncStore:
                       "color": d.get("color", "#4f7cff"), "external_id": d.get("external_id")}
         elif s.kind == "job":
             values = {"name": d["name"], "color": d.get("color", "#0090ff"),
-                      "hourly_rate": d.get("hourly_rate"), "deductions": d.get("deductions", 0)}
+                      "hourly_rate": d.get("hourly_rate"), "deductions": d.get("deductions", 0),
+                      "pay_mode": d.get("pay_mode", "hourly"),
+                      "monthly_pay": d.get("monthly_pay"), "mensilities": d.get("mensilities", 13),
+                      "contract_start": d.get("contract_start"),
+                      "contract_end": d.get("contract_end"),
+                      "tax_model": d.get("tax_model", "flat"), "inps": d.get("inps", 9.19),
+                      "addizionali": d.get("addizionali", 0),
+                      "fixed_term": int(d.get("fixed_term", True)),
+                      "cuneo": int(bool(d.get("cuneo")))}
         elif s.kind == "event":
             values = {"day": d["day"], "start_min": d["start"], "end_min": d["end"],
                       "title": d["title"], "details": d.get("details", ""),

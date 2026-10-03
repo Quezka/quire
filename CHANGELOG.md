@@ -4,6 +4,17 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.29.0] - 2026-10-03
+
+### Added
+- **Payslip-style pay for jobs** (desktop and phone). A job is now paid **by the hour** or a **fixed monthly pay** (for example 446.23 × 13 payments), optionally with contract start and end dates. The first and last month are prorated by days, the tredicesima (and quattordicesima) builds up month by month and is paid in December or with the last payslip.
+- **Italian tax model.** Take-home pay now follows the rules for an employee: INPS contributions, IRPEF with the work detrazione (prorated by the days worked), regional and municipal surtax and the optional low-income bonus (cuneo fiscale). The year is worked out as a whole and spread over its months. The old flat percentage is still there, and existing jobs keep it.
+- **Payslips** (Jobs, then Edit job, then Payslips): gross, contributions, IRPEF, surtax, bonus, net and the TFR set aside, month by month for any year.
+- The Work summaries (week and month) include monthly jobs, even in weeks without shifts.
+
+### Changed
+- Settings of a job now sync more fields (pay mode, monthly pay, contract dates, tax model). Update both devices so an older app doesn't reset them.
+
 ## [0.28.0] - 2026-10-03
 
 ### Added

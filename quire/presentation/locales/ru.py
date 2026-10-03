@@ -342,12 +342,6 @@ MESSAGES = {
     "Occasional work: ritenuta d'acconto (20%)": "Разовая работа: ritenuta d'acconto (20%)",
     "Employee: INPS contributions (9.19%)": "Сотрудник: взносы INPS (9,19%)",
     "Custom…": "Своё значение…",
-    "Take-home pay is an estimate: what's really withheld depends on your contract and your total income for the year.":
-        "Сумма «на руки» примерная: реальные удержания зависят от договора и вашего общего "
-        "дохода за год.",
-    "Type the hourly pay and deductions as numbers, like 8.50 or 8,50. Leave the pay empty if you don't want to track it.":
-        "Введите оплату и удержания числами, например 8.50 или 8,50. Оставьте оплату пустой, "
-        "если не хотите её учитывать.",
     "<b>Weekly schedule</b>": "<b>График на неделю</b>",
     "Shifts you work every week. They show up in Week next to your classes. Changes apply from this week on.":
         "Смены, которые вы работаете каждую неделю. Они видны в разделе «Неделя» рядом с "
@@ -714,4 +708,51 @@ MESSAGES = {
     'That picture is too big to keep in a note (over 700 KB).': 'Эта картинка слишком большая для заметки (больше 700 КБ).',
     'That picture is no longer here.': 'Этой картинки больше нет.',
     "That picture wasn't made with Ligature.": 'Эта картинка сделана не в Ligature.',
+    "Take-home pay is an estimate: it follows the Italian rules for an employee, but what's really withheld depends on your contract and your total income for the year.":
+        "Сумма «на руки» примерная: расчёт идёт по итальянским правилам для наёмного "
+        "работника, а реальные удержания зависят от договора и вашего общего дохода за год.",
+    "Type the pay, contributions and deductions as numbers, like 8.50 or 8,50. Leave the pay empty if you don't want to track it.":
+        "Введите оплату, взносы и удержания числами, например 8.50 или 8,50. Оставьте оплату "
+        "пустой, если не хотите её учитывать.",
+    "12 payments a year": "12 выплат в год",
+    "13 payments (with tredicesima)": "13 выплат (с tredicesima)",
+    "14 payments (tredicesima and quattordicesima)": "14 выплат (tredicesima и quattordicesima)",
+    "Bonus": "Бонус",
+    "By the hour": "Почасовая",
+    "Contract": "Договор",
+    "Contributions": "Взносы",
+    "Estimates. The year is worked out as a whole (IRPEF after the employee detrazione for the days worked) and spread over the months. The TFR is set aside for you and isn't part of the net pay. A tredicesima counts a month when you work at least 15 days of it.":
+        "Это оценка. Год считается целиком (IRPEF после вычета detrazione для работника "
+        "за отработанные дни) и распределяется по месяцам. TFR откладывается для вас и не "
+        "входит в сумму «на руки». Месяц засчитывается в tredicesima, если вы работаете в нём "
+        "не меньше 15 дней.",
+    "Fixed monthly pay": "Фиксированная в месяц",
+    "Flat percentage": "Один процент",
+    "Gross": "До вычетов",
+    "INPS": "INPS",
+    "IRPEF": "IRPEF",
+    "Italian employee (INPS + IRPEF)": "Работник в Италии (INPS + IRPEF)",
+    "Low-income bonus (cuneo fiscale)": "Бонус при низком доходе (cuneo fiscale)",
+    "Month": "Месяц",
+    "Monthly pay": "Оплата в месяц",
+    "Net": "На руки",
+    "Pay": "Оплата",
+    "Payments": "Выплаты",
+    "Payslips": "Расчётные листки",
+    "Payslips…": "Расчётные листки…",
+    "Regional + municipal tax": "Налог региона и коммуны",
+    "Surtax": "Надбавки",
+    "TFR": "TFR",
+    "The contract has dates": "У договора есть даты",
+    "This job pays nothing in this year yet.": "В этом году эта работа пока ничего не приносит.",
+    "Total": "Итого",
+    "Year": "Год",
+    "e.g. 446.23 (optional)": "например, 446,23 (необязательно)",
+    "{amount} × {count} a year": "{amount} × {count} в год",
+    "{currency} per payment, before tax": "{currency} за выплату, до налогов",
+    "A job pays 12, 13 or 14 monthly payments a year.": "Работа выплачивает 12, 13 или 14 месячных платежей в год.",
+    "Contributions and surtax must be between 0% and 100%.": "Взносы и надбавки должны быть от 0% до 100%.",
+    "Pick how the job is paid and taxed.": "Выберите, как оплачивается работа и как облагается налогом.",
+    "The contract can't end before it starts.": "Договор не может закончиться раньше, чем начался.",
+    "The monthly pay can't be negative.": "Месячная оплата не может быть отрицательной.",
 }

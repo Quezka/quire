@@ -9,6 +9,7 @@ import io.github.quezka.quire.domain.FocusSession
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
 import io.github.quezka.quire.domain.Notebook
+import io.github.quezka.quire.domain.Payslip
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
@@ -96,6 +97,8 @@ class Repository(
 
     fun workWeek(): WorkSummary = Work.week(jobs(), shifts(), today())
     fun workMonth(): WorkSummary = Work.month(jobs(), shifts(), today())
+    fun payslips(job: Job, year: Int): List<Payslip> = Work.payslips(job, year, shifts())
+    fun shiftNet(job: Job, shift: Shift, gross: Double): Double = Work.shiftNet(job, shift, gross, shifts())
 
     // ---- tasks and notes ----
 

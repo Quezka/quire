@@ -11,7 +11,7 @@ from datetime import date, datetime
 
 from ..domain import (
     Absence, AbsenceKind, Book, DocumentKind, Notice, SchoolDocument,
-    Course, Event, Grade, Job, Lesson, Note, Notebook, Shift, ShiftPattern, Subject, Task, TaskKind,
+    Course, Event, Grade, Job, Lesson, Note, Notebook, Payslip, Shift, ShiftPattern, Subject, Task, TaskKind,
     TimeRange,
 )
 from ..domain.focus import FocusSettings, Phase
@@ -124,6 +124,32 @@ class JobRecord:
     hourly_rate: float | None
     deductions: float
     weekly: tuple[PatternRecord, ...]  # the schedule that applies from today on
+    pay_mode: str = "hourly"
+    monthly_pay: float | None = None
+    mensilities: int = 13
+    contract_start: date | None = None
+    contract_end: date | None = None
+    tax_model: str = "flat"
+    inps: float = 9.19
+    addizionali: float = 0.0
+    fixed_term: bool = True
+    cuneo: bool = False
+
+
+@dataclass(frozen=True)
+class PayslipRecord:
+    """One month of a job's pay, worked out like a payslip."""
+
+    year: int
+    month: int
+    gross: float
+    extra: float  # tredicesima / quattordicesima inside gross
+    contributions: float
+    irpef: float
+    addizionali: float
+    bonus: float
+    net: float
+    tfr: float
 
 
 @dataclass(frozen=True)
@@ -311,7 +337,15 @@ def pattern_record(p: ShiftPattern) -> PatternRecord:
 
 def job_record(j: Job, today: date) -> JobRecord:
     return JobRecord(j.id, j.name, j.color, j.hourly_rate, j.deductions,
-                     tuple(pattern_record(p) for p in j.active_schedule(today)))
+                     tuple(pattern_record(p) for p in j.active_schedule(today)),
+                     j.pay_mode, j.monthly_pay, j.mensilities, j.contract_start,
+                     j.contract_end, j.tax_model, j.inps, j.addizionali, j.fixed_term,
+                     j.cuneo)
+
+
+def payslip_record(p: Payslip) -> PayslipRecord:
+    return PayslipRecord(p.year, p.month, p.gross, p.extra, p.contributions, p.irpef,
+                         p.addizionali, p.bonus, p.net, p.tfr)
 
 
 def shift_record(s: Shift) -> ShiftRecord:

@@ -6,6 +6,7 @@ from .model import (
     NoteImage, Notebook, Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange, average, derive_note_title,
     image_markdown, image_uids, net_pay, normalize_topic, note_snippet, reschedule, work_shifts,
 )
+from .payroll import PayTerms, Payslip, monthly_gross, monthly_share, take_home, year_payslips
 from .register import (
     ABSENCE_LIMIT, GRADE_MAX, GRADE_MIN, Absence, AbsenceKind, Book, DocumentKind, Notice,
     NoticeAttachment, SchoolDocument, lesson_hours, needed_grade, running_average,
@@ -16,6 +17,7 @@ __all__ = [
     "DomainError", "NotFound", "ValidationError", "COURSE_COLORS", "EVERY_DAY", "PASS_MARK", "UPCOMING_DAYS", "WORK_DAYS", "ClassSlot", "Course",
     "DueBucket", "Event", "Grade", "Job", "Lesson", "Note", "Notebook", "Shift", "ShiftPattern", "Subject", "Task", "TaskKind", "TimeRange", "average",
     "derive_note_title", "note_snippet", "IMAGE_SCHEME", "MAX_IMAGE_BYTES", "NoteImage",
+    "PayTerms", "Payslip", "monthly_gross", "monthly_share", "take_home", "year_payslips",
     "image_markdown", "image_uids", "net_pay", "normalize_topic", "reschedule", "work_shifts",
     "ABSENCE_LIMIT", "GRADE_MAX", "GRADE_MIN", "Absence", "AbsenceKind", "Book", "DocumentKind",
     "Notice", "NoticeAttachment", "SchoolDocument", "lesson_hours", "needed_grade",

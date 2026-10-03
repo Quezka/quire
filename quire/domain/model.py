@@ -12,6 +12,7 @@ from datetime import date, datetime, timedelta
 from enum import Enum
 
 from .errors import ValidationError
+from .payroll import PAY_MODES, TAX_MODELS, PayTerms
 
 MINUTES_PER_DAY = 24 * 60
 UPCOMING_DAYS = 7
@@ -307,8 +308,25 @@ class Job:
     id: int | None = None
     # Every weekly pattern the job has had, including ended ones (kept for history).
     schedule: list["ShiftPattern"] = field(default_factory=list)
-    # Share of gross pay withheld for tax and contributions, in percent (0-99.99).
+    # Share of gross pay withheld for tax and contributions, in percent (0-99.99); used by
+    # the "flat" tax model.
     deductions: float = 0.0
+    pay_mode: str = "hourly"  # "hourly", or "monthly" (a fixed gross amount per month)
+    monthly_pay: float | None = None  # gross, per mensilità
+    mensilities: int = 13
+    contract_start: date | None = None
+    contract_end: date | None = None
+    tax_model: str = "flat"  # "flat" percentage, or "italy": INPS + IRPEF
+    inps: float = 9.19  # "italy": employee contributions, percent
+    addizionali: float = 0.0  # "italy": regional + municipal surtax, percent
+    fixed_term: bool = True
+    cuneo: bool = False  # "italy": add the low-income cuneo fiscale bonus
+
+    @property
+    def terms(self) -> PayTerms:
+        return PayTerms(self.pay_mode, self.monthly_pay, self.mensilities, self.contract_start,
+                        self.contract_end, self.tax_model, self.deductions, self.inps,
+                        self.addizionali, self.fixed_term, self.cuneo)
 
     def validate(self):
         if not self.name.strip():
@@ -317,6 +335,17 @@ class Job:
             raise ValidationError("The hourly rate can't be negative.")
         if not 0 <= self.deductions < 100:
             raise ValidationError("Tax and deductions must be between 0% and 100%.")
+        if self.pay_mode not in PAY_MODES or self.tax_model not in TAX_MODELS:
+            raise ValidationError("Pick how the job is paid and taxed.")
+        if self.monthly_pay is not None and self.monthly_pay < 0:
+            raise ValidationError("The monthly pay can't be negative.")
+        if self.mensilities not in (12, 13, 14):
+            raise ValidationError("A job pays 12, 13 or 14 monthly payments a year.")
+        if not 0 <= self.inps < 100 or not 0 <= self.addizionali < 100:
+            raise ValidationError("Contributions and surtax must be between 0% and 100%.")
+        if (self.contract_start and self.contract_end
+                and self.contract_end < self.contract_start):
+            raise ValidationError("The contract can't end before it starts.")
         for pattern in self.schedule:
             pattern.validate()
 

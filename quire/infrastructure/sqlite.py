@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 13
+SCHEMA_VERSION = 14
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -183,6 +183,15 @@ class SqliteDatabase:
         # v13: notebooks, groups of notes that aren't classes (table made by SCHEMA).
         self._add_column("notes", "notebook_id",
                          "INTEGER REFERENCES notebooks(id) ON DELETE SET NULL")
+        # v14: monthly pay, contract dates and the Italian tax model per job.
+        for column, definition in (
+                ("pay_mode", "TEXT NOT NULL DEFAULT 'hourly'"), ("monthly_pay", "REAL"),
+                ("mensilities", "INTEGER NOT NULL DEFAULT 13"), ("contract_start", "TEXT"),
+                ("contract_end", "TEXT"), ("tax_model", "TEXT NOT NULL DEFAULT 'flat'"),
+                ("inps", "REAL NOT NULL DEFAULT 9.19"), ("addizionali", "REAL NOT NULL DEFAULT 0"),
+                ("fixed_term", "INTEGER NOT NULL DEFAULT 1"),
+                ("cuneo", "INTEGER NOT NULL DEFAULT 0")):
+            self._add_column("jobs", column, definition)
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
                           " ON tasks(external_id) WHERE external_id IS NOT NULL")
         # v9: change tracking for sync between devices (ids, timestamps, tombstones).

@@ -137,7 +137,20 @@ data class Job(
     val deductions: Double = 0.0,
     val patterns: List<ShiftPattern> = emptyList(),
     val skips: Set<Pair<LocalDate, Int>> = emptySet(),
-)
+    val payMode: String = "hourly", // or "monthly": a fixed gross amount per month
+    val monthlyPay: Double? = null, // gross, per mensilità
+    val mensilities: Int = 13,
+    val contractStart: LocalDate? = null,
+    val contractEnd: LocalDate? = null,
+    val taxModel: String = "flat", // "flat" percentage, or "italy": INPS + IRPEF
+    val inps: Double = 9.19,
+    val addizionali: Double = 0.0,
+    val fixedTerm: Boolean = true,
+    val cuneo: Boolean = false,
+) {
+    val terms get() = PayTerms(payMode, monthlyPay, mensilities, contractStart, contractEnd, taxModel,
+        deductions, inps, addizionali, fixedTerm, cuneo)
+}
 
 data class Shift(
     val uid: String?, // null for an occurrence of a weekly schedule

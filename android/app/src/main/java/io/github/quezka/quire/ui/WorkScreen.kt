@@ -107,7 +107,7 @@ fun WorkScreen(repo: Repository, version: Int, back: () -> Unit) {
                     val item = AgendaItem(ItemKind.SHIFT, s.uid ?: s.jobUid, s.day, s.start,
                         minOf(s.end, MINUTES_PER_DAY), job?.name ?: "", job?.color ?: "#0090ff",
                         details = listOfNotNull(relativeDate(context, s.day, today), hoursText(s.paidMinutes),
-                            s.pay(job?.hourlyRate)?.let(::money)).joinToString(" · "),
+                            s.pay(job)?.let(::money)).joinToString(" · "),
                         weekly = s.uid == null)
                     Box(Modifier.animateItem()) { AgendaRow(item) { editing = item } }
                 }
@@ -122,7 +122,8 @@ fun WorkScreen(repo: Repository, version: Int, back: () -> Unit) {
                         Column(Modifier.weight(1f)) {
                             Text(job.name, fontWeight = FontWeight.SemiBold)
                             val meta = listOfNotNull(
-                                job.hourlyRate?.let { context.getString(R.string.per_hour, money(it)) },
+                                if (job.payMode == "monthly") job.monthlyPay?.let { context.getString(R.string.pay_per_month, money(it), job.mensilities) }
+                                else job.hourlyRate?.let { context.getString(R.string.per_hour, money(it)) },
                                 if (weekly.isEmpty()) null else weekly.joinToString(", ") {
                                     "${weekdayName(it.weekday)} ${span(it.start, (it.start + it.duration) % MINUTES_PER_DAY)}"
                                 })

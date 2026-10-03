@@ -448,8 +448,12 @@ class SqliteKeyValueStore(_Repo):
 
 class SqliteJobRepository(_Repo):
     def _load(self, rows) -> list[Job]:
-        jobs = {r["id"]: Job(r["name"], r["color"], r["hourly_rate"], r["id"],
-                             deductions=r["deductions"]) for r in rows}
+        jobs = {r["id"]: Job(
+            r["name"], r["color"], r["hourly_rate"], r["id"], deductions=r["deductions"],
+            pay_mode=r["pay_mode"], monthly_pay=r["monthly_pay"], mensilities=r["mensilities"],
+            contract_start=_date(r["contract_start"]), contract_end=_date(r["contract_end"]),
+            tax_model=r["tax_model"], inps=r["inps"], addizionali=r["addizionali"],
+            fixed_term=bool(r["fixed_term"]), cuneo=bool(r["cuneo"])) for r in rows}
         if jobs:
             marks = ",".join("?" * len(jobs))
             for p in self._all(f"SELECT * FROM shift_patterns WHERE job_id IN ({marks})"
@@ -475,19 +479,31 @@ class SqliteJobRepository(_Repo):
               p.since.isoformat() if p.since else None,
               p.until.isoformat() if p.until else None) for p in job.schedule])
 
+    @staticmethod
+    def _pay_columns(job: Job) -> tuple:
+        return (job.name, job.color, job.hourly_rate, job.deductions, job.pay_mode,
+                job.monthly_pay, job.mensilities,
+                job.contract_start.isoformat() if job.contract_start else None,
+                job.contract_end.isoformat() if job.contract_end else None, job.tax_model,
+                job.inps, job.addizionali, int(job.fixed_term), int(job.cuneo))
+
     def add(self, job: Job) -> int:
         with self._conn:
             job.id = self._conn.execute(
-                "INSERT INTO jobs (name, color, hourly_rate, deductions) VALUES (?, ?, ?, ?)",
-                (job.name, job.color, job.hourly_rate, job.deductions)).lastrowid
+                "INSERT INTO jobs (name, color, hourly_rate, deductions, pay_mode, monthly_pay,"
+                " mensilities, contract_start, contract_end, tax_model, inps, addizionali,"
+                " fixed_term, cuneo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                self._pay_columns(job)).lastrowid
             self._write_schedule(job)
         return job.id
 
     def update(self, job: Job):
         with self._conn:
             self._conn.execute(
-                "UPDATE jobs SET name = ?, color = ?, hourly_rate = ?, deductions = ? WHERE id = ?",
-                (job.name, job.color, job.hourly_rate, job.deductions, job.id))
+                "UPDATE jobs SET name = ?, color = ?, hourly_rate = ?, deductions = ?,"
+                " pay_mode = ?, monthly_pay = ?, mensilities = ?, contract_start = ?,"
+                " contract_end = ?, tax_model = ?, inps = ?, addizionali = ?, fixed_term = ?,"
+                " cuneo = ? WHERE id = ?", (*self._pay_columns(job), job.id))
             self._write_schedule(job)
 
     def delete(self, job_id):

@@ -167,13 +167,27 @@ object Codec {
             d.list("patterns").map {
                 ShiftPattern(it.i(0), it.i(1), it.i(2), it.i(3), date(it.s(4)), date(it.s(5)))
             },
-            d.list("skips").mapNotNull { a -> date(a.s(0))?.let { it to a.i(1) } }.toSet())
+            d.list("skips").mapNotNull { a -> date(a.s(0))?.let { it to a.i(1) } }.toSet(),
+            d.str("pay_mode", "hourly"), d.double("monthly_pay"), d.int("mensilities").takeIf { it in 12..14 } ?: 13,
+            date(d.strOrNull("contract_start")), date(d.strOrNull("contract_end")),
+            d.str("tax_model", "flat"), d.double("inps") ?: 9.19, d.double("addizionali") ?: 0.0,
+            if (d["fixed_term"] == null) true else d.bool("fixed_term"), d.bool("cuneo"))
     }
 
     fun jobData(j: Job, previous: JsonObject?) = merged(previous, mapOf(
         "name" to JsonPrimitive(j.name), "color" to JsonPrimitive(j.color),
         "hourly_rate" to (j.hourlyRate?.let(::JsonPrimitive) ?: JsonNull),
         "deductions" to JsonPrimitive(j.deductions),
+        "pay_mode" to JsonPrimitive(j.payMode),
+        "monthly_pay" to (j.monthlyPay?.let(::JsonPrimitive) ?: JsonNull),
+        "mensilities" to JsonPrimitive(j.mensilities),
+        "contract_start" to text(j.contractStart?.toString()),
+        "contract_end" to text(j.contractEnd?.toString()),
+        "tax_model" to JsonPrimitive(j.taxModel),
+        "inps" to JsonPrimitive(j.inps),
+        "addizionali" to JsonPrimitive(j.addizionali),
+        "fixed_term" to JsonPrimitive(j.fixedTerm),
+        "cuneo" to JsonPrimitive(j.cuneo),
         "patterns" to buildJsonArray {
             for (p in j.patterns.sortedWith(compareBy({ it.weekday }, { it.start }))) add(buildJsonArray {
                 add(JsonPrimitive(p.weekday)); add(JsonPrimitive(p.start)); add(JsonPrimitive(p.duration))
