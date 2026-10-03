@@ -18,10 +18,12 @@ import androidx.core.content.ContextCompat
 import io.github.quezka.quire.MainActivity
 import io.github.quezka.quire.R
 import io.github.quezka.quire.container
+import io.github.quezka.quire.widget.AgendaWidget
 import io.github.quezka.quire.domain.ItemKind
 import io.github.quezka.quire.domain.Phase
 import io.github.quezka.quire.school.SchoolReport
 import io.github.quezka.quire.ui.minutes
+import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.time.ZoneId
 
@@ -153,5 +155,8 @@ class AlarmReceiver : BroadcastReceiver() {
         }
         container.reminders.plan()
         container.focus.planAlarm()
+        // A start passed, or the clock or time zone changed.
+        val pending = goAsync()
+        AgendaWidget.scope.launch { try { AgendaWidget.refreshNow(context) } finally { pending.finish() } }
     }
 }

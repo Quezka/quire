@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.28.0] - 2026-10-03
+
+### Added
+- **Phone: agenda home-screen widget** (Android). Shows the next 7 days of classes, events, shifts and tasks, with a + button for a new task and a circle to mark a task done. Refreshes on changes, syncs and reminders.
+
 ## [0.27.0] - 2026-10-02
 
 ### Added

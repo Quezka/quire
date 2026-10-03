@@ -19,6 +19,7 @@ import io.github.quezka.quire.sync.Settings
 import io.github.quezka.quire.sync.SyncEngine
 import io.github.quezka.quire.sync.SyncManager
 import io.github.quezka.quire.update.Updater
+import io.github.quezka.quire.widget.AgendaWidget
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.sync.Mutex
@@ -60,7 +61,7 @@ class Container(
         io.github.quezka.quire.ui.currencyCode = settings.get("currency") ?: "EUR"
         sync.start()
         SchoolWorker.schedule(context)
-        repository.onChanged = { reminders.plan() }
+        repository.onChanged = { reminders.plan(); AgendaWidget.refresh(context) }
         reminders.plan()
         focus.tick(announce = false)
         focus.planAlarm()

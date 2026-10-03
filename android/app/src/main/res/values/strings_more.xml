@@ -238,4 +238,9 @@
     <string name="course_or_notebook">Course or notebook</string>
     <string name="no_course_or_notebook">Not filed</string>
     <string name="delete_notebook_question">Delete the notebook “%1$s”? Its notes stay, but aren\'t in any notebook.</string>
+    <string name="widget_name">Quire agenda</string>
+    <string name="widget_description">What\'s coming up: classes, events, shifts and tasks.</string>
+    <string name="widget_empty">Nothing coming up.</string>
+    <string name="add_task">Add a task</string>
+    <string name="mark_done">Mark done</string>
 </resources>

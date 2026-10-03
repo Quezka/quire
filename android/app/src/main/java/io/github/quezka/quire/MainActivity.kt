@@ -62,11 +62,13 @@ class MainActivity : ComponentActivity() {
     }
 
     private var requested by mutableStateOf<Int?>(null)
+    private var addTask by mutableStateOf(false) // from the widget's + button
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requested = intent?.getIntExtra("tab", -1)?.takeIf { it >= 0 }
+        addTask = intent?.getBooleanExtra("new_task", false) == true
         val container = container
         setContent {
             QuireTheme {
@@ -86,6 +88,9 @@ class MainActivity : ComponentActivity() {
                         else -> { tab = 4; page = Page.entries[r - 10] }
                     }
                     requested = null
+                }
+                LaunchedEffect(addTask) {
+                    if (addTask) { newTaskDue = null; newTask = true; addTask = false }
                 }
                 AskForNotifications()
 
@@ -145,6 +150,7 @@ class MainActivity : ComponentActivity() {
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         requested = intent.getIntExtra("tab", -1).takeIf { it >= 0 }
+        addTask = intent.getBooleanExtra("new_task", false)
     }
 
     override fun onResume() {

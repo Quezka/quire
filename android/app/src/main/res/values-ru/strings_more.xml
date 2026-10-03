@@ -254,4 +254,9 @@
     <string name="course_or_notebook">Предмет или блокнот</string>
     <string name="no_course_or_notebook">Без группы</string>
     <string name="delete_notebook_question">Удалить блокнот «%1$s»? Заметки останутся, но будут вне блокнота.</string>
+    <string name="widget_name">Повестка Quire</string>
+    <string name="widget_description">Что впереди: занятия, события, смены и задачи.</string>
+    <string name="widget_empty">Ничего не предстоит.</string>
+    <string name="add_task">Добавить задачу</string>
+    <string name="mark_done">Отметить выполненным</string>
 </resources>
