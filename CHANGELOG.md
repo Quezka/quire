@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.30.0] - 2026-10-03
+
+### Added
+- **Smooth day changes on Today.** Swiping two fingers on the touchpad, the arrows, the Today button and the calendar now slide the old day out and the new one in, instead of jumping.
+
 ## [0.29.0] - 2026-10-03
 
 ### Added

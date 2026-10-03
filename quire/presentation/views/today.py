@@ -3,10 +3,10 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtCore import QEasingCurve, Qt, QTimer, QVariantAnimation, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QCalendarWidget, QHBoxLayout, QLineEdit, QListWidget, QListWidgetItem, QMenu,
+    QCalendarWidget, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
     QPlainTextEdit, QScrollArea, QToolButton, QVBoxLayout, QWidgetAction,
 )
 
@@ -38,12 +38,14 @@ class TodayView(Page):
         self.services = services
         self.planner = services.planner
         self.day = self.planner.today()
+        self._slide = None  # (animation, [old picture, new picture]) once first used
+        self._step = 1
 
         # ---- header ----
         prev_btn = icon_button("chevron-left", _("Previous day"))
-        prev_btn.clicked.connect(lambda: self.set_day(self.day - timedelta(days=1)))
+        prev_btn.clicked.connect(lambda: self.go_to(self.day - timedelta(days=1)))
         next_btn = icon_button("chevron-right", _("Next day"))
-        next_btn.clicked.connect(lambda: self.set_day(self.day + timedelta(days=1)))
+        next_btn.clicked.connect(lambda: self.go_to(self.day + timedelta(days=1)))
         self.leading.addWidget(prev_btn)
         self.leading.addWidget(next_btn)
 
@@ -59,7 +61,7 @@ class TodayView(Page):
         pick.setMenu(self._calendar_menu)
 
         self.today_btn = button(_("Today"))
-        self.today_btn.clicked.connect(lambda: self.set_day(self.planner.today()))
+        self.today_btn.clicked.connect(lambda: self.go_to(self.planner.today()))
         add = menu_button(_("Add"), add_menu(self, self.services, lambda: self.day), primary=True)
         self.add_actions(pick, self.today_btn, add)
 
@@ -67,7 +69,7 @@ class TodayView(Page):
         self.grid = TimeGrid()
         self.grid.blockActivated.connect(self._block_activated)
         self.grid.emptyActivated.connect(self._empty_activated)
-        self.grid.swiped.connect(lambda step: self.set_day(self.day + timedelta(days=step)))
+        self.grid.swiped.connect(lambda step: self.go_to(self.day + timedelta(days=step)))
         self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setWidget(self.grid)
         self.zoom = TimelineZoom(self.grid, self.scroll, "today", self)
@@ -135,9 +137,66 @@ class TodayView(Page):
         self._journal_day = day
         QTimer.singleShot(0, self._scroll_to_focus)
 
+    SLIDE_MS = 240
+
+    def _slide_parts(self):
+        """The two pictures and the animation behind a day change, made on first use."""
+        if self._slide is None:
+            view = self.scroll.viewport()
+            labels = []
+            for _i in range(2):
+                label = QLabel(view)
+                label.setAttribute(Qt.WA_TransparentForMouseEvents)  # wheel/clicks reach the grid
+                label.hide()
+                labels.append(label)
+            animation = QVariantAnimation(self, duration=self.SLIDE_MS, startValue=0.0,
+                                          endValue=1.0)
+            animation.setEasingCurve(QEasingCurve.OutCubic)
+            animation.valueChanged.connect(self._slide_to)
+            animation.finished.connect(self._finish_slide)
+            self._slide = (animation, labels)
+        return self._slide
+
+    def go_to(self, day: date):
+        """Change day with a slide: the old day moves out as the new one moves in."""
+        if day == self.day:
+            return
+        view = self.scroll.viewport()
+        if not view.isVisible():
+            self.set_day(day)
+            return
+        animation, labels = self._slide_parts()
+        self._finish_slide()
+        self._step = 1 if day > self.day else -1
+        old = view.grab()
+        self.set_day(day)
+        self._scroll_to_focus()  # settle the new day now so the picture shows where it lands
+        new = view.grab()
+        for label, picture in zip(labels, (old, new)):
+            label.setPixmap(picture)
+            label.setGeometry(0, 0, view.width(), view.height())
+            label.show()
+            label.raise_()
+        self._slide_to(0.0)
+        animation.start()
+
+    def _slide_to(self, t):
+        _animation, labels = self._slide
+        width = self.scroll.viewport().width()
+        labels[0].move(round(-self._step * width * t), 0)
+        labels[1].move(round(self._step * width * (1 - t)), 0)
+
+    def _finish_slide(self):
+        if self._slide is None:
+            return
+        animation, labels = self._slide
+        animation.stop()
+        for label in labels:
+            label.hide()
+
     def _calendar_picked(self, qdate):
         self._calendar_menu.close()
-        self.set_day(qdate.toPython())
+        self.go_to(qdate.toPython())
 
     def _check_midnight(self):
         today = self.planner.today()

@@ -1142,3 +1142,22 @@ def test_round_checkbox_shows_done_and_unticks(app):
                         Qt.LeftButton, Qt.NoButton, Qt.NoModifier)
     assert delegate.editorEvent(click, lst.model(), option, index)
     assert item.checkState() == Qt.Unchecked
+
+
+def test_changing_day_slides_and_cleans_up(window, services, app):
+    from datetime import timedelta
+
+    from .conftest import TODAY
+
+    today = window.today
+    window.show_page(0)
+    today.set_day(TODAY)
+    today.go_to(TODAY + timedelta(days=1))
+    assert today.day == TODAY + timedelta(days=1)  # the day changes at once; the slide is cosmetic
+    animation, labels = today._slide
+    assert animation.state() == animation.State.Running
+    assert all(label.isVisible() and not label.pixmap().isNull() for label in labels)
+    today.go_to(TODAY)  # a new move while sliding finishes the old one first
+    today._finish_slide()
+    assert today.day == TODAY
+    assert not any(label.isVisible() for label in labels)
