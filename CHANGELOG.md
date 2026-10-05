@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.32.0] - 2026-10-05
+
+### Added
+- Changing the week on Week (touchpad swipe, arrows, "This week") now slides smoothly, like Today does for days.
+
 ## [0.31.0] - 2026-10-05
 
 ### Added

@@ -4,7 +4,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from PySide6.QtCore import Qt, QTimer, Signal
-from PySide6.QtWidgets import QMenu, QScrollArea
+from PySide6.QtWidgets import QMenu, QScrollArea, QVBoxLayout, QWidget
 
 from ...application.bus import Topic
 from ...application.dto import AgendaItem, ItemKind
@@ -14,7 +14,7 @@ from ..dialogs import (
     CoursesDialog, EventDialog, JobsDialog, ShiftDialog, add_menu, class_menu, new_item_menu,
     weekly_shift_menu,
 )
-from ..widgets import GridHeader, TimeGrid, TimelineZoom
+from ..widgets import GridHeader, Slider, TimeGrid, TimelineZoom
 from .common import Card, Page, agenda_block, button, icon_button, menu_button, zoom_controls
 from ..i18n import _, month_name, month_short, weekday_short
 
@@ -30,9 +30,9 @@ class WeekView(Page):
         self.days: tuple[date, ...] = ()
 
         prev_btn = icon_button("chevron-left", _("Previous week"))
-        prev_btn.clicked.connect(lambda: self.set_week(self.anchor - timedelta(days=7)))
+        prev_btn.clicked.connect(lambda: self.go_to_week(self.anchor - timedelta(days=7)))
         next_btn = icon_button("chevron-right", _("Next week"))
-        next_btn.clicked.connect(lambda: self.set_week(self.anchor + timedelta(days=7)))
+        next_btn.clicked.connect(lambda: self.go_to_week(self.anchor + timedelta(days=7)))
         self.leading.addWidget(prev_btn)
         self.leading.addWidget(next_btn)
 
@@ -42,14 +42,14 @@ class WeekView(Page):
         timetable.addAction(_("Jobs && work schedule…"),
                             lambda: JobsDialog(self.services, self).exec())
         self.this_week = button(_("This week"))
-        self.this_week.clicked.connect(lambda: self.set_week(self.planner.today()))
+        self.this_week.clicked.connect(lambda: self.go_to_week(self.planner.today()))
         add = menu_button(_("Add"), add_menu(self, self.services, self._default_day), primary=True)
         self.add_actions(menu_button(_("Timetable"), timetable, "week"), self.this_week, add)
 
         self.grid = TimeGrid()
         self.grid.blockActivated.connect(self._block_activated)
         self.grid.emptyActivated.connect(self._empty_activated)
-        self.grid.swiped.connect(lambda step: self.set_week(self.anchor + timedelta(days=7 * step)))
+        self.grid.swiped.connect(lambda step: self.go_to_week(self.anchor + timedelta(days=7 * step)))
         self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setVerticalScrollBarPolicy(Qt.ScrollBarAlwaysOn)
         self.scroll.setWidget(self.grid)
@@ -61,8 +61,14 @@ class WeekView(Page):
 
         card = Card(padding=6)
         card.body.setSpacing(0)
-        card.add(self.day_header)
-        card.add(self.scroll, 1)
+        pane = QWidget()  # what slides when the week changes: day names and timeline together
+        pane_layout = QVBoxLayout(pane)
+        pane_layout.setContentsMargins(0, 0, 0, 0)
+        pane_layout.setSpacing(0)
+        pane_layout.addWidget(self.day_header)
+        pane_layout.addWidget(self.scroll, 1)
+        self.slider = Slider(pane)
+        card.add(pane, 1)
         self.root.addWidget(card, 1)
 
         relay.changed.connect(self._changed)
@@ -71,6 +77,17 @@ class WeekView(Page):
     def _default_day(self) -> date:
         today = self.planner.today()
         return today if today in self.days else self.days[0] if self.days else today
+
+    def go_to_week(self, any_day: date):
+        """Change week with a slide: the old week moves out as the new one moves in."""
+        if any_day == self.anchor:
+            return
+
+        def change():
+            self.set_week(any_day)
+            self._scroll_to_focus()  # settle now so the picture shows where the week lands
+
+        self.slider.run(1 if any_day > self.anchor else -1, change)
 
     def set_week(self, any_day: date):
         self.anchor = any_day

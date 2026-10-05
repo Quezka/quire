@@ -1154,10 +1154,29 @@ def test_changing_day_slides_and_cleans_up(window, services, app):
     today.set_day(TODAY)
     today.go_to(TODAY + timedelta(days=1))
     assert today.day == TODAY + timedelta(days=1)  # the day changes at once; the slide is cosmetic
-    animation, labels = today._slide
+    animation, labels = today.slider.animation, today.slider.labels
     assert animation.state() == animation.State.Running
     assert all(label.isVisible() and not label.pixmap().isNull() for label in labels)
     today.go_to(TODAY)  # a new move while sliding finishes the old one first
-    today._finish_slide()
+    today.slider.finish()
     assert today.day == TODAY
+    assert not any(label.isVisible() for label in labels)
+
+
+def test_changing_week_slides_and_cleans_up(window, services, app):
+    from datetime import timedelta
+
+    from .conftest import TODAY
+
+    week = window.week
+    window.show_page(1)
+    week.set_week(TODAY)
+    week.go_to_week(TODAY + timedelta(days=7))
+    assert week.anchor == TODAY + timedelta(days=7)
+    animation, labels = week.slider.animation, week.slider.labels
+    assert animation.state() == animation.State.Running
+    assert all(label.isVisible() and not label.pixmap().isNull() for label in labels)
+    week.grid.swiped.emit(-1)  # a swipe while sliding finishes the old slide first
+    week.slider.finish()
+    assert week.anchor == TODAY
     assert not any(label.isVisible() for label in labels)

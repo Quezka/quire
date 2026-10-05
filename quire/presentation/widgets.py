@@ -6,11 +6,12 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from PySide6.QtCore import (
-    QEvent, QObject, QPoint, QPointF, QRectF, QSettings, QSize, Qt, QTime, QTimer, Signal,
+    QEasingCurve, QEvent, QObject, QPoint, QPointF, QRectF, QSettings, QSize, Qt, QTime, QTimer,
+    QVariantAnimation, Signal,
 )
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
-    QColorDialog, QLineEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate, QToolTip, QWidget,
+    QColorDialog, QLabel, QLineEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate, QToolTip, QWidget,
 )
 
 from ..application.types import COURSE_COLORS
@@ -19,6 +20,67 @@ from .i18n import _, weekday_names
 
 PALETTE = list(COURSE_COLORS)
 NO_COLOR = "#00000000"
+
+
+class Slider(QObject):
+    """Slides a widget's contents sideways when the page it shows changes (day, week).
+
+    `run(step, change)` takes a picture of `area`, calls `change()` (which must update it at
+    once), and animates old → new in direction `step` (+1: the new page comes from the right).
+    The change itself is immediate; the slide is cosmetic.
+    """
+
+    MS = 240
+
+    def __init__(self, area: QWidget):
+        super().__init__(area)
+        self.area = area
+        self.step = 1
+        self.labels: list[QLabel] = []
+        self.animation: QVariantAnimation | None = None
+
+    def _parts(self):
+        if self.animation is None:
+            for _i in range(2):
+                label = QLabel(self.area)
+                label.setAttribute(Qt.WA_TransparentForMouseEvents)  # wheel/clicks reach the grid
+                label.hide()
+                self.labels.append(label)
+            self.animation = QVariantAnimation(self, duration=self.MS, startValue=0.0, endValue=1.0)
+            self.animation.setEasingCurve(QEasingCurve.OutCubic)
+            self.animation.valueChanged.connect(self._to)
+            self.animation.finished.connect(self.finish)
+        return self.animation, self.labels
+
+    def run(self, step: int, change):
+        if not self.area.isVisible():
+            change()
+            return
+        animation, labels = self._parts()
+        self.finish()
+        self.step = step
+        old = self.area.grab()
+        change()
+        new = self.area.grab()
+        for label, picture in zip(labels, (old, new)):
+            label.setPixmap(picture)
+            label.setGeometry(0, 0, self.area.width(), self.area.height())
+            label.show()
+            label.raise_()
+        self._to(0.0)
+        animation.start()
+
+    def _to(self, t):
+        width = self.area.width()
+        self.labels[0].move(round(-self.step * width * t), 0)
+        self.labels[1].move(round(self.step * width * (1 - t)), 0)
+
+    def finish(self):
+        if self.animation is None:
+            return
+        self.animation.stop()
+        for label in self.labels:
+            label.hide()
 
 
 def qtime_to_min(t: QTime) -> int:

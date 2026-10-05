@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import date, datetime, timedelta
 
-from PySide6.QtCore import QEasingCurve, Qt, QTimer, QVariantAnimation, Signal
+from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCalendarWidget, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
@@ -23,7 +23,7 @@ from ..dialogs import (
 )
 from ..formatting import KIND_LABELS, long_date, plural, relative_date, was_due
 from ..task_view import TaskView
-from ..widgets import TimeGrid, TimelineZoom, TwoLineDelegate
+from ..widgets import Slider, TimeGrid, TimelineZoom, TwoLineDelegate
 from .common import (
     Card, Page, agenda_block, badge, button, icon_button, menu_button, zoom_controls,
 )
@@ -38,8 +38,6 @@ class TodayView(Page):
         self.services = services
         self.planner = services.planner
         self.day = self.planner.today()
-        self._slide = None  # (animation, [old picture, new picture]) once first used
-        self._step = 1
 
         # ---- header ----
         prev_btn = icon_button("chevron-left", _("Previous day"))
@@ -73,6 +71,7 @@ class TodayView(Page):
         self.scroll = QScrollArea(widgetResizable=True)
         self.scroll.setWidget(self.grid)
         self.zoom = TimelineZoom(self.grid, self.scroll, "today", self)
+        self.slider = Slider(self.scroll.viewport())
         self.header.insertWidget(self.header.count() - 3, zoom_controls(self, self.zoom))
         timeline = Card(padding=6)
         timeline.add(self.scroll, 1)
@@ -137,62 +136,16 @@ class TodayView(Page):
         self._journal_day = day
         QTimer.singleShot(0, self._scroll_to_focus)
 
-    SLIDE_MS = 240
-
-    def _slide_parts(self):
-        """The two pictures and the animation behind a day change, made on first use."""
-        if self._slide is None:
-            view = self.scroll.viewport()
-            labels = []
-            for _i in range(2):
-                label = QLabel(view)
-                label.setAttribute(Qt.WA_TransparentForMouseEvents)  # wheel/clicks reach the grid
-                label.hide()
-                labels.append(label)
-            animation = QVariantAnimation(self, duration=self.SLIDE_MS, startValue=0.0,
-                                          endValue=1.0)
-            animation.setEasingCurve(QEasingCurve.OutCubic)
-            animation.valueChanged.connect(self._slide_to)
-            animation.finished.connect(self._finish_slide)
-            self._slide = (animation, labels)
-        return self._slide
-
     def go_to(self, day: date):
         """Change day with a slide: the old day moves out as the new one moves in."""
         if day == self.day:
             return
-        view = self.scroll.viewport()
-        if not view.isVisible():
+
+        def change():
             self.set_day(day)
-            return
-        animation, labels = self._slide_parts()
-        self._finish_slide()
-        self._step = 1 if day > self.day else -1
-        old = view.grab()
-        self.set_day(day)
-        self._scroll_to_focus()  # settle the new day now so the picture shows where it lands
-        new = view.grab()
-        for label, picture in zip(labels, (old, new)):
-            label.setPixmap(picture)
-            label.setGeometry(0, 0, view.width(), view.height())
-            label.show()
-            label.raise_()
-        self._slide_to(0.0)
-        animation.start()
+            self._scroll_to_focus()  # settle the new day now so the picture shows where it lands
 
-    def _slide_to(self, t):
-        _animation, labels = self._slide
-        width = self.scroll.viewport().width()
-        labels[0].move(round(-self._step * width * t), 0)
-        labels[1].move(round(self._step * width * (1 - t)), 0)
-
-    def _finish_slide(self):
-        if self._slide is None:
-            return
-        animation, labels = self._slide
-        animation.stop()
-        for label in labels:
-            label.hide()
+        self.slider.run(1 if day > self.day else -1, change)
 
     def _calendar_picked(self, qdate):
         self._calendar_menu.close()
