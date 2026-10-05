@@ -83,7 +83,7 @@ you own.
   desktop notification when something new appears. Ticking off an imported task sticks
   across syncs. If a teacher deletes an assignment, Quire removes it too, unless you had
   already finished it.
-- **Languages**: English and Русский (Russian). Change it in **More → Settings → Language**.
+- **Languages**: English, Italiano (Italian) and Русский (Russian). Change it in **More → Settings → Language**.
 - A modern sidebar layout with light and dark themes. It follows your system by default; change
   it in **More → Settings**, which also sets your currency and backs up your data.
 
@@ -342,8 +342,8 @@ On-screen text goes through `quire/presentation/i18n.py`:
 - Use `plural(n, "lesson")` for counts, and the name helpers (`weekday_name`, `month_of`, …)
   for dates; never use `strftime("%A")`.
 
-Russian lives in `quire/presentation/locales/ru.py`. `tests/test_i18n.py` fails when a string,
-error message or plural word has no Russian translation, or when a translation's placeholders
+Russian and Italian live in `quire/presentation/locales/ru.py` and `it.py`. `tests/test_i18n.py` fails when a string,
+error message or plural word has no translation in either, or when a translation's placeholders
 differ from the English.
 
 ## Adding a feature

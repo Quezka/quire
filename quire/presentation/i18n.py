@@ -6,7 +6,7 @@ placeholders: `_("Delete “{title}”?").format(title=...)`.
 
 The language is picked once at start-up (changing it asks for a restart).
 Catalogues live in `locales/<code>.py`; tests check every `_()` string has a
-Russian translation.
+Russian and an Italian translation.
 """
 from __future__ import annotations
 
@@ -16,8 +16,9 @@ from datetime import date
 from PySide6.QtCore import QLibraryInfo, QLocale, QSettings, QTranslator
 
 # (code, name in its own language). "" follows the system.
-LANGUAGES = [("", "System"), ("en", "English"), ("ru", "Русский")]
-SUPPORTED = {"en", "ru"}
+LANGUAGES = [("", "System"), ("en", "English"), ("it", "Italiano"), ("ru", "Русский")]
+SUPPORTED = {"en", "it", "ru"}
+_QT_LOCALES = {"en": QLocale.English, "it": QLocale.Italian, "ru": QLocale.Russian}
 
 _language = "en"
 _messages: dict[str, str] = {}
@@ -36,7 +37,7 @@ EN_NAMES = {
 
 
 def chosen_language() -> str:
-    """The Settings choice: "", "en" or "ru"."""
+    """The Settings choice: "", "en", "it" or "ru"."""
     return str(QSettings().value("language", ""))
 
 
@@ -45,10 +46,11 @@ def set_chosen_language(code: str):
 
 
 def resolve(code: str) -> str:
-    """What "" (system) means here: Russian systems get Russian, the rest English."""
+    """What "" (system) means here: Italian and Russian systems get their language, the rest English."""
     if code in SUPPORTED:
         return code
-    return "ru" if QLocale.system().language() == QLocale.Russian else "en"
+    system = QLocale.system().language()
+    return next((c for c, qt in _QT_LOCALES.items() if qt == system), "en")
 
 
 def install(code: str | None = None, app=None) -> str:
@@ -70,7 +72,7 @@ def install(code: str | None = None, app=None) -> str:
             if translator.load(f"qtbase_{_language}", folder):
                 app.installTranslator(translator)
                 _qt_translators.append(translator)
-        QLocale.setDefault(QLocale(QLocale.Russian if _language == "ru" else QLocale.English))
+        QLocale.setDefault(QLocale(_QT_LOCALES[_language]))
     return _language
 
 
@@ -121,10 +123,15 @@ def plural_form(n: int) -> int:
     return 2
 
 
+def _form(n: int) -> int:
+    """Which plural form the active language uses: Italian has two, Russian three."""
+    return (0 if n == 1 else 1) if _language == "it" else plural_form(n)
+
+
 def plural(n: int, word: str, suffix: str = "s") -> str:
     """"3 classes" / "3 урока". `word` is the English singular (the catalogue key)."""
     if _language != "en" and word in _plurals:
-        return f"{n} {_plurals[word][plural_form(n)]}"
+        return f"{n} {_plurals[word][_form(n)]}"
     return f"{n} {word}{'' if n == 1 else suffix}"
 
 

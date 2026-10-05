@@ -1,0 +1,106 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="nav_today">Oggi</string>
+    <string name="nav_tasks">Attività</string>
+    <string name="nav_notes">Note</string>
+    <string name="nav_settings">Impostazioni</string>
+
+    <string name="today">Oggi</string>
+    <string name="tomorrow">Domani</string>
+    <string name="yesterday">Ieri</string>
+    <string name="previous_day">Giorno precedente</string>
+    <string name="next_day">Giorno successivo</string>
+    <string name="back_to_today">Torna a oggi</string>
+    <string name="schedule">Programma</string>
+    <string name="nothing_scheduled">Niente in programma.</string>
+    <string name="to_do">Da fare</string>
+    <string name="nothing_due">Niente in scadenza.</string>
+    <string name="quick_add_hint">Aggiungi un’attività per questo giorno</string>
+    <string name="add">Aggiungi</string>
+    <string name="day_note">Nota del giorno</string>
+    <string name="day_note_hint">Qualcosa da ricordare di questo giorno…</string>
+    <string name="kind_class">Lezione</string>
+    <string name="kind_event">Evento</string>
+    <string name="kind_shift">Turno di lavoro</string>
+    <string name="continues_from_yesterday">continua da ieri</string>
+    <string name="was_due">scadeva %1$s</string>
+
+    <string name="show_completed">Mostra completate</string>
+    <string name="bucket_overdue">In ritardo</string>
+    <string name="bucket_today">Oggi</string>
+    <string name="bucket_upcoming">Prossimi 7 giorni</string>
+    <string name="bucket_later">Più avanti</string>
+    <string name="bucket_undated">Senza data</string>
+    <string name="bucket_done">Completate</string>
+    <string name="no_tasks">Niente da fare. Aggiungi un’attività con +.</string>
+    <string name="new_task">Nuova attività</string>
+    <string name="edit_task">Modifica attività</string>
+    <string name="task_title_hint">Cosa c’è da fare?</string>
+    <string name="kind_task">Attività</string>
+    <string name="kind_homework">Compiti</string>
+    <string name="kind_assignment">Consegna</string>
+    <string name="kind_exam">Verifica</string>
+    <string name="kind_reading">Lettura</string>
+    <string name="course">Materia</string>
+    <string name="no_course">Nessuna materia</string>
+    <string name="no_due_date">Nessuna scadenza</string>
+    <string name="due_on">Scadenza: %1$s</string>
+    <string name="details">Dettagli</string>
+    <string name="completed">Completata</string>
+    <string name="from_register">Da Classeviva: la prossima sincronizzazione sul computer potrebbe aggiornarla.</string>
+    <string name="save">Salva</string>
+    <string name="delete">Elimina</string>
+    <string name="cancel">Annulla</string>
+    <string name="clear">Cancella</string>
+    <string name="ok">OK</string>
+
+    <string name="search_notes">Cerca nelle note</string>
+    <string name="no_notes">Ancora nessuna nota. Creane una con +.</string>
+    <string name="new_note">Nuova nota</string>
+    <string name="note_hint">Inizia a scrivere… La prima riga è il titolo. Scrivi # per un titolo, - per un elenco, [ ] per una lista di controllo.</string>
+    <string name="topic">Argomento</string>
+    <string name="pin">Fissa</string>
+    <string name="unpin">Sblocca</string>
+    <string name="delete_note_question">Eliminare questa nota?</string>
+    <string name="back">Indietro</string>
+    <string name="pinned">Fissate</string>
+
+    <string name="sync">Sincronizzazione</string>
+    <string name="sync_off">La sincronizzazione mantiene uguali sul telefono e sui computer orario, attività, note e note del giorno.</string>
+    <string name="sync_help">Usa lo stesso progetto Firebase e lo stesso account del computer (Quire → Impostazioni → Sincronizzazione).</string>
+    <string name="project_id">ID del progetto</string>
+    <string name="api_key">Chiave API Web</string>
+    <string name="email">Email</string>
+    <string name="password">Password</string>
+    <string name="new_account">Nuovo account</string>
+    <string name="existing_account">Ce l’ho già</string>
+    <string name="take_cloud_copy">Sostituisci i dati di questo telefono con la copia nel cloud</string>
+    <string name="connect">Collega</string>
+    <string name="connecting">Collegamento in corso…</string>
+    <string name="signed_in_as">Accesso effettuato come %1$s</string>
+    <string name="last_synced">Ultima sincronizzazione: %1$s</string>
+    <string name="never_synced">Non ancora sincronizzato</string>
+    <plurals name="changes_waiting">
+        <item quantity="one">%d modifica in attesa</item>
+        <item quantity="other">%d modifiche in attesa</item>
+    </plurals>
+    <string name="sync_now">Sincronizza ora</string>
+    <string name="syncing">Sincronizzazione in corso…</string>
+    <string name="sign_out">Esci</string>
+    <string name="sign_out_question">Interrompere la sincronizzazione di questo telefono? I dati restano qui e la copia nel cloud non viene eliminata.</string>
+    <string name="about">Informazioni</string>
+    <string name="version">Quire %1$s per Android</string>
+    <string name="licence">Software libero sotto la GNU General Public License, versione 3 o successiva.</string>
+    <string name="source_code">Codice sorgente su GitHub</string>
+
+    <string name="err_offline">Impossibile contattare il server di sincronizzazione. Controlla la connessione a Internet.</string>
+    <string name="err_wrong_login">Email o password errata.</string>
+    <string name="err_expired">L’accesso è scaduto: configura di nuovo la sincronizzazione.</string>
+    <string name="err_exists">Esiste già un account con questa email: accedi invece.</string>
+    <string name="err_weak_password">Scegli una password di almeno 6 caratteri.</string>
+    <string name="err_project">Copia l’ID del progetto dalla console di Firebase, ad es. quire-sync-1a2b3.</string>
+    <string name="err_api_key">Copia la chiave API Web dalla console di Firebase.</string>
+    <string name="err_email">Scrivi l’indirizzo email del tuo account di sincronizzazione.</string>
+    <string name="err_password">Scrivi una password.</string>
+    <string name="err_access">Firestore ha negato l’accesso. Controlla che il database esista e che le regole di sicurezza siano pubblicate.</string>
+</resources>

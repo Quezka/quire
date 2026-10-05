@@ -1,4 +1,4 @@
-"""Every on-screen text needs a Russian translation, with the same placeholders."""
+"""Every on-screen text needs a Russian and an Italian translation, with the same placeholders."""
 import ast
 import re
 import string
@@ -61,26 +61,30 @@ def placeholders(text: str) -> set[str]:
     return {name for _, name, _, _ in string.Formatter().parse(text) if name}
 
 
-@pytest.fixture(scope="module")
-def ru():
-    from quire.presentation.locales import ru
-    return ru
+FORMS = {"ru": 3, "it": 2}
+
+
+@pytest.fixture(scope="module", params=sorted(FORMS))
+def ru(request):
+    """The catalogue under test (named ru for history): Russian, then Italian."""
+    import importlib
+    return importlib.import_module(f"quire.presentation.locales.{request.param}")
 
 
 def test_every_ui_string_is_translated(ru):
     missing = sorted(ui_strings() - ru.MESSAGES.keys())
-    assert not missing, "Missing Russian for:\n" + "\n".join(missing)
+    assert not missing, "Missing translation for:\n" + "\n".join(missing)
 
 
 def test_every_core_message_is_translated(ru):
     missing = sorted(core_messages() - ru.MESSAGES.keys())
-    assert not missing, "Missing Russian for:\n" + "\n".join(missing)
+    assert not missing, "Missing translation for:\n" + "\n".join(missing)
 
 
-def test_every_plural_word_has_three_forms(ru):
+def test_every_plural_word_has_its_forms(ru):
     missing = sorted(plural_words() - ru.PLURALS.keys())
-    assert not missing, "Missing Russian plural forms for: " + ", ".join(missing)
-    assert all(len(forms) == 3 for forms in ru.PLURALS.values())
+    assert not missing, "Missing plural forms for: " + ", ".join(missing)
+    assert all(len(forms) == FORMS[ru.__name__[-2:]] for forms in ru.PLURALS.values())
 
 
 def test_translations_keep_their_placeholders(ru):
@@ -112,3 +116,12 @@ def test_nothing_in_the_ui_assigns_to_underscore():
             if isinstance(node, ast.arg) and node.arg == "_":
                 offenders.append(f"{path.name}:{node.lineno}")
     assert not offenders, "Don't use _ as a variable: " + ", ".join(offenders)
+
+
+def test_italian_plural_rule():
+    from quire.presentation import i18n
+    i18n.install("it")
+    try:
+        assert [i18n._form(n) for n in (0, 1, 2, 5, 21)] == [1, 0, 1, 1, 1]
+    finally:
+        i18n.install("en")

@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.31.0] - 2026-10-05
+
+### Added
+- **Italian translation** of the whole desktop app and of the Android app, with the Language setting (More → Settings). Systems set to Italian now start in Italian by default.
+
 ## [0.30.0] - 2026-10-03
 
 ### Added
