@@ -28,6 +28,7 @@ def create_application(argv: list[str]) -> QApplication:
 
 def run(services: Services, argv: list[str], background: bool = False) -> int:
     from .background import SingleInstance, Tray, instance_name
+    from . import notify
     from .main_window import MainWindow
 
     app = create_application(argv)
@@ -39,6 +40,7 @@ def run(services: Services, argv: list[str], background: bool = False) -> int:
     tray = Tray(app) if Tray.available() else None
     window = MainWindow(services, tray)
     single.activated.connect(window.bring_back)
+    notify.on_click(window.bring_back)  # clicking a notification opens Quire
     if tray is not None:
         tray.show()
         # Closing the window keeps Quire in the tray; quitting is explicit.

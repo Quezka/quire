@@ -9,8 +9,11 @@ from __future__ import annotations
 import shutil
 import subprocess
 import sys
+import threading
+from collections.abc import Callable
 from pathlib import Path
 
+from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
@@ -26,13 +29,26 @@ _tray: QSystemTrayIcon | None = None
 _server_plays_sounds: bool | None = None
 
 
+class _Clicks(QObject):
+    """Relays a click on a notification to the GUI thread (notify-send is waited on off it)."""
+    clicked = Signal()
+
+
+_clicks = _Clicks()
+
+
+def on_click(handler: Callable[[], None]) -> None:
+    """Call `handler` (bring the window back) whenever a notification is clicked."""
+    _clicks.clicked.connect(handler)
+
+
 def notify(title: str, body: str) -> None:
     sound = preferences().notification_sound()
     if sys.platform.startswith("linux") and shutil.which("notify-send"):
         try:
-            subprocess.Popen(["notify-send", "--app-name=Quire", f"--icon={APP_ID}",
-                              *sound_hints(sound, server_plays_sounds()), title, body],
-                             stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            command = ["notify-send", "--app-name=Quire", f"--icon={APP_ID}",
+                       *sound_hints(sound, server_plays_sounds()), title, body]
+            threading.Thread(target=_send_and_wait, args=(command,), daemon=True).start()
             if sound and not server_plays_sounds():
                 play_chime()
             return
@@ -44,10 +60,27 @@ def notify(title: str, body: str) -> None:
     if _tray is None:
         _tray = QSystemTrayIcon(QIcon(str(APP_ICON)), QApplication.instance())
         _tray.setToolTip(_("Quire"))
+        _tray.messageClicked.connect(_clicks.clicked)
         _tray.show()
     _tray.showMessage(title, body, QIcon(str(APP_ICON)), 8000)
     if sound:
         play_chime()
+
+
+def _send_and_wait(command: list[str]) -> None:
+    """Show the notification with a default (click) action and wait for the answer.
+
+    notify-send older than 0.8 has no --action; it then fails, so show it plainly instead.
+    """
+    try:
+        run = subprocess.run([command[0], "--action=default=Open", "--wait", *command[1:]],
+                             capture_output=True, text=True)
+        if run.returncode != 0:
+            subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        elif run.stdout.strip() == "default":
+            _clicks.clicked.emit()
+    except OSError:
+        pass
 
 
 def sound_hints(sound: bool, server_plays: bool, chime: Path = CHIME) -> list[str]:

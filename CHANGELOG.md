@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.32.1] - 2026-10-08
+
+### Fixed
+- Clicking a desktop notification now opens Quire instead of just dismissing it.
+
 ## [0.32.0] - 2026-10-05
 
 ### Added
