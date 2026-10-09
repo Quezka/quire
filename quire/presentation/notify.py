@@ -14,6 +14,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
+from shiboken6 import isValid
 from PySide6.QtGui import QIcon
 from PySide6.QtWidgets import QApplication, QSystemTrayIcon
 
@@ -34,12 +35,21 @@ class _Clicks(QObject):
     clicked = Signal()
 
 
-_clicks = _Clicks()
+_clicks: _Clicks | None = None
+
+
+def _relay() -> _Clicks:
+    """The click relay, made on first use (GUI thread) and owned by the application, so Qt
+    never deletes it from under a signal that still points at it."""
+    global _clicks
+    if _clicks is None or not isValid(_clicks):
+        _clicks = _Clicks(QApplication.instance())
+    return _clicks
 
 
 def on_click(handler: Callable[[], None]) -> None:
     """Call `handler` (bring the window back) whenever a notification is clicked."""
-    _clicks.clicked.connect(handler)
+    _relay().clicked.connect(handler)
 
 
 def notify(title: str, body: str) -> None:
@@ -48,7 +58,7 @@ def notify(title: str, body: str) -> None:
         try:
             command = ["notify-send", "--app-name=Quire", f"--icon={APP_ID}",
                        *sound_hints(sound, server_plays_sounds()), title, body]
-            threading.Thread(target=_send_and_wait, args=(command,), daemon=True).start()
+            threading.Thread(target=_send_and_wait, args=(command, _relay()), daemon=True).start()
             if sound and not server_plays_sounds():
                 play_chime()
             return
@@ -60,14 +70,14 @@ def notify(title: str, body: str) -> None:
     if _tray is None:
         _tray = QSystemTrayIcon(QIcon(str(APP_ICON)), QApplication.instance())
         _tray.setToolTip(_("Quire"))
-        _tray.messageClicked.connect(_clicks.clicked)
+        _tray.messageClicked.connect(lambda: _relay().clicked.emit())
         _tray.show()
     _tray.showMessage(title, body, QIcon(str(APP_ICON)), 8000)
     if sound:
         play_chime()
 
 
-def _send_and_wait(command: list[str]) -> None:
+def _send_and_wait(command: list[str], relay: _Clicks) -> None:
     """Show the notification with a default (click) action and wait for the answer.
 
     notify-send older than 0.8 has no --action; it then fails, so show it plainly instead.
@@ -78,7 +88,7 @@ def _send_and_wait(command: list[str]) -> None:
         if run.returncode != 0:
             subprocess.run(command, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         elif run.stdout.strip() == "default":
-            _clicks.clicked.emit()
+            relay.clicked.emit()
     except OSError:
         pass
 

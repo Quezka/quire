@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.32.2] - 2026-10-09
+
+### Fixed
+- On Windows, Quire could crash with "RuntimeError: Signal source has been deleted" when a notification appeared.
+
 ## [0.32.1] - 2026-10-08
 
 ### Fixed

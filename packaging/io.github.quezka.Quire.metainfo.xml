@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.32.2" date="2026-10-09">
+      <description>
+        <p>Fixed a crash on Windows ("Signal source has been deleted") when a notification appeared.</p>
+      </description>
+    </release>
     <release version="0.32.1" date="2026-10-08">
       <description>
         <p>Clicking a desktop notification now opens Quire instead of just dismissing it.</p>
