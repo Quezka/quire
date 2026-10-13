@@ -49,6 +49,7 @@ fun syncMessage(context: Context, message: String?): String {
         "already an account" to R.string.err_exists,
         "at least 6 characters" to R.string.err_weak_password,
         "project ID" to R.string.err_project,
+        "address of your Quire server" to R.string.err_server_address,
         "Web API key" to R.string.err_api_key,
         "email address" to R.string.err_email,
         "Type a password" to R.string.err_password,

@@ -18,6 +18,7 @@ data class DeviceLink(
     val refreshToken: String,
     val registerUser: String? = null,
     val registerPassword: String? = null,
+    val backend: String = Backends.FIREBASE, // for SERVER, projectId is the server's address
 ) {
     companion object {
         const val PREFIX = "quire-link:"
@@ -27,9 +28,17 @@ data class DeviceLink(
             val json = String(Base64.getUrlDecoder().decode(body.trimEnd('=')))
             val o = Json.parseToJsonElement(json).jsonObject
             fun s(k: String) = (o[k] as? JsonPrimitive)?.takeIf { it.isString }?.content
-            if ((o["v"] as? JsonPrimitive)?.content != "1") return null
-            DeviceLink(s("project")!!, s("api_key")!!, s("email").orEmpty(), s("refresh")!!,
-                s("cv_user"), s("cv_pass"))
+            when ((o["v"] as? JsonPrimitive)?.content) {
+                // Version 1: a Firebase project. Version 2: a Quire server's address.
+                "1" -> DeviceLink(s("project")!!, s("api_key")!!, s("email").orEmpty(), s("refresh")!!,
+                    s("cv_user"), s("cv_pass"))
+                "2" -> {
+                    if (s("backend") != Backends.SERVER) return null
+                    DeviceLink(s("url")!!, "", s("email").orEmpty(), s("refresh")!!,
+                        s("cv_user"), s("cv_pass"), Backends.SERVER)
+                }
+                else -> return null
+            }
         }.getOrNull()
     }
 }

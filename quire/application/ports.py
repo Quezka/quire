@@ -338,11 +338,23 @@ class SyncStore(Protocol):
         """Delete every synced record here without sending deletions (to take the cloud's copy)."""
         ...
 
+    def mark_all_dirty(self) -> None:
+        """Send everything again at the next sync (e.g. after moving to another backend). Safe:
+        the receiving side keeps the newest version of each record."""
+        ...
+
+
+FIREBASE, SERVER = "firebase", "server"
+
 
 @dataclass(frozen=True)
 class CloudConfig:
+    """Where to sync. For Firebase, `project_id` and `api_key` are the project's; for a Quire
+    server, `project_id` is the server's address and `api_key` is unused."""
+
     project_id: str
     api_key: str
+    backend: str = FIREBASE
 
 
 @dataclass(frozen=True)
@@ -356,7 +368,11 @@ class CloudSession:
 class CloudBackend(Protocol):
     """A cloud database with accounts (e.g. Firebase). Network only: safe on a worker thread."""
 
-    def sign_up(self, config: CloudConfig, email: str, password: str) -> CloudSession: ...
+    def sign_up(self, config: CloudConfig, email: str, password: str,
+                invite: str = "") -> CloudSession:
+        """`invite` is the code a Quire server may ask for; Firebase ignores it."""
+        ...
+
     def sign_in(self, config: CloudConfig, email: str, password: str) -> CloudSession: ...
     def refresh(self, config: CloudConfig, refresh_token: str) -> CloudSession: ...
 

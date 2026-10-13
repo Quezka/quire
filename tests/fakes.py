@@ -112,7 +112,7 @@ class FakeCloud:
     def _session(self, email):
         return self._Session(f"user-{email}", email, f"token-{email}", f"refresh-{email}")
 
-    def sign_up(self, config, email, password):
+    def sign_up(self, config, email, password, invite=""):
         from quire.application.errors import CloudAuthError
         self._check()
         if email in self.accounts:

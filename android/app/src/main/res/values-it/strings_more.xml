@@ -266,4 +266,11 @@
     <string name="payslip_tfr">TFR %1$s</string>
     <string name="pay_per_month">%1$s × %2$d all’anno</string>
     <string name="close">Chiudi</string>
+    <string name="quire_server">Server Quire</string>
+    <string name="firebase">Firebase</string>
+    <string name="server_help">Usa il tuo server Quire e lo stesso account del computer (Quire → Impostazioni → Sincronizzazione).</string>
+    <string name="server_address">Indirizzo del server</string>
+    <string name="invite_code">Codice d’invito</string>
+    <string name="invite_hint">Solo se il server lo richiede</string>
+    <string name="err_server_address">Scrivi l’indirizzo del tuo server Quire, ad es. https://sync.example.com.</string>
 </resources>

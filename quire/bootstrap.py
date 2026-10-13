@@ -17,7 +17,7 @@ from .application.services import (
 from .infrastructure.classeviva import ClassevivaRegister
 from .infrastructure.clock import SystemClock
 from .infrastructure.credentials import KeyringCredentialStore
-from .infrastructure.firebase import FirebaseCloud
+from .infrastructure.cloud import RoutingCloud
 from .infrastructure.ligature import LigatureApp
 from .infrastructure.login_item import platform_login_item
 from .infrastructure.repositories import (
@@ -69,7 +69,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         work=WorkService(jobs, shifts, clock, bus),
         focus=FocusService(SqliteFocusLogRepository(db), settings, tasks, courses, clock, bus),
         reminders=ReminderService(planner, settings, clock),
-        sync=SyncService(SqliteSyncStore(db), cloud or FirebaseCloud(),
+        sync=SyncService(SqliteSyncStore(db), cloud or RoutingCloud(),
                          sync_secrets or KeyringCredentialStore("sync"), settings, clock, bus),
         updates=UpdateService(
             releases or GitHubReleaseFeed(HOMEPAGE.removeprefix("https://github.com/"),

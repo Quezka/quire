@@ -415,3 +415,143 @@ def test_monthly_pay_settings_sync_between_devices(pair):
     assert (job.pay_mode, job.monthly_pay, job.mensilities) == ("monthly", 446.23, 13)
     assert (job.contract_start, job.contract_end) == (date(2026, 9, 1), date(2027, 2, 26))
     assert (job.tax_model, job.inps, job.addizionali, job.cuneo) == ("italy", 9.19, 1.5, True)
+
+
+# ---- a Quire server instead of Firebase ----------------------------------------------
+
+SERVER_URL = "https://sync.example.com"
+
+
+def connect_server(services, create=False, take_cloud_copy=False, invite=""):
+    config = services.sync.check_server(SERVER_URL, EMAIL, PASSWORD)
+    session = services.sync.authenticate(config, EMAIL, PASSWORD, create, invite)
+    services.sync.connect(config, session, take_cloud_copy)
+
+
+def test_server_setup_checks_its_inputs(services):
+    for bad in ("", "   ", "ftp://sync.example.com", "sync example com", "https://"):
+        with pytest.raises(ValidationError, match="Quire server"):
+            services.sync.check_server(bad, EMAIL, PASSWORD)
+    with pytest.raises(ValidationError):
+        services.sync.check_server(SERVER_URL, "not-an-email", PASSWORD)
+    with pytest.raises(ValidationError):
+        services.sync.check_server(SERVER_URL, EMAIL, "")
+    tidy = services.sync.check_server("  sync.example.com/ ", EMAIL, "x")
+    assert (tidy.project_id, tidy.api_key, tidy.backend) == (SERVER_URL, "", "server")
+    local = services.sync.check_server("http://192.168.1.106:8080/", EMAIL, "x")
+    assert local.project_id == "http://192.168.1.106:8080"
+
+
+def test_two_devices_sync_through_a_server_account(tmp_path, shared_cloud):
+    a, db_a = device(tmp_path, shared_cloud, "laptop")
+    b, db_b = device(tmp_path, shared_cloud, "desktop")
+    try:
+        connect_server(a, create=True, invite="open-sesame")
+        connect_server(b)
+        status = a.sync.status()
+        assert status.set_up and status.backend == "server" and status.project_id == SERVER_URL
+        a.notes.create("# From the server")
+        a.sync.sync()
+        b.sync.sync()
+        assert [n.title for n in b.notes.search()] == ["From the server"]
+    finally:
+        db_a.close()
+        db_b.close()
+
+
+def test_the_invite_code_reaches_the_cloud_only_when_creating(services, cloud, monkeypatch):
+    seen = []
+    original = cloud.sign_up
+    monkeypatch.setattr(cloud, "sign_up", lambda *args: seen.append(args) or original(*args))
+    config = services.sync.check_server(SERVER_URL, EMAIL, PASSWORD)
+    services.sync.authenticate(config, EMAIL, PASSWORD, True, "  code  ")
+    assert seen[0][3] == "code"
+
+
+def test_moving_from_firebase_to_a_server_sends_everything_again(tmp_path, shared_cloud):
+    a, db_a = device(tmp_path, shared_cloud, "laptop")
+    try:
+        a.notes.create("# One")
+        a.notes.create("# Two")
+        connect(a, create=True)
+        a.sync.sync()
+        assert a.sync.status().pending == 0 and a.sync.status().backend == "firebase"
+        connect_server(a)  # the server starts empty (the fake keeps one account list)
+        status = a.sync.status()
+        assert status.backend == "server" and status.pending == 2
+        shared_cloud.docs.clear()  # (what the new server lacks)
+        a.sync.sync()
+        assert a.sync.status().pending == 0 and len(shared_cloud.docs) == 2
+    finally:
+        db_a.close()
+
+
+def test_signing_in_again_to_the_same_place_does_not_resend_everything(tmp_path, shared_cloud):
+    a, db_a = device(tmp_path, shared_cloud, "laptop")
+    try:
+        a.notes.create("# One")
+        connect_server(a, create=True)
+        a.sync.sync()
+        connect_server(a)  # e.g. after the sign-in expired
+        assert a.sync.status().pending == 0
+    finally:
+        db_a.close()
+
+
+def test_taking_the_cloud_copy_still_clears_instead_of_resending(tmp_path, shared_cloud):
+    a, db_a = device(tmp_path, shared_cloud, "laptop")
+    try:
+        a.notes.create("# Typed twice")
+        connect_server(a, create=True)
+        connect_server(a, take_cloud_copy=True)
+        assert a.sync.status().pending == 0 and a.notes.search() == []
+    finally:
+        db_a.close()
+
+
+def test_the_phone_code_for_a_server_carries_its_address(tmp_path, shared_cloud):
+    import base64
+    import json
+
+    services, db = device(tmp_path, shared_cloud, "a")
+    connect_server(services, create=True)
+    body = services.sync.phone_link().removeprefix("quire-link:")
+    data = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
+    assert data["v"] == "2" and data["backend"] == "server"
+    assert data["url"] == SERVER_URL and data["refresh"] and data["email"] == EMAIL
+    assert "api_key" not in data and "project" not in data
+    db.close()
+
+
+def test_disconnecting_forgets_the_server(tmp_path, shared_cloud):
+    services, db = device(tmp_path, shared_cloud, "a")
+    connect_server(services, create=True)
+    services.sync.disconnect()
+    status = services.sync.status()
+    assert not status.set_up and status.backend == "firebase" and status.project_id == ""
+    db.close()
+
+
+def test_the_router_sends_each_call_to_its_backend():
+    from quire.application.ports import CloudConfig, CloudSession
+    from quire.infrastructure.cloud import RoutingCloud
+
+    class Spy:
+        def __init__(self, name):
+            self.name, self.calls = name, []
+
+        def __getattr__(self, method):
+            def call(*args):
+                self.calls.append((method, args))
+                return CloudSession("u", "e", "t", "r")
+            return call
+
+    firebase, server = Spy("firebase"), Spy("server")
+    cloud = RoutingCloud(firebase, server)
+    old, new = CloudConfig("proj", "key"), CloudConfig(SERVER_URL, "", "server")
+    cloud.sign_in(old, "a@b.c", "pw")
+    cloud.sign_up(new, "a@b.c", "pw", "code")
+    cloud.refresh(new, "r")
+    assert [c[0] for c in firebase.calls] == ["sign_in"]
+    assert [c[0] for c in server.calls] == ["sign_up", "refresh"]
+    assert server.calls[0][1] == (new, "a@b.c", "pw", "code")

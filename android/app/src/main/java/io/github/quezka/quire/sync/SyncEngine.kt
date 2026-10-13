@@ -25,6 +25,7 @@ data class SyncStatus(
     val lastSync: Instant?,
     val pending: Int,
     val problem: String,
+    val backend: String = Backends.FIREBASE, // projectId is the server's address when SERVER
 )
 
 data class SyncResult(val received: Int, val sent: Int)
@@ -45,13 +46,16 @@ class SyncEngine(
     fun config(): CloudConfig? {
         val project = get("project")
         val key = get("api_key")
+        if (get("backend") == Backends.SERVER) {
+            return if (project.isNotEmpty()) CloudConfig(project, "", Backends.SERVER) else null
+        }
         return if (project.isNotEmpty() && key.isNotEmpty()) CloudConfig(project, key) else null
     }
 
     fun status() = SyncStatus(
         config() != null && get("refresh").isNotEmpty(), get("email"), get("project"),
         get("last_sync").takeIf { it.isNotEmpty() }?.let(Instant::parse),
-        records.pending(), get("problem"),
+        records.pending(), get("problem"), get("backend").ifEmpty { Backends.FIREBASE },
     )
 
     companion object {
@@ -68,15 +72,40 @@ class SyncEngine(
             password.isEmpty() -> "Type a password."
             else -> null
         }
+
+        /** The same checks for a Quire server: its address instead of a Firebase project. */
+        fun checkServer(address: String, email: String, password: String): String? = when {
+            serverConfig(address) == null ->
+                "Type the address of your Quire server, e.g. https://sync.example.com."
+            !EMAIL.matches(email.trim()) -> "Type the email address for your sync account."
+            password.isEmpty() -> "Type a password."
+            else -> null
+        }
+
+        /** The tidy config for what was typed (https:// assumed), or null if it isn't an address. */
+        fun serverConfig(address: String): CloudConfig? {
+            val text = address.trim()
+            if (text.isEmpty() || ' ' in text) return null
+            val uri = runCatching { java.net.URI(if ("://" in text) text else "https://$text") }.getOrNull()
+                ?: return null
+            if (uri.scheme !in setOf("http", "https") || uri.host.isNullOrEmpty()) return null
+            val port = if (uri.port >= 0) ":${uri.port}" else ""
+            return CloudConfig("${uri.scheme}://${uri.host}$port${uri.path.orEmpty().trimEnd('/')}", "",
+                Backends.SERVER)
+        }
     }
 
     /** Sign in (or create the account) and remember it. Network: call off the main thread. */
     fun connect(config: CloudConfig, email: String, password: String, create: Boolean,
-                takeCloudCopy: Boolean) {
-        val session = if (create) cloud.signUp(config, email.trim(), password)
+                takeCloudCopy: Boolean, invite: String = "") {
+        val session = if (create) cloud.signUp(config, email.trim(), password, invite.trim())
         else cloud.signIn(config, email.trim(), password)
+        val moved = (get("backend").ifEmpty { Backends.FIREBASE } to get("project")) !=
+            (config.backend to config.projectId)
         if (takeCloudCopy) records.clear()
-        set("project", config.projectId); set("api_key", config.apiKey)
+        else if (moved) records.markAllDirty() // a new place starts empty: send everything there
+        set("backend", config.backend)
+        set("project", config.projectId); set("api_key", config.apiKey.ifEmpty { null })
         set("email", session.email); set("refresh", session.refreshToken)
         set("cursor", null); set("problem", null)
     }
@@ -85,16 +114,18 @@ class SyncEngine(
      *  computer's sign-in is checked and reused, and this phone takes the cloud copy.
      *  Network: call off the main thread. */
     fun connectWithLink(link: DeviceLink) {
-        val config = CloudConfig(link.projectId, link.apiKey)
+        val config = if (link.backend == Backends.SERVER) CloudConfig(link.projectId, "", Backends.SERVER)
+        else CloudConfig(link.projectId, link.apiKey)
         val session = cloud.refresh(config, link.refreshToken)
         records.clear()
-        set("project", config.projectId); set("api_key", config.apiKey)
+        set("backend", config.backend)
+        set("project", config.projectId); set("api_key", config.apiKey.ifEmpty { null })
         set("email", link.email.ifEmpty { session.email }); set("refresh", session.refreshToken)
         set("cursor", null); set("problem", null)
     }
 
     fun disconnect() {
-        for (name in listOf("project", "api_key", "email", "refresh", "cursor", "last_sync", "problem")) {
+        for (name in listOf("backend", "project", "api_key", "email", "refresh", "cursor", "last_sync", "problem")) {
             set(name, null)
         }
     }

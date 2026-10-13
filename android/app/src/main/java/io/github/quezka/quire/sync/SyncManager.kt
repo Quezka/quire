@@ -70,9 +70,9 @@ class SyncManager(
 
     /** Connect on a worker thread; the result comes back on the main thread. */
     fun connect(config: CloudConfig, email: String, password: String, create: Boolean,
-                takeCloudCopy: Boolean, done: (Throwable?) -> Unit) {
+                takeCloudCopy: Boolean, invite: String = "", done: (Throwable?) -> Unit) {
         scope.launch {
-            val result = runCatching { engine.connect(config, email, password, create, takeCloudCopy) }
+            val result = runCatching { engine.connect(config, email, password, create, takeCloudCopy, invite) }
             withContext(Dispatchers.Main) {
                 if (takeCloudCopy && result.isSuccess) repository.refreshed()
                 refreshState()

@@ -59,6 +59,7 @@ import io.github.quezka.quire.BuildConfig
 import io.github.quezka.quire.Container
 import io.github.quezka.quire.R
 import io.github.quezka.quire.notify.ReminderSettings
+import io.github.quezka.quire.sync.Backends
 import io.github.quezka.quire.sync.CloudConfig
 import io.github.quezka.quire.sync.DeviceLink
 import io.github.quezka.quire.sync.SyncEngine
@@ -103,7 +104,7 @@ fun SettingsScreen(container: Container, back: () -> Unit) {
                     if (status.problem.isNotEmpty()) Text(syncMessage(context, status.problem),
                         color = MaterialTheme.colorScheme.error)
                     LinkSetup(container)
-                    SyncSetup(sync, status.projectId, status.email)
+                    SyncSetup(sync, status.projectId, status.email, status.backend)
                 }
             }
             RemindersPanel(container)
@@ -160,9 +161,13 @@ private fun LinkSetup(container: Container) {
 }
 
 @Composable
-private fun SyncSetup(sync: SyncManager, project: String, email: String) {
+private fun SyncSetup(sync: SyncManager, project: String, email: String, backend: String) {
     val context = LocalContext.current
-    var projectId by rememberSaveable { mutableStateOf(project) }
+    // A new setup starts with a Quire server; one that was on Firebase shows what it used.
+    var useServer by rememberSaveable { mutableStateOf(backend == Backends.SERVER || project.isEmpty()) }
+    var address by rememberSaveable { mutableStateOf(if (backend == Backends.SERVER) project else "") }
+    var invite by rememberSaveable { mutableStateOf("") }
+    var projectId by rememberSaveable { mutableStateOf(if (backend == Backends.SERVER) "" else project) }
     var apiKey by rememberSaveable { mutableStateOf("") }
     var mail by rememberSaveable { mutableStateOf(email) }
     var password by rememberSaveable { mutableStateOf("") }
@@ -172,11 +177,25 @@ private fun SyncSetup(sync: SyncManager, project: String, email: String) {
     var error by remember { mutableStateOf<String?>(null) }
 
     Hint(stringResource(R.string.sync_off))
-    Hint(stringResource(R.string.sync_help))
-    OutlinedTextField(projectId, { projectId = it }, Modifier.fillMaxWidth(), singleLine = true,
-        label = { Text(stringResource(R.string.project_id)) })
-    OutlinedTextField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), singleLine = true,
-        label = { Text(stringResource(R.string.api_key)) })
+    SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
+        SegmentedButton(selected = useServer, onClick = { useServer = true },
+            shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text(stringResource(R.string.quire_server)) }
+        SegmentedButton(selected = !useServer, onClick = { useServer = false },
+            shape = SegmentedButtonDefaults.itemShape(1, 2)) { Text(stringResource(R.string.firebase)) }
+    }
+    if (useServer) {
+        Hint(stringResource(R.string.server_help))
+        OutlinedTextField(address, { address = it }, Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.server_address)) },
+            placeholder = { Text("https://sync.example.com") },
+            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Uri))
+    } else {
+        Hint(stringResource(R.string.sync_help))
+        OutlinedTextField(projectId, { projectId = it }, Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.project_id)) })
+        OutlinedTextField(apiKey, { apiKey = it }, Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.api_key)) })
+    }
     SingleChoiceSegmentedButtonRow(Modifier.fillMaxWidth()) {
         SegmentedButton(selected = !create, onClick = { create = false },
             shape = SegmentedButtonDefaults.itemShape(0, 2)) { Text(stringResource(R.string.existing_account)) }
@@ -190,6 +209,11 @@ private fun SyncSetup(sync: SyncManager, project: String, email: String) {
         label = { Text(stringResource(R.string.password)) },
         visualTransformation = PasswordVisualTransformation(),
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password))
+    AnimatedVisibility(create && useServer) {
+        OutlinedTextField(invite, { invite = it }, Modifier.fillMaxWidth(), singleLine = true,
+            label = { Text(stringResource(R.string.invite_code)) },
+            supportingText = { Text(stringResource(R.string.invite_hint)) })
+    }
     AnimatedVisibility(!create) {
         Row(verticalAlignment = Alignment.CenterVertically) {
             Checkbox(takeCloud, { takeCloud = it })
@@ -198,11 +222,14 @@ private fun SyncSetup(sync: SyncManager, project: String, email: String) {
     }
     error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
     Button(enabled = !busy, onClick = {
-        val problem = SyncEngine.check(projectId, apiKey, mail, password)
+        val problem = if (useServer) SyncEngine.checkServer(address, mail, password)
+        else SyncEngine.check(projectId, apiKey, mail, password)
         if (problem != null) { error = syncMessage(context, problem); return@Button }
         busy = true; error = null
-        sync.connect(CloudConfig(projectId.trim(), apiKey.trim()), mail, password, create,
-            takeCloudCopy = !create && takeCloud) { failure ->
+        val config = if (useServer) SyncEngine.serverConfig(address)!!
+        else CloudConfig(projectId.trim(), apiKey.trim())
+        sync.connect(config, mail, password, create, takeCloudCopy = !create && takeCloud,
+            invite = invite) { failure ->
             busy = false
             error = failure?.let { syncMessage(context, it.message) }
         }

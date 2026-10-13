@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QApplication
 from .. import APP_ID
 from ..application.services import Services
 from . import fit, i18n, leave_on_enter, theme, uiscale
+from .i18n import _
 from .icons import APP_ICON
 
 
@@ -26,16 +27,21 @@ def create_application(argv: list[str]) -> QApplication:
     return app
 
 
-def run(services: Services, argv: list[str], background: bool = False) -> int:
+def run(services: Services, argv: list[str], background: bool = False,
+        app: QApplication | None = None, splash=None) -> int:
     from .background import SingleInstance, Tray, instance_name
     from . import notify
     from .main_window import MainWindow
 
-    app = create_application(argv)
+    app = app or create_application(argv)
     single = SingleInstance(instance_name(str(services.storage.location)), app)
     if single.already_running():
+        if splash is not None:
+            splash.close_now()
         return 0  # the running Quire shows its window instead
     single.listen()
+    if splash is not None:
+        splash.step(_("Building the interface…"), 0.7)
 
     tray = Tray(app) if Tray.available() else None
     window = MainWindow(services, tray)
@@ -49,6 +55,10 @@ def run(services: Services, argv: list[str], background: bool = False) -> int:
     # However Quire quits (Ctrl+Q, the tray, an update, logging out), a focus session
     # under way still adds the minutes spent so far.
     app.aboutToQuit.connect(services.focus.stop)
+    if splash is not None:
+        splash.step(_("Ready"), 1.0)
     if not (background and tray is not None):
         window.show()
+    if splash is not None:
+        splash.finish()
     return app.exec()

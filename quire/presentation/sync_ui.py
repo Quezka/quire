@@ -11,6 +11,7 @@ from PySide6.QtWidgets import (
 )
 
 from ..application.errors import ApplicationError, DomainError, SyncNotSetUp
+from ..application.ports import SERVER
 from ..application.services import Services, SyncStatus
 from .bridge import ChangeRelay
 from .formatting import relative_timestamp
@@ -133,7 +134,7 @@ class SyncRunner(QObject):
 
 
 class SyncSetupDialog(QDialog):
-    """Connect this computer to your Firebase project and account."""
+    """Connect this computer to your Quire server (or your own Firebase project) and account."""
 
     def __init__(self, services: Services, parent=None):
         super().__init__(parent)
@@ -143,7 +144,13 @@ class SyncSetupDialog(QDialog):
         self.setMinimumWidth(560)
 
         title = QLabel(_("Sync your computers"), objectName="sheetTitle")
-        steps = QLabel(_(
+        self.server_steps = QLabel(_(
+            "Quire syncs through your own Quire server. Type its address, then create your "
+            "account (a new server may ask for an invite code from whoever runs it) or sign in."
+            "<br>On your other computers, use the same server and account."))
+        self.server_steps.setWordWrap(True)
+        self.server_steps.setTextFormat(Qt.RichText)
+        self.steps = steps = QLabel(_(
             "Quire syncs through your own free Firebase project. Do this once:"
             "<ol>"
             "<li>In the <a href=\"{console}\">Firebase console</a>, create a project.</li>"
@@ -160,18 +167,32 @@ class SyncSetupDialog(QDialog):
         steps.setWordWrap(True)
         steps.setOpenExternalLinks(True)
         steps.setTextFormat(Qt.RichText)
-        copy_rules = QPushButton(_("Copy security rules"))
+        self.copy_rules = copy_rules = QPushButton(_("Copy security rules"))
         copy_rules.clicked.connect(self._copy_rules)
 
+        self.address = QLineEdit(placeholderText="https://sync.example.com")
+        self.invite = QLineEdit(placeholderText=_("only if the server asks for one"))
         self.project = QLineEdit(placeholderText="quire-sync-1a2b3")
         self.api_key = QLineEdit(placeholderText="AIza…")
         self.email = QLineEdit(placeholderText=_("you@example.com"))
         self.password = QLineEdit(echoMode=QLineEdit.Password)
         status = services.sync.status()
         if status.project_id:
-            self.project.setText(status.project_id)
+            (self.address if status.backend == SERVER else self.project).setText(status.project_id)
         if status.email:
             self.email.setText(status.email)
+
+        self.use_server = QPushButton(_("Quire server"), objectName="segment", checkable=True)
+        self.use_firebase = QPushButton(_("Firebase"), objectName="segment", checkable=True)
+        where = QFrame(objectName="segmented")
+        where_row = QHBoxLayout(where)
+        where_row.setContentsMargins(3, 3, 3, 3)
+        where_row.setSpacing(2)
+        for choice in (self.use_server, self.use_firebase):
+            choice.setAutoExclusive(True)
+            choice.setCursor(Qt.PointingHandCursor)
+            choice.toggled.connect(self._mode_changed)
+            where_row.addWidget(choice)
 
         self.create = QPushButton(_("New account"), objectName="segment", checkable=True)
         self.sign_in = QPushButton(_("I already have one"), objectName="segment", checkable=True)
@@ -192,11 +213,15 @@ class SyncSetupDialog(QDialog):
 
         form = QFormLayout()
         form.setVerticalSpacing(10)
+        self.form = form
+        form.addRow(_("Sync through"), where)
+        form.addRow(_("Server address"), self.address)
         form.addRow(_("Project ID"), self.project)
         form.addRow(_("Web API key"), self.api_key)
         form.addRow(_("Account"), mode)
         form.addRow(_("Email"), self.email)
         form.addRow(_("Password"), self.password)
+        form.addRow(_("Invite code"), self.invite)
         form.addRow("", self.take_cloud)
         form.addRow("", self.take_cloud_hint)
 
@@ -218,15 +243,28 @@ class SyncSetupDialog(QDialog):
         layout.setContentsMargins(22, 20, 22, 18)
         layout.setSpacing(12)
         layout.addWidget(title)
+        layout.addWidget(self.server_steps)
         layout.addWidget(steps)
         layout.addLayout(form)
         layout.addWidget(self.error)
         layout.addLayout(buttons)
         (self.sign_in if status.email else self.create).setChecked(True)
+        # A new setup starts with a Quire server; one already on Firebase shows what it uses.
+        (self.use_firebase if status.set_up and status.backend != SERVER
+         else self.use_server).setChecked(True)
         self._mode_changed()
 
     def _mode_changed(self, *_args):
         signing_in = self.sign_in.isChecked()
+        server = self.use_server.isChecked()
+        self.server_steps.setVisible(server)
+        self.steps.setVisible(not server)
+        self.copy_rules.setVisible(not server)
+        for field in (self.address,):
+            self.form.setRowVisible(field, server)
+        for field in (self.project, self.api_key):
+            self.form.setRowVisible(field, not server)
+        self.form.setRowVisible(self.invite, server and not signing_in)
         self.take_cloud.setVisible(signing_in)
         self.take_cloud_hint.setVisible(signing_in)
         self.password.setPlaceholderText(_("at least 6 characters") if not signing_in else "")
@@ -243,8 +281,12 @@ class SyncSetupDialog(QDialog):
         if self._worker is not None:
             return
         try:
-            config = self.services.sync.check(self.project.text(), self.api_key.text(),
-                                              self.email.text(), self.password.text())
+            if self.use_server.isChecked():
+                config = self.services.sync.check_server(self.address.text(), self.email.text(),
+                                                         self.password.text())
+            else:
+                config = self.services.sync.check(self.project.text(), self.api_key.text(),
+                                                  self.email.text(), self.password.text())
         except (ApplicationError, DomainError) as e:
             self._show_error(_(str(e)))
             return
@@ -252,9 +294,10 @@ class SyncSetupDialog(QDialog):
         self.connect_btn.setEnabled(False)
         self.connect_btn.setText(_("Connecting…"))
         email, password, create = self.email.text(), self.password.text(), self.create.isChecked()
+        invite = self.invite.text()
         self._config = config
         self._worker = run_in_background(
-            lambda: self.services.sync.authenticate(config, email, password, create),
+            lambda: self.services.sync.authenticate(config, email, password, create, invite),
             self._signed_in, self._sign_in_failed)
 
     def _signed_in(self, session):

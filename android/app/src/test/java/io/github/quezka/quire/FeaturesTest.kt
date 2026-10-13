@@ -268,6 +268,16 @@ class FeaturesTest {
         assertNotNull(link)
         assertEquals("quire-sync-1a2b3", link!!.projectId)
         assertEquals("pw", link.registerPassword)
+                // Version 2 carries a Quire server's address instead of a Firebase project.
+        val v2 = """{"v":"2","backend":"server","url":"https://sync.example.com","email":"me@example.com","refresh":"r"}"""
+        val server = DeviceLink.parse("quire-link:" + Base64.getUrlEncoder().withoutPadding().encodeToString(v2.toByteArray()))!!
+        assertEquals("https://sync.example.com", server.projectId)
+        assertEquals("server", server.backend)
+        assertEquals("", server.apiKey)
+        val bad = """{"v":"2","backend":"other","url":"x","refresh":"r"}"""
+        assertNull(DeviceLink.parse("quire-link:" + Base64.getUrlEncoder().withoutPadding().encodeToString(bad.toByteArray())))
+        val future = """{"v":"3","url":"x","refresh":"r"}"""
+        assertNull(DeviceLink.parse("quire-link:" + Base64.getUrlEncoder().withoutPadding().encodeToString(future.toByteArray())))
         assertNull(DeviceLink.parse("https://example.com"))
     }
 

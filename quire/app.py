@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import os
 import sys
 from pathlib import Path
 
@@ -17,6 +18,8 @@ def main(argv: list[str] | None = None) -> int:
                         help="open a throwaway database filled with sample data")
     parser.add_argument("--background", action="store_true",
                         help="start in the tray without opening the window (used at login)")
+    parser.add_argument("--no-splash", action="store_true",
+                        help="don't show the start-up splash screen (QUIRE_NO_SPLASH=1 does too)")
     args, qt_args = parser.parse_known_args(argv[1:])
 
     if args.demo and args.db:
@@ -26,6 +29,19 @@ def main(argv: list[str] | None = None) -> int:
         path.unlink(missing_ok=True)
     else:
         path = args.db or data_dir() / "quire.db"
+    # The splash goes up before the database is opened, so it covers the slow part of starting.
+    app = splash = None
+    if not (args.background or args.no_splash or os.environ.get("QUIRE_NO_SPLASH")):
+        from . import __version__
+        from .presentation.i18n import _
+        from .presentation.qt_app import create_application
+        from .presentation.splash import SplashScreen
+
+        app = create_application([argv[0], *qt_args])
+        splash = SplashScreen(__version__)
+        splash.show()
+        splash.step(_("Starting…"), 0.12)
+        splash.step(_("Opening your data…"), 0.35)
     if args.demo:
         from datetime import date
 
@@ -44,6 +60,7 @@ def main(argv: list[str] | None = None) -> int:
     from .presentation.qt_app import run
 
     try:
-        return run(services, [argv[0], *qt_args], background=args.background)
+        return run(services, [argv[0], *qt_args], background=args.background, app=app,
+                   splash=splash)
     finally:
         db.close()

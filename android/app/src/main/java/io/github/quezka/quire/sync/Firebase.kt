@@ -19,7 +19,13 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.net.URLEncoder
 
-data class CloudConfig(val projectId: String, val apiKey: String)
+object Backends {
+    const val FIREBASE = "firebase"
+    const val SERVER = "server"
+}
+
+/** Where to sync. For a Quire server, [projectId] is its address and [apiKey] is unused. */
+data class CloudConfig(val projectId: String, val apiKey: String, val backend: String = Backends.FIREBASE)
 data class CloudSession(val userId: String, val email: String, val token: String, val refreshToken: String)
 
 open class SyncException(message: String) : Exception(message)
@@ -27,7 +33,8 @@ class CloudAuthException(message: String) : SyncException(message)
 
 /** The cloud side of sync, as the desktop's CloudBackend port. */
 interface Cloud {
-    fun signUp(config: CloudConfig, email: String, password: String): CloudSession
+    /** [invite] is the code a Quire server may ask for; Firebase ignores it. */
+    fun signUp(config: CloudConfig, email: String, password: String, invite: String = ""): CloudSession
     fun signIn(config: CloudConfig, email: String, password: String): CloudSession
     fun refresh(config: CloudConfig, refreshToken: String): CloudSession
     fun pull(config: CloudConfig, session: CloudSession, cursor: String?): Pair<List<SyncRecord>, String?>
@@ -153,7 +160,7 @@ class FirebaseCloud(private val http: Http = urlConnectionHttp) : Cloud {
             s("idToken"), s("refreshToken"))
     }
 
-    override fun signUp(config: CloudConfig, email: String, password: String) =
+    override fun signUp(config: CloudConfig, email: String, password: String, invite: String) =
         account("signUp", config, email, password)
 
     override fun signIn(config: CloudConfig, email: String, password: String) =

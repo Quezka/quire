@@ -137,8 +137,8 @@ class FirebaseCloud:
                        auth=True)
         return CloudSession(r["localId"], r.get("email", email), r["idToken"], r["refreshToken"])
 
-    def sign_up(self, config, email, password):
-        return self._account("signUp", config, email, password)
+    def sign_up(self, config, email, password, invite=""):
+        return self._account("signUp", config, email, password)  # (no invite codes here)
 
     def sign_in(self, config, email, password):
         return self._account("signInWithPassword", config, email, password)

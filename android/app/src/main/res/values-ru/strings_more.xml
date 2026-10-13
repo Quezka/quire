@@ -282,4 +282,11 @@
     <string name="payslip_tfr">TFR %1$s</string>
     <string name="pay_per_month">%1$s × %2$d в год</string>
     <string name="close">Закрыть</string>
+    <string name="quire_server">Сервер Quire</string>
+    <string name="firebase">Firebase</string>
+    <string name="server_help">Используйте свой сервер Quire и тот же аккаунт, что на компьютере (Quire → Настройки → Синхронизация).</string>
+    <string name="server_address">Адрес сервера</string>
+    <string name="invite_code">Код приглашения</string>
+    <string name="invite_hint">Только если сервер его просит</string>
+    <string name="err_server_address">Введите адрес вашего сервера Quire, например https://sync.example.com.</string>
 </resources>

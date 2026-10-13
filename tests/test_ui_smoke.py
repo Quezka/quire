@@ -890,6 +890,23 @@ def test_sync_setup_dialog_and_background_sync(window, services, cloud, app):
 
     dialog = SyncSetupDialog(services, settings)
     assert dialog.create.isChecked() and not dialog.take_cloud.isVisibleTo(dialog)
+    # A new setup starts with a Quire server: its address and invite code, no Firebase fields.
+    assert dialog.use_server.isChecked()
+    assert dialog.address.isVisibleTo(dialog) and dialog.invite.isVisibleTo(dialog)
+    assert not dialog.project.isVisibleTo(dialog) and not dialog.api_key.isVisibleTo(dialog)
+    assert not dialog.copy_rules.isVisibleTo(dialog)
+    dialog.sign_in.setChecked(True)  # the invite code is only for creating an account
+    assert not dialog.invite.isVisibleTo(dialog)
+    dialog.create.setChecked(True)
+    dialog.address.setText("not an address")
+    dialog.email.setText("me@example.com")
+    dialog.password.setText("secret123")
+    dialog._connect()
+    assert "address of your Quire server" in dialog.error.text()
+
+    dialog.use_firebase.setChecked(True)
+    assert dialog.project.isVisibleTo(dialog) and not dialog.address.isVisibleTo(dialog)
+    assert dialog.copy_rules.isVisibleTo(dialog) and not dialog.invite.isVisibleTo(dialog)
     dialog.project.setText("Not A Project")
     dialog._connect()
     assert "project ID" in dialog.error.text()
@@ -902,6 +919,21 @@ def test_sync_setup_dialog_and_background_sync(window, services, cloud, app):
     QThreadPool.globalInstance().waitForDone(5000)
     app.processEvents()
     assert dialog.result() == QDialog.Accepted and services.sync.status().set_up
+
+    # Moving to a Quire server: sign out, then connect by address (+ invite code).
+    services.sync.disconnect()
+    server = SyncSetupDialog(services, settings)
+    assert server.use_server.isChecked()
+    server.address.setText(" sync.example.com/ ")
+    server.sign_in.setChecked(True)
+    server.email.setText("me@example.com")
+    server.password.setText("secret123")
+    server._connect()
+    QThreadPool.globalInstance().waitForDone(5000)
+    app.processEvents()
+    status = services.sync.status()
+    assert server.result() == QDialog.Accepted and status.set_up
+    assert status.backend == "server" and status.project_id == "https://sync.example.com"
 
     window.sync.sync_now()
     QThreadPool.globalInstance().waitForDone(5000)

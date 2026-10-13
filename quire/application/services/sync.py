@@ -6,11 +6,12 @@ import re
 import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from urllib.parse import urlparse
 
 from ..bus import ChangeBus, Topic
 from ..errors import CloudAuthError, SyncNotSetUp, ValidationError
 from ..ports import (
-    CloudBackend, CloudConfig, CloudSession, Clock, CredentialStore, Credentials, KeyValueStore,
+    FIREBASE, SERVER, CloudBackend, CloudConfig, CloudSession, Clock, CredentialStore, Credentials, KeyValueStore,
     SyncRecord, SyncStore,
 )
 
@@ -29,6 +30,7 @@ class SyncStatus:
     last_sync: datetime | None
     pending: int  # local changes not sent yet
     problem: str  # the last sync's error, "" if it worked
+    backend: str = FIREBASE  # FIREBASE or SERVER; `project_id` is the server's address then
 
 
 @dataclass(frozen=True)
@@ -87,6 +89,8 @@ class SyncService:
 
     def config(self) -> CloudConfig | None:
         project, key = self._get("project"), self._get("api_key")
+        if self._get("backend") == SERVER:
+            return CloudConfig(project, "", SERVER) if project else None
         return CloudConfig(project, key) if project and key else None
 
     def status(self) -> SyncStatus:
@@ -94,7 +98,8 @@ class SyncService:
         return SyncStatus(self.config() is not None and self._secrets.load() is not None,
                           self._get("email"), self._get("project"),
                           datetime.fromisoformat(last) if last else None,
-                          self._store.pending(), self._get("problem"))
+                          self._store.pending(), self._get("problem"),
+                          self._get("backend") or FIREBASE)
 
     # ---- account ----------------------------------------------------------------
 
@@ -105,8 +110,12 @@ class SyncService:
         config, saved = self.config(), self._secrets.load()
         if config is None or saved is None:
             raise SyncNotSetUp("Set up sync on this computer first.")
-        data = {"v": "1", "project": config.project_id, "api_key": config.api_key,
-                "email": self._get("email"), "refresh": saved.password}
+        if config.backend == SERVER:  # version 2: the phone needs the server's address
+            data = {"v": "2", "backend": SERVER, "url": config.project_id,
+                    "email": self._get("email"), "refresh": saved.password}
+        else:  # version 1 stays as it was, for phones that only know Firebase
+            data = {"v": "1", "project": config.project_id, "api_key": config.api_key,
+                    "email": self._get("email"), "refresh": saved.password}
         if register is not None:
             data.update(cv_user=register.username, cv_pass=register.password)
         raw = json.dumps(data, separators=(",", ":")).encode()
@@ -127,12 +136,27 @@ class SyncService:
             raise ValidationError("Type a password.")
         return CloudConfig(project_id, api_key)
 
+    @staticmethod
+    def check_server(address: str, email: str, password: str) -> CloudConfig:
+        """The same checks for a Quire server: its address instead of a Firebase project."""
+        address = address.strip()
+        parsed = urlparse(address if "://" in address else "https://" + address)
+        if parsed.scheme not in ("http", "https") or not parsed.hostname or " " in address:
+            raise ValidationError("Type the address of your Quire server, "
+                                  "e.g. https://sync.example.com.")
+        if not _EMAIL.match(email.strip()):
+            raise ValidationError("Type the email address for your sync account.")
+        if not password:
+            raise ValidationError("Type a password.")
+        return CloudConfig(f"{parsed.scheme}://{parsed.netloc}{parsed.path.rstrip('/')}", "", SERVER)
+
     def authenticate(self, config: CloudConfig, email: str, password: str,
-                     create: bool) -> CloudSession:
-        """Sign in (or create the account). Network only: run it on a worker thread."""
+                     create: bool, invite: str = "") -> CloudSession:
+        """Sign in (or create the account). Network only: run it on a worker thread.
+        `invite` is the code a Quire server may ask for when creating an account."""
         email = email.strip()
         if create:
-            return self._cloud.sign_up(config, email, password)
+            return self._cloud.sign_up(config, email, password, invite.strip())
         return self._cloud.sign_in(config, email, password)
 
     def connect(self, config: CloudConfig, session: CloudSession,
@@ -143,9 +167,14 @@ class SyncService:
             self._store.clear_all()
             for topic in set(TOPICS.values()):
                 self._bus.publish(topic)
+        moved = (self._get("backend") or FIREBASE, self._get("project")) != (
+            config.backend, config.project_id)
+        if moved and not take_cloud_copy:
+            self._store.mark_all_dirty()  # a new place starts empty: send everything there
         self._secrets.save(Credentials(session.email, session.refresh_token))
+        self._set("backend", config.backend)
         self._set("project", config.project_id)
-        self._set("api_key", config.api_key)
+        self._set("api_key", config.api_key or None)
         self._set("email", session.email)
         self._set("cursor", None)  # pull everything once from the new account
         self._set("problem", None)
@@ -155,7 +184,7 @@ class SyncService:
     def disconnect(self) -> None:
         """Stop syncing on this device; its data stays here."""
         self._secrets.clear()
-        for name in ("project", "api_key", "email", "cursor", "last_sync", "problem"):
+        for name in ("backend", "project", "api_key", "email", "cursor", "last_sync", "problem"):
             self._set(name, None)
 
     # ---- syncing ----------------------------------------------------------------

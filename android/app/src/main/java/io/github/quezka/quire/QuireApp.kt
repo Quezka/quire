@@ -14,7 +14,7 @@ import io.github.quezka.quire.school.RegisterStore
 import io.github.quezka.quire.school.SchoolReport
 import io.github.quezka.quire.school.SchoolSync
 import io.github.quezka.quire.school.SchoolWorker
-import io.github.quezka.quire.sync.FirebaseCloud
+import io.github.quezka.quire.sync.RoutingCloud
 import io.github.quezka.quire.sync.Settings
 import io.github.quezka.quire.sync.SyncEngine
 import io.github.quezka.quire.sync.SyncManager
@@ -44,7 +44,7 @@ class Container(
     val repository: Repository = Repository(records),
     val settings: Settings = PrefsSettings(context),
 ) {
-    val engine = SyncEngine(records, FirebaseCloud(), settings)
+    val engine = SyncEngine(records, RoutingCloud(), settings)
     val sync = SyncManager(context, engine, repository)
     val notifier = Notifier(context)
     val reminders = ReminderManager(repository, settings, notifier)

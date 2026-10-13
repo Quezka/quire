@@ -97,4 +97,8 @@ class Records(private val store: RowStore, private val clock: () -> Instant = In
     }
 
     fun clear() = store.clear()
+
+    /** Send everything again at the next sync (e.g. after moving to another backend). Safe: the
+     *  receiving side keeps the newest version of each record. */
+    fun markAllDirty() = store.put(store.rows().filter { !it.dirty }.map { it.copy(dirty = true) })
 }

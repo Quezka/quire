@@ -363,6 +363,12 @@ class SqliteSyncStore:
                                         ).fetchone()[0]
         return total
 
+    def mark_all_dirty(self) -> None:
+        with self._applying() as conn:  # tracking off: `modified` must stay as it is
+            for s in SYNCED:
+                conn.execute(f"UPDATE {s.table} SET dirty = 1")
+            conn.execute("UPDATE sync_tombstones SET dirty = 1")
+
     def clear_all(self) -> None:
         with self._applying() as conn:
             for s in reversed(SYNCED):

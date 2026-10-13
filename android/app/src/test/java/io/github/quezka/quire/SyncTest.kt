@@ -22,6 +22,7 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.put
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
@@ -38,7 +39,7 @@ class FakeCloud : Cloud {
     private fun check() { if (offline) throw SyncException("Can't reach the sync server.") }
     private fun session(email: String) = CloudSession("user-$email", email, "t", "refresh-$email")
 
-    override fun signUp(config: CloudConfig, email: String, password: String): CloudSession {
+    override fun signUp(config: CloudConfig, email: String, password: String, invite: String): CloudSession {
         check(); if (email in accounts) throw CloudAuthException("exists")
         accounts[email] = password; return session(email)
     }
@@ -129,6 +130,103 @@ class SyncTest {
         assertTrue(SyncEngine.check(config.projectId, "short", "a@b.co", "x") != null)
         assertTrue(SyncEngine.check(config.projectId, config.apiKey, "nope", "x") != null)
         assertNull(SyncEngine.check(config.projectId, config.apiKey, "a@b.co", "x"))
+    }
+
+    // ---- a Quire server instead of Firebase -------------------------------------------
+
+    private val server = CloudConfig("https://sync.example.com", "", io.github.quezka.quire.sync.Backends.SERVER)
+
+    @Test fun serverSetupChecksItsInputs() {
+        for (bad in listOf("", "   ", "ftp://sync.example.com", "sync example com", "https://"))
+            assertTrue(bad, SyncEngine.checkServer(bad, "me@example.com", "pw")!!.contains("Quire server"))
+        assertTrue(SyncEngine.checkServer("sync.example.com", "nope", "pw")!!.contains("email"))
+        assertTrue(SyncEngine.checkServer("sync.example.com", "me@example.com", "")!!.contains("password"))
+        assertNull(SyncEngine.checkServer("sync.example.com", "me@example.com", "pw"))
+        assertEquals(server, SyncEngine.serverConfig("  sync.example.com/ "))
+        assertEquals("http://192.168.1.106:8080", SyncEngine.serverConfig("http://192.168.1.106:8080/")!!.projectId)
+    }
+
+    @Test fun twoPhonesSyncThroughAServerAccount() {
+        val cloud = FakeCloud()
+        val a = Device(cloud); val b = Device(cloud)
+        a.engine.connect(server, "me@example.com", "secret1", create = true, takeCloudCopy = false, invite = "code")
+        b.engine.connect(server, "me@example.com", "secret1", create = false, takeCloudCopy = false)
+        val status = a.engine.status()
+        assertTrue(status.setUp)
+        assertEquals(io.github.quezka.quire.sync.Backends.SERVER, status.backend)
+        assertEquals("https://sync.example.com", status.projectId)
+        a.repo.saveTask(Task(Codec.newUid(), "From the server"))
+        a.engine.sync()
+        assertEquals(1, b.engine.sync().received)
+    }
+
+    @Test fun movingFromFirebaseToAServerSendsEverythingAgain() {
+        val cloud = FakeCloud()
+        val a = Device(cloud)
+        a.repo.saveTask(Task(Codec.newUid(), "One")); a.repo.saveTask(Task(Codec.newUid(), "Two"))
+        a.engine.connect(config, "me@example.com", "secret1", create = true, takeCloudCopy = false)
+        a.engine.sync()
+        assertEquals(0, a.engine.status().pending)
+        a.engine.connect(server, "me@example.com", "secret1", create = false, takeCloudCopy = false)
+        assertEquals(2, a.engine.status().pending)
+        cloud.docs.clear() // what the new server lacks
+        assertEquals(2, a.engine.sync().sent)
+        assertEquals(2, cloud.docs.size)
+    }
+
+    @Test fun signingInAgainToTheSamePlaceDoesNotResendEverything() {
+        val cloud = FakeCloud()
+        val a = Device(cloud)
+        a.repo.saveTask(Task(Codec.newUid(), "One"))
+        a.engine.connect(server, "me@example.com", "secret1", create = true, takeCloudCopy = false)
+        a.engine.sync()
+        a.engine.connect(server, "me@example.com", "secret1", create = false, takeCloudCopy = false)
+        assertEquals(0, a.engine.status().pending)
+    }
+
+    @Test fun aServerLinkFromTheComputerSetsUpThePhone() {
+        val cloud = FakeCloud()
+        val laptop = Device(cloud); val phone = Device(cloud)
+        laptop.engine.connect(server, "me@example.com", "secret1", create = true, takeCloudCopy = false)
+        laptop.repo.saveTask(Task(Codec.newUid(), "On the laptop"))
+        laptop.engine.sync()
+        val link = io.github.quezka.quire.sync.DeviceLink(
+            "https://sync.example.com", "", "me@example.com", "refresh-me@example.com",
+            backend = io.github.quezka.quire.sync.Backends.SERVER)
+        phone.engine.connectWithLink(link)
+        assertEquals(io.github.quezka.quire.sync.Backends.SERVER, phone.engine.status().backend)
+        assertEquals(1, phone.engine.sync().received)
+        assertEquals(listOf("On the laptop"), phone.repo.tasks().map { it.title })
+    }
+
+    @Test fun disconnectingForgetsTheServer() {
+        val cloud = FakeCloud()
+        val a = Device(cloud)
+        a.engine.connect(server, "me@example.com", "secret1", create = true, takeCloudCopy = false)
+        a.engine.disconnect()
+        val status = a.engine.status()
+        assertFalse(status.setUp)
+        assertEquals(io.github.quezka.quire.sync.Backends.FIREBASE, status.backend)
+        assertEquals("", status.projectId)
+    }
+
+    @Test fun theRouterSendsEachCallToItsBackend() {
+        val calls = mutableListOf<String>()
+        class Spy(val name: String) : Cloud {
+            private fun s() = CloudSession("u", "e", "t", "r")
+            override fun signUp(config: CloudConfig, email: String, password: String, invite: String) = s().also { calls += "$name:signUp:$invite" }
+            override fun signIn(config: CloudConfig, email: String, password: String) = s().also { calls += "$name:signIn" }
+            override fun refresh(config: CloudConfig, refreshToken: String) = s().also { calls += "$name:refresh" }
+            override fun pull(config: CloudConfig, session: CloudSession, cursor: String?) =
+                (emptyList<SyncRecord>() to cursor).also { calls += "$name:pull" }
+            override fun push(config: CloudConfig, session: CloudSession, records: List<SyncRecord>) { calls += "$name:push" }
+        }
+        val router = io.github.quezka.quire.sync.RoutingCloud(Spy("firebase"), Spy("server"))
+        router.signIn(config, "a@b.c", "pw")
+        router.signUp(server, "a@b.c", "pw", "code")
+        router.refresh(server, "r")
+        router.push(config, CloudSession("u", "e", "t", "r"), emptyList())
+        assertEquals(listOf("firebase:signIn", "server:signUp:code", "server:refresh", "firebase:push"), calls)
     }
 }
 
