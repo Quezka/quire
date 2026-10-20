@@ -4,6 +4,15 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.33.0] - 2026-10-20
+
+### Added
+- **Vesper bedside clock.** The phone app now shares what is on today and tomorrow with the Vesper charging clock
+  (github.com/Quezka/vesper), only after you allow it once in Vesper: the next class, event or shift, what starts
+  tomorrow, how many tasks are due and the focus timer. Nothing leaves the phone, and grades are never shared.
+- **Sync through your own Quire server** (desktop and phone) as an alternative to Firebase, with a splash screen while
+  the desktop app starts.
+
 ## [0.32.2] - 2026-10-09
 
 ### Fixed

@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.33.0" date="2026-10-20">
+      <description>
+        <p>The phone app can feed the Vesper bedside clock with the next class or shift, tomorrow's start, due tasks and the focus timer. Sync through a self-hosted Quire server, and a splash screen at start-up.</p>
+      </description>
+    </release>
     <release version="0.32.2" date="2026-10-09">
       <description>
         <p>Fixed a crash on Windows ("Signal source has been deleted") when a notification appeared.</p>

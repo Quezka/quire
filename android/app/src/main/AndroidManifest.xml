@@ -12,6 +12,14 @@
     <!-- In-app updates from GitHub releases. -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
 
+    <!-- Lets one other app on the phone (the Vesper bedside clock) read what is on today and tomorrow. Runtime
+         permission: the user grants it once, in Vesper. -->
+    <permission
+        android:name="io.github.quezka.quire.permission.READ_BEDSIDE"
+        android:description="@string/perm_bedside_description"
+        android:label="@string/perm_bedside_label"
+        android:protectionLevel="dangerous" />
+
     <application
         android:name=".QuireApp"
         android:allowBackup="true"
@@ -54,6 +62,12 @@
                 android:resource="@xml/agenda_widget_info" />
         </receiver>
         <receiver android:name=".update.InstallReceiver" android:exported="false" />
+
+        <provider
+            android:name=".bedside.BedsideProvider"
+            android:authorities="io.github.quezka.quire.bedside"
+            android:exported="true"
+            android:readPermission="io.github.quezka.quire.permission.READ_BEDSIDE" />
 
         <!-- Hands the camera app a file to put a scanned page in. -->
         <provider

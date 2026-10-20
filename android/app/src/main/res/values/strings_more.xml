@@ -273,4 +273,6 @@
     <string name="invite_code">Invite code</string>
     <string name="invite_hint">Only if the server asks for one</string>
     <string name="err_server_address">Type the address of your Quire server, e.g. https://sync.example.com.</string>
+    <string name="perm_bedside_label">read your schedule for the bedside clock</string>
+    <string name="perm_bedside_description">Lets the Vesper bedside clock show your next class or shift, what starts tomorrow, your open tasks and the focus timer. Grades are never shared.</string>
 </resources>

@@ -273,4 +273,6 @@
     <string name="invite_code">Codice d’invito</string>
     <string name="invite_hint">Solo se il server lo richiede</string>
     <string name="err_server_address">Scrivi l’indirizzo del tuo server Quire, ad es. https://sync.example.com.</string>
+    <string name="perm_bedside_label">leggere il tuo programma per l\'orologio da comodino</string>
+    <string name="perm_bedside_description">Permette all\'orologio Vesper di mostrare la prossima lezione o il prossimo turno, cosa inizia domani, le attività aperte e il timer di concentrazione. I voti non vengono mai condivisi.</string>
 </resources>

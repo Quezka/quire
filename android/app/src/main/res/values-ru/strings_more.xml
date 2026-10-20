@@ -289,4 +289,6 @@
     <string name="invite_code">Код приглашения</string>
     <string name="invite_hint">Только если сервер его просит</string>
     <string name="err_server_address">Введите адрес вашего сервера Quire, например https://sync.example.com.</string>
+    <string name="perm_bedside_label">читать ваше расписание для прикроватных часов</string>
+    <string name="perm_bedside_description">Позволяет часам Vesper показывать ближайшую пару или смену, что начинается завтра, ваши задачи и таймер фокуса. Оценки никогда не передаются.</string>
 </resources>
