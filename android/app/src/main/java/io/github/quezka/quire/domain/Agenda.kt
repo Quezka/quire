@@ -2,7 +2,7 @@ package io.github.quezka.quire.domain
 
 import java.time.LocalDate
 
-enum class ItemKind { CLASS, EVENT, SHIFT }
+enum class ItemKind { CLASS, EVENT, SHIFT, ROUTINE }
 
 /** One thing on a day's timeline. A shift past midnight gives one item on each day. */
 data class AgendaItem(
@@ -20,7 +20,9 @@ data class AgendaItem(
     val weekly: Boolean = false, // an occurrence of a job's weekly schedule (refUid: the job)
     val originDay: LocalDate = day, // for a shift: the day and minute it started
     val originStart: Int = start,
-)
+) {
+    val isMilestone get() = (kind == ItemKind.EVENT || kind == ItemKind.ROUTINE) && end - start == MILESTONE_MINUTES
+}
 
 data class DayAgenda(
     val day: LocalDate,
@@ -54,8 +56,13 @@ object Agenda {
         events: List<Event>,
         jobs: List<Job>,
         shifts: List<Shift>,
+        routines: List<Routine> = emptyList(),
     ): List<AgendaItem> {
         val items = mutableListOf<AgendaItem>()
+        for (r in routines.filter { it.occursOn(day) }) {
+            val start = minOf(r.minute, MINUTES_PER_DAY - MILESTONE_MINUTES)
+            items += AgendaItem(ItemKind.ROUTINE, r.uid, day, start, start + MILESTONE_MINUTES, r.title, r.color)
+        }
         for (course in courses) {
             for (slot in course.slots.filter { it.weekday == day.weekdayIndex() }) {
                 items += AgendaItem(ItemKind.CLASS, course.uid, day, slot.start, slot.end,

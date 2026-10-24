@@ -62,6 +62,7 @@ _PATHS = {
     "zoom-in": '<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>',
     "zoom-out": '<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/>',
     "fit-day": '<path d="M7 15l5 5 5-5M7 9l5-5 5 5"/><path d="M4 12h16"/>',
+    "moon": '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
     "timer": '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6M12 2v3"/>',
     "play": '<path d="M7 4l13 8-13 8z"/>',
     "pause": '<path d="M8 4v16M16 4v16"/>',

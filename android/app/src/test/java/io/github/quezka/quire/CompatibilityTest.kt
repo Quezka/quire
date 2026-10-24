@@ -40,6 +40,19 @@ class CompatibilityTest {
         return Repository(records, today = { today })
     }
 
+    @Test fun routinesAndSleepFromTheDesktopAreRead() {
+        val repo = repository()
+        val wake = repo.routines().single()
+        assertEquals("Wake up", wake.title)
+        assertEquals(360, wake.minute)
+        assertEquals(setOf(0, 1, 2, 3, 4), wake.weekdays)
+        assertEquals("#e5484d", wake.color)
+        val night = repo.sleep(today)!!
+        assertEquals(23 * 60 to 6 * 60 + 30, night.asleep to night.woke)
+        assertEquals(4, night.quality)
+        assertEquals("woke once", night.note)
+    }
+
     @Test fun everyDesktopKindIsRead() {
         val repo = repository()
         assertEquals(6, repo.courses().size)

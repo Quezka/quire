@@ -12,7 +12,7 @@ from typing import Protocol
 from dataclasses import dataclass
 
 from ..domain import (
-    Absence, Book, Course, Event, FocusSession, Grade, Job, Lesson, Note, Notebook, NoteImage, Notice,
+    Absence, Book, Course, Event, FocusSession, Grade, Job, Lesson, Note, Notebook, NoteImage, Notice, Routine, SleepLog,
     SchoolDocument,
     Shift, Subject, Task, TaskKind,
 )
@@ -35,6 +35,30 @@ class EventRepository(Protocol):
     def add(self, event: Event) -> int: ...
     def update(self, event: Event) -> None: ...
     def delete(self, event_id: int) -> None: ...
+
+
+class SleepRepository(Protocol):
+    def get(self, day: date) -> SleepLog | None: ...
+    def between(self, first: date, last: date) -> list[SleepLog]: ...
+    def put(self, log: SleepLog) -> None: ...
+    def delete(self, day: date) -> None: ...
+
+
+class QuietSwitch(Protocol):
+    """Turns the computer's Do Not Disturb on and off."""
+
+    name: str  # the desktop it works on, for the settings text
+
+    def available(self) -> bool: ...
+    def set_quiet(self, on: bool) -> None: ...
+
+
+class RoutineRepository(Protocol):
+    def list(self) -> list[Routine]: ...
+    def get(self, routine_id: int) -> Routine | None: ...
+    def add(self, routine: Routine) -> int: ...
+    def update(self, routine: Routine) -> None: ...
+    def delete(self, routine_id: int) -> None: ...
 
 
 class JobRepository(Protocol):
@@ -304,7 +328,7 @@ class SyncRecord:
     `modified` is an ISO-8601 UTC time with milliseconds; the newer change wins.
     """
 
-    kind: str  # "course", "event", "task", "note", "journal", "job", "shift", "focus"
+    kind: str  # "course", "event", "routine", "task", "note", "journal", "job", "shift", "focus"
     uid: str
     modified: str
     deleted: bool = False

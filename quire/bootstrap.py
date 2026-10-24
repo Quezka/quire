@@ -6,11 +6,11 @@ from pathlib import Path
 from .application.bus import ChangeBus
 from . import HOMEPAGE, __version__
 from .application.ports import (
-    CloudBackend, DiagramEditor, Clock, CredentialStore, LoginItem, ReleaseFeed, SchoolRegister,
+    CloudBackend, DiagramEditor, Clock, CredentialStore, LoginItem, QuietSwitch, ReleaseFeed, SchoolRegister,
     UpdateInstaller,
 )
 from .application.services import (
-    FocusService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
+    FocusService, QuietService, SleepService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
     SchoolSyncService, Services, StartupService, SyncService, TaskService, TimetableService,
     UpdateService, WorkService,
 )
@@ -20,8 +20,9 @@ from .infrastructure.credentials import KeyringCredentialStore
 from .infrastructure.cloud import RoutingCloud
 from .infrastructure.ligature import LigatureApp
 from .infrastructure.login_item import platform_login_item
+from .infrastructure.quiet import platform_quiet
 from .infrastructure.repositories import (
-    SqliteCourseRepository, SqliteEventRepository, SqliteFocusLogRepository, SqliteJobRepository,
+    SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
     SqliteImageRepository, SqliteKeyValueStore, SqliteNotebookRepository, SqliteNoteRepository, SqliteSchoolRecordRepository,
     SqliteShiftRepository, SqliteTaskRepository,
@@ -40,6 +41,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                    installer: UpdateInstaller | None = None,
                    login_item: LoginItem | None = None,
                    diagrams: DiagramEditor | None = None,
+                   quiet: QuietSwitch | None = None,
                    ) -> tuple[Services, SqliteDatabase]:
     db = SqliteDatabase(db_path)
     clock = clock or SystemClock()
@@ -56,7 +58,8 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     settings = SqliteKeyValueStore(db)
     records = SqliteSchoolRecordRepository(db)
     register = register or ClassevivaRegister()
-    planner = PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts)
+    planner = PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts,
+                              SqliteRoutineRepository(db))
     services = Services(
         timetable=TimetableService(courses, bus),
         planner=planner,
@@ -68,6 +71,8 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                                       courses, tasks, records, settings, clock, bus),
         work=WorkService(jobs, shifts, clock, bus),
         focus=FocusService(SqliteFocusLogRepository(db), settings, tasks, courses, clock, bus),
+        sleep=SleepService(SqliteSleepRepository(db), settings, clock, bus),
+        quiet=QuietService(planner, settings, clock, quiet or platform_quiet()),
         reminders=ReminderService(planner, settings, clock),
         sync=SyncService(SqliteSyncStore(db), cloud or RoutingCloud(),
                          sync_secrets or KeyringCredentialStore("sync"), settings, clock, bus),

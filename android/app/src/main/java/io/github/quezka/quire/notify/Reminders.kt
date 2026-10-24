@@ -16,7 +16,7 @@ data class ReminderSettings(
 ) {
     fun wants(kind: ItemKind) = when (kind) {
         ItemKind.CLASS -> classes
-        ItemKind.EVENT -> events
+        ItemKind.EVENT, ItemKind.ROUTINE -> events
         ItemKind.SHIFT -> shifts
     }
 

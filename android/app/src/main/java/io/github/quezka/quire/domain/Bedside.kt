@@ -26,17 +26,18 @@ object Bedside {
         jobs: List<Job>,
         shifts: List<Shift>,
         tasks: List<Task>,
+        routines: List<Routine> = emptyList(),
     ): BedsideFeed {
         val today = now.toLocalDate()
         val tomorrow = today.plusDays(1)
         val minute = now.hour * 60 + now.minute
 
         // What is running or still to come today.
-        val next = Agenda.itemsOn(today, courses, events, jobs, shifts)
+        val next = Agenda.itemsOn(today, courses, events, jobs, shifts, routines)
             .filter { it.end > minute }
             .minByOrNull { it.start }
         // The first thing tomorrow; the tail of a shift that started tonight is not a start.
-        val first = Agenda.itemsOn(tomorrow, courses, events, jobs, shifts)
+        val first = Agenda.itemsOn(tomorrow, courses, events, jobs, shifts, routines)
             .filter { !it.continues }
             .minByOrNull { it.start }
 

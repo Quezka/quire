@@ -39,6 +39,7 @@ SYNCED = (
            f" ELSE {RANDOM_UID} END", (("class_slots", "course_id"),)),
     Synced("job", "jobs", RANDOM_UID, (("shift_patterns", "job_id"), ("shift_skips", "job_id"))),
     Synced("event", "events", RANDOM_UID),
+    Synced("routine", "routines", RANDOM_UID),
     Synced("task", "tasks",
            f"CASE WHEN NEW.external_id IS NOT NULL THEN 'ext:' || NEW.external_id"
            f" ELSE {RANDOM_UID} END"),
@@ -46,6 +47,7 @@ SYNCED = (
     Synced("notebook", "notebooks", RANDOM_UID),  # groups of notes, before the notes
     Synced("note", "notes", RANDOM_UID),
     Synced("journal", "journal", "'day:' || NEW.day"),
+    Synced("sleep", "sleep_logs", "'day:' || NEW.day"),  # one night per day, like the journal
     Synced("shift", "shifts", RANDOM_UID),
     Synced("focus", "focus_sessions", RANDOM_UID),
 )
@@ -179,6 +181,9 @@ class SqliteSyncStore:
         if kind == "event":
             return {"day": r["day"], "start": r["start_min"], "end": r["end_min"],
                     "title": r["title"], "details": r["details"], "color": r["color"]}
+        if kind == "routine":
+            return {"title": r["title"], "start": r["start_min"], "color": r["color"],
+                    "weekdays": [int(d) for d in r["weekdays"].split(",") if d.strip().isdigit()]}
         if kind == "task":
             return {"title": r["title"], "kind": r["kind"],
                     "course": self._uid("courses", r["course_id"]), "due": r["due"],
@@ -195,6 +200,9 @@ class SqliteSyncStore:
             return {"mime": r["mime"], "data": base64.b64encode(bytes(r["data"])).decode()}
         if kind == "journal":
             return {"day": r["day"], "body": r["body"]}
+        if kind == "sleep":
+            return {"day": r["day"], "asleep": r["asleep"], "woke": r["woke"],
+                    "quality": r["quality"], "note": r["note"]}
         if kind == "shift":
             return {"job": self._uid("jobs", r["job_id"]), "day": r["day"],
                     "start": r["start_min"], "duration": r["duration_min"],
@@ -267,6 +275,10 @@ class SqliteSyncStore:
             values = {"day": d["day"], "start_min": d["start"], "end_min": d["end"],
                       "title": d["title"], "details": d.get("details", ""),
                       "color": d.get("color", "#8a8f98")}
+        elif s.kind == "routine":
+            values = {"title": d["title"], "start_min": d["start"],
+                      "weekdays": ",".join(str(x) for x in d.get("weekdays", range(7))),
+                      "color": d.get("color", "#f5a524")}
         elif s.kind == "task":
             values = {"title": d["title"], "kind": d.get("kind", "task"),
                       "course_id": self._id("courses", d.get("course")), "due": d.get("due"),
@@ -286,6 +298,9 @@ class SqliteSyncStore:
             values = {"mime": d["mime"], "data": base64.b64decode(d["data"])}
         elif s.kind == "journal":
             values = {"day": d["day"], "body": d.get("body", "")}
+        elif s.kind == "sleep":
+            values = {"day": d["day"], "asleep": d["asleep"], "woke": d["woke"],
+                      "quality": d.get("quality"), "note": d.get("note", "")}
         elif s.kind == "shift":
             job = self._id("jobs", d.get("job"))
             if job is None:
@@ -334,8 +349,8 @@ class SqliteSyncStore:
     def _same_thing(self, s: Synced, values: dict):
         """A local row that is the same thing under another uid: the same day's journal, or
         the same register item imported before this device had synced."""
-        if s.kind == "journal":
-            return self._conn.execute("SELECT rowid FROM journal WHERE day = ?",
+        if s.kind in ("journal", "sleep"):
+            return self._conn.execute(f"SELECT rowid FROM {s.table} WHERE day = ?",
                                       (values["day"],)).fetchone()
         if s.kind in ("task", "course") and values.get("external_id"):
             return self._conn.execute(f"SELECT rowid FROM {s.table} WHERE external_id = ?",

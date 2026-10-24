@@ -7,7 +7,7 @@ import json
 
 from ..domain import (
     Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
-    Lesson, Note, Notebook, NoteImage, Notice, NoticeAttachment, SchoolDocument, Shift, ShiftPattern,
+    Lesson, Note, Notebook, NoteImage, Notice, NoticeAttachment, Routine, SchoolDocument, Shift, ShiftPattern, SleepLog,
     Subject, Task,
     TaskKind, TimeRange,
 )
@@ -119,6 +119,34 @@ class SqliteEventRepository(_Repo):
 
     def delete(self, event_id):
         self._write("DELETE FROM events WHERE id = ?", event_id)
+
+
+class SqliteRoutineRepository(_Repo):
+    @staticmethod
+    def _routine(r) -> Routine:
+        days = tuple(sorted({int(d) for d in r["weekdays"].split(",") if d.strip().isdigit()}))
+        return Routine(r["title"], r["start_min"], days, r["color"], r["id"])
+
+    def list(self) -> list[Routine]:
+        return [self._routine(r) for r in
+                self._all("SELECT * FROM routines ORDER BY start_min, title COLLATE NOCASE")]
+
+    def get(self, routine_id):
+        r = self._one("SELECT * FROM routines WHERE id = ?", routine_id)
+        return self._routine(r) if r else None
+
+    def add(self, routine: Routine) -> int:
+        return self._write(
+            "INSERT INTO routines (title, start_min, weekdays, color) VALUES (?, ?, ?, ?)",
+            routine.title, routine.minute, ",".join(map(str, routine.weekdays)), routine.color)
+
+    def update(self, routine: Routine):
+        self._write("UPDATE routines SET title = ?, start_min = ?, weekdays = ?, color = ?"
+                    " WHERE id = ?", routine.title, routine.minute,
+                    ",".join(map(str, routine.weekdays)), routine.color, routine.id)
+
+    def delete(self, routine_id):
+        self._write("DELETE FROM routines WHERE id = ?", routine_id)
 
 
 class SqliteTaskRepository(_Repo):
@@ -295,6 +323,31 @@ class SqliteJournalRepository(_Repo):
                         day.isoformat(), body)
         else:
             self._write("DELETE FROM journal WHERE day = ?", day.isoformat())
+
+
+class SqliteSleepRepository(_Repo):
+    @staticmethod
+    def _log(r) -> SleepLog:
+        return SleepLog(date.fromisoformat(r["day"]), r["asleep"], r["woke"], r["quality"], r["note"])
+
+    def get(self, day):
+        r = self._one("SELECT * FROM sleep_logs WHERE day = ?", day.isoformat())
+        return self._log(r) if r else None
+
+    def between(self, first, last):
+        return [self._log(r) for r in self._all(
+            "SELECT * FROM sleep_logs WHERE day BETWEEN ? AND ? ORDER BY day",
+            first.isoformat(), last.isoformat())]
+
+    def put(self, log: SleepLog):
+        self._write("INSERT INTO sleep_logs (day, asleep, woke, quality, note)"
+                    " VALUES (?, ?, ?, ?, ?) ON CONFLICT(day) DO UPDATE SET"
+                    " asleep = excluded.asleep, woke = excluded.woke,"
+                    " quality = excluded.quality, note = excluded.note",
+                    log.day.isoformat(), log.asleep, log.woke, log.quality, log.note)
+
+    def delete(self, day):
+        self._write("DELETE FROM sleep_logs WHERE day = ?", day.isoformat())
 
 
 class SqliteSchoolRecordRepository(_Repo):

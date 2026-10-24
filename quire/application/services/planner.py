@@ -2,14 +2,18 @@ from __future__ import annotations
 
 from datetime import date, timedelta
 
-from ...domain import Course, Event, NotFound, TimeRange, work_shifts
+from ...domain import (
+    Course, Event, NotFound, Routine, TimeRange, milestone_time, work_shifts,
+)
 from ..bus import ChangeBus, Topic
 from ..dto import AgendaItem, DayAgenda, ItemKind, TaskItem, WeekAgenda
-from ..inputs import EventInput
-from ..records import EventRecord, course_record, event_record, span, task_record
+from ..inputs import EventInput, RoutineInput
+from ..records import (
+    EventRecord, RoutineRecord, course_record, event_record, routine_record, span, task_record,
+)
 from ..ports import (
-    Clock, CourseRepository, EventRepository, JobRepository, JournalRepository, ShiftRepository,
-    TaskRepository,
+    Clock, CourseRepository, EventRepository, JobRepository, JournalRepository, RoutineRepository,
+    ShiftRepository, TaskRepository,
 )
 from .work import shift_agenda_items
 
@@ -35,12 +39,20 @@ def _event_item(e: Event) -> AgendaItem:
                       details=e.details)
 
 
+def _routine_items(routines: list[Routine], day: date) -> list[AgendaItem]:
+    return [AgendaItem(ItemKind.ROUTINE, r.id, day, span(milestone_time(r.minute)), r.title,
+                       r.color, details="")
+            for r in routines if r.occurs_on(day)]
+
+
 class PlannerService:
     """Use cases for the day planner and the weekly view."""
 
     def __init__(self, courses: CourseRepository, events: EventRepository,
                  tasks: TaskRepository, journal: JournalRepository, clock: Clock,
-                 bus: ChangeBus, jobs: JobRepository, shifts: ShiftRepository):
+                 bus: ChangeBus, jobs: JobRepository, shifts: ShiftRepository,
+                 routines: RoutineRepository):
+        self._routines = routines
         self._jobs = jobs
         self._shifts = shifts
         self._courses = courses
@@ -67,7 +79,9 @@ class PlannerService:
         """Every class, event and shift segment on days first..last."""
         courses = self._courses.list()
         days = [first + timedelta(days=n) for n in range((last - first).days + 1)]
+        routines = self._routines.list()
         return ([i for d in days for i in _class_items(courses, d)]
+                + [i for d in days for i in _routine_items(routines, d)]
                 + [_event_item(e) for e in self._events.between(first, last)]
                 + self._shift_items(first, last))
 
@@ -75,6 +89,7 @@ class PlannerService:
         today = self._clock.today()
         courses = self._courses.list()
         items = (_class_items(courses, day)
+                 + _routine_items(self._routines.list(), day)
                  + [_event_item(e) for e in self._events.between(day, day)]
                  + self._shift_items(day, day))
         items.sort(key=lambda i: (i.time.start, i.time.end))
@@ -101,6 +116,7 @@ class PlannerService:
         sunday = monday + timedelta(days=6)
         courses = self._courses.list()
         events = self._events.between(monday, sunday)
+        routines = self._routines.list()
         shifts = self._shift_items(monday, sunday)
         weekend = (any(s.weekday >= 5 for c in courses for s in c.slots)
                    or any(e.day.weekday() >= 5 for e in events)
@@ -109,6 +125,7 @@ class PlannerService:
 
         items = [item for d in days for item in _class_items(courses, d)]
         items += [_event_item(e) for e in events if e.day in days]
+        items += [i for d in days for i in _routine_items(routines, d)]
         items += [i for i in shifts if i.day in days]
         today = self._clock.today()
         today_index = days.index(today) if today in days else None
@@ -124,7 +141,7 @@ class PlannerService:
         return event_record(self._event(event_id))
 
     def save_event(self, event_id: int | None, data: EventInput) -> int:
-        time = TimeRange(data.start, data.end)
+        time = milestone_time(data.start) if data.milestone else TimeRange(data.start, data.end)
         if event_id is None:
             event = Event(data.day, time, data.title.strip(), data.details, data.color)
         else:
@@ -141,6 +158,32 @@ class PlannerService:
 
     def delete_event(self, event_id: int):
         self._events.delete(event_id)
+        self._bus.publish(Topic.EVENTS)
+
+    def routines(self) -> list[RoutineRecord]:
+        return [routine_record(r) for r in self._routines.list()]
+
+    def routine(self, routine_id: int) -> RoutineRecord:
+        r = self._routines.get(routine_id)
+        if r is None:
+            raise NotFound(f"Routine {routine_id} does not exist.")
+        return routine_record(r)
+
+    def save_routine(self, routine_id: int | None, data: RoutineInput) -> int:
+        routine = Routine(data.title.strip(), data.minute, tuple(sorted(set(data.weekdays))),
+                          data.color, routine_id)
+        routine.validate()
+        if routine_id is None:
+            routine.id = self._routines.add(routine)
+        else:
+            if self._routines.get(routine_id) is None:
+                raise NotFound(f"Routine {routine_id} does not exist.")
+            self._routines.update(routine)
+        self._bus.publish(Topic.EVENTS)
+        return routine.id
+
+    def delete_routine(self, routine_id: int):
+        self._routines.delete(routine_id)
         self._bus.publish(Topic.EVENTS)
 
     def journal(self, day: date) -> str:

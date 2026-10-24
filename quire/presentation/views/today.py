@@ -18,7 +18,7 @@ from ...application.types import TaskKind
 from .. import icons, theme
 from ..bridge import ChangeRelay
 from ..dialogs import (
-    EventDialog, ShiftDialog, add_menu, class_menu, new_item_menu, to_qdate,
+    EventDialog, RoutineDialog, ShiftDialog, add_menu, class_menu, new_item_menu, to_qdate,
     weekly_shift_menu,
 )
 from ..formatting import KIND_LABELS, long_date, plural, relative_date, was_due
@@ -275,6 +275,8 @@ class TodayView(Page):
     def _block_activated(self, item: AgendaItem, pos):
         if item.kind is ItemKind.EVENT:
             EventDialog(self.services, item.ref_id, parent=self).exec()
+        elif item.kind is ItemKind.ROUTINE:
+            RoutineDialog(self.services, item.ref_id, parent=self).exec()
         elif item.kind is ItemKind.SHIFT:
             ShiftDialog(self.services, item.ref_id, parent=self).exec()
         elif item.kind is ItemKind.WEEKLY_SHIFT:

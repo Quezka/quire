@@ -108,6 +108,7 @@ fun SettingsScreen(container: Container, back: () -> Unit) {
                 }
             }
             RemindersPanel(container)
+            QuietPanel(container)
             UpdatesPanel(container)
             CurrencyPanel(container)
             Panel(stringResource(R.string.about)) {
@@ -281,6 +282,40 @@ private fun RemindersPanel(container: Container) {
                     android.net.Uri.parse("package:" + context.packageName)))
             }) { Text(stringResource(R.string.allow_exact_alarms)) }
         }
+    }
+}
+
+@Composable
+private fun QuietPanel(container: Container) {
+    val context = LocalContext.current
+    var settings by remember { mutableStateOf(container.quiet.settings()) }
+    var access by remember { mutableStateOf(container.quiet.hasAccess()) }
+    fun save(new: io.github.quezka.quire.domain.QuietSettings) { settings = new; container.quiet.save(new) }
+    LaunchedEffect(Unit) { access = container.quiet.hasAccess() }
+    Panel(stringResource(R.string.quiet_title)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.quiet_switch), Modifier.weight(1f))
+            Switch(settings.enabled, { save(settings.copy(enabled = it)) })
+        }
+        AnimatedVisibility(settings.enabled) {
+            Column {
+                if (!access) {
+                    Text(stringResource(R.string.quiet_no_access), color = MaterialTheme.colorScheme.error)
+                    OutlinedButton(onClick = {
+                        context.startActivity(Intent(AndroidSettings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS))
+                    }) { Text(stringResource(R.string.quiet_allow)) }
+                }
+                for ((label, value, set) in listOf(
+                    Triple(R.string.for_classes, settings.classes) { v: Boolean -> settings.copy(classes = v) },
+                    Triple(R.string.for_events, settings.events) { v: Boolean -> settings.copy(events = v) },
+                    Triple(R.string.for_shifts, settings.shifts) { v: Boolean -> settings.copy(shifts = v) },
+                )) Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(label), Modifier.weight(1f))
+                    Switch(value, { save(set(it)) })
+                }
+            }
+        }
+        Hint(stringResource(R.string.quiet_hint))
     }
 }
 

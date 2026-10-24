@@ -70,7 +70,9 @@ import io.github.quezka.quire.domain.Course
 import io.github.quezka.quire.domain.Event
 import io.github.quezka.quire.domain.ItemKind
 import io.github.quezka.quire.domain.Job
+import io.github.quezka.quire.domain.MILESTONE_MINUTES
 import io.github.quezka.quire.domain.MINUTES_PER_DAY
+import io.github.quezka.quire.domain.Routine
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Work
@@ -87,15 +89,18 @@ import java.util.Locale
 
 /** What tapping something on the timeline opens, and the "new event / new shift" sheets. */
 @Composable
-fun AgendaEditors(repo: Repository, editing: AgendaItem?, adding: ItemKind?, day: LocalDate, close: () -> Unit) {
+fun AgendaEditors(repo: Repository, editing: AgendaItem?, adding: ItemKind?, day: LocalDate,
+                  milestone: Boolean = false, close: () -> Unit) {
     var weeklyChoice by remember(editing) { mutableStateOf(editing?.takeIf { it.kind == ItemKind.SHIFT && it.weekly }) }
     var replacing by remember(editing) { mutableStateOf<AgendaItem?>(null) }
     var schedule by remember(editing) { mutableStateOf<String?>(null) }
     when {
-        adding == ItemKind.EVENT -> EventEditor(repo, null, day, close)
+        adding == ItemKind.EVENT -> EventEditor(repo, null, day, close, milestone = milestone)
+        adding == ItemKind.ROUTINE -> RoutineEditor(repo, null, close)
         adding == ItemKind.SHIFT -> ShiftEditor(repo, null, day, null, close)
         editing == null -> Unit
         editing.kind == ItemKind.EVENT -> EventEditor(repo, editing.refUid, day, close)
+        editing.kind == ItemKind.ROUTINE -> RoutineEditor(repo, editing.refUid, close)
         editing.kind == ItemKind.CLASS -> editing.refUid?.let { CourseEditor(repo, it, close) }
         schedule != null -> JobEditor(repo, schedule, close)
         replacing != null -> ShiftEditor(repo, null, editing.originDay, editing, close)
@@ -219,7 +224,7 @@ fun WeekdayChips(selected: Int, onPick: (Int) -> Unit) {
 // ---- events ----
 
 @Composable
-fun EventEditor(repo: Repository, uid: String?, day: LocalDate, close: () -> Unit) {
+fun EventEditor(repo: Repository, uid: String?, day: LocalDate, close: () -> Unit, milestone: Boolean = false) {
     val existing = remember(uid) { uid?.let(repo::event) }
     var title by remember { mutableStateOf(existing?.title.orEmpty()) }
     var date by remember { mutableStateOf(existing?.day ?: day) }
@@ -227,24 +232,61 @@ fun EventEditor(repo: Repository, uid: String?, day: LocalDate, close: () -> Uni
     var end by remember { mutableStateOf(existing?.end ?: 10 * 60) }
     var details by remember { mutableStateOf(existing?.details.orEmpty()) }
     var color by remember { mutableStateOf(existing?.color ?: "#8a8f98") }
-    EditorSheet(stringResource(if (existing == null) R.string.new_event else R.string.edit_event), close,
-        canSave = title.isNotBlank() && end > start,
+    var moment by remember { mutableStateOf(existing?.isMilestone ?: milestone) }
+    EditorSheet(stringResource(if (existing == null) (if (moment) R.string.new_milestone else R.string.new_event) else R.string.edit_event), close,
+        canSave = title.isNotBlank() && (moment || end > start),
         onSave = {
-            repo.saveEvent(Event(existing?.uid ?: Codec.newUid(), date, start, end, title, details, color)); close()
+            val from = if (moment) minOf(start, MINUTES_PER_DAY - MILESTONE_MINUTES) else start
+            val until = if (moment) from + MILESTONE_MINUTES else end
+            repo.saveEvent(Event(existing?.uid ?: Codec.newUid(), date, from, until, title, details, color)); close()
         },
         onDelete = existing?.let { { repo.deleteEvent(it.uid); close() } }) {
         OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(),
             placeholder = { Text(stringResource(R.string.event_title_hint)) },
             textStyle = MaterialTheme.typography.titleMedium)
         DateButton(date, repo.today(), { date = it })
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-            TimeButton(stringResource(R.string.from), start, { start = it; if (end <= it) end = minOf(it + 60, MINUTES_PER_DAY) })
-            TimeButton(stringResource(R.string.to), end, { end = if (it == 0) MINUTES_PER_DAY else it })
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.milestone_switch), Modifier.weight(1f))
+            Switch(moment, { moment = it })
         }
-        if (end <= start) Text(stringResource(R.string.ends_before_start), color = MaterialTheme.colorScheme.error)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (moment) {
+                TimeButton(stringResource(R.string.at_time), start, { start = it; if (end <= it) end = minOf(it + 60, MINUTES_PER_DAY) })
+            } else {
+                TimeButton(stringResource(R.string.from), start, { start = it; if (end <= it) end = minOf(it + 60, MINUTES_PER_DAY) })
+                TimeButton(stringResource(R.string.to), end, { end = if (it == 0) MINUTES_PER_DAY else it })
+            }
+        }
+        if (!moment && end <= start) Text(stringResource(R.string.ends_before_start), color = MaterialTheme.colorScheme.error)
         ColorPicker(color) { color = it }
         OutlinedTextField(details, { details = it }, Modifier.fillMaxWidth().heightIn(min = 90.dp),
             label = { Text(stringResource(R.string.details)) })
+    }
+}
+
+/** A milestone that repeats on chosen weekdays ("Wake up" at 06:00). */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun RoutineEditor(repo: Repository, uid: String?, close: () -> Unit) {
+    val existing = remember(uid) { uid?.let(repo::routine) }
+    var title by remember { mutableStateOf(existing?.title.orEmpty()) }
+    var minute by remember { mutableStateOf(existing?.minute ?: 6 * 60) }
+    var days by remember { mutableStateOf(existing?.weekdays ?: (0..6).toSet()) }
+    var color by remember { mutableStateOf(existing?.color ?: "#f5a524") }
+    EditorSheet(stringResource(if (existing == null) R.string.new_routine else R.string.edit_routine), close,
+        canSave = title.isNotBlank() && days.isNotEmpty(),
+        onSave = { repo.saveRoutine(Routine(existing?.uid ?: Codec.newUid(), title, minute, days, color)); close() },
+        onDelete = existing?.let { { repo.deleteRoutine(it.uid); close() } }) {
+        OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(),
+            placeholder = { Text(stringResource(R.string.routine_title_hint)) },
+            textStyle = MaterialTheme.typography.titleMedium)
+        TimeButton(stringResource(R.string.at_time), minute, { minute = it })
+        Text(stringResource(R.string.repeats_on), style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (d in 0..6) FilterChip(selected = d in days, onClick = { days = if (d in days) days - d else days + d },
+                label = { Text(weekdayName(d)) })
+        }
+        ColorPicker(color) { color = it }
     }
 }
 

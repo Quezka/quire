@@ -11,7 +11,7 @@ from ...application.dto import AgendaItem, ItemKind
 from ...application.services import Services
 from ..bridge import ChangeRelay
 from ..dialogs import (
-    CoursesDialog, EventDialog, JobsDialog, ShiftDialog, add_menu, class_menu, new_item_menu,
+    CoursesDialog, EventDialog, RoutineDialog, JobsDialog, ShiftDialog, add_menu, class_menu, new_item_menu,
     weekly_shift_menu,
 )
 from ..widgets import GridHeader, Slider, TimeGrid, TimelineZoom
@@ -128,6 +128,8 @@ class WeekView(Page):
     def _block_activated(self, item: AgendaItem, pos):
         if item.kind is ItemKind.EVENT:
             EventDialog(self.services, item.ref_id, parent=self).exec()
+        elif item.kind is ItemKind.ROUTINE:
+            RoutineDialog(self.services, item.ref_id, parent=self).exec()
         elif item.kind is ItemKind.SHIFT:
             ShiftDialog(self.services, item.ref_id, parent=self).exec()
         elif item.kind is ItemKind.WEEKLY_SHIFT:

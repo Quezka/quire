@@ -26,6 +26,7 @@ object WidgetAgenda {
         jobs: List<Job>,
         shifts: List<Shift>,
         tasks: List<Task>,
+        routines: List<Routine> = emptyList(),
     ): List<WidgetDay> {
         val today = now.toLocalDate()
         val minute = now.hour * 60 + now.minute
@@ -39,7 +40,7 @@ object WidgetAgenda {
                 .sortedWith(compareBy({ it.due }, { it.kind != TaskKind.EXAM }, { it.title.lowercase() }))) {
                 entries += WidgetEntry.Due(t, overdue = t.due!! < today)
             }
-            for (item in Agenda.itemsOn(day, courses, events, jobs, shifts)) {
+            for (item in Agenda.itemsOn(day, courses, events, jobs, shifts, routines)) {
                 if (offset == 0L && item.end <= minute) continue
                 entries += WidgetEntry.Timed(item)
             }

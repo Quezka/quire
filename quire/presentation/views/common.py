@@ -147,6 +147,9 @@ def agenda_block(item: AgendaItem, column: int) -> Block:
         details = [label_, item.details.splitlines()[0] if item.details else ""]
     else:
         details = [item.details.splitlines()[0] if item.details else ""]
+    if item.is_milestone:
+        return Block(column, item.time.start, item.time.end, item.title, fmt_min(item.time.start),
+                     item.color, item, milestone=True)
     when = fmt_range(item.time)
     is_shift = item.kind in (ItemKind.SHIFT, ItemKind.WEEKLY_SHIFT)
     if is_shift and item.time.end == 24 * 60:

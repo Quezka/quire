@@ -17,6 +17,8 @@ val COURSE_COLORS = listOf(
 )
 
 /** Weekdays are numbered like the desktop (Python): Monday = 0 … Sunday = 6. */
+const val MILESTONE_MINUTES = 1
+
 fun LocalDate.weekdayIndex(): Int = dayOfWeek.value - 1
 
 data class ClassSlot(val weekday: Int, val start: Int, val end: Int, val room: String = "")
@@ -41,7 +43,21 @@ data class Event(
     val title: String,
     val details: String = "",
     val color: String = "#8a8f98",
-)
+) {
+    /** A moment with no duration is stored as a one-minute event (as on the desktop). */
+    val isMilestone get() = end - start == MILESTONE_MINUTES
+}
+
+/** A milestone that repeats on chosen weekdays, such as "Wake up" at 06:00. */
+data class Routine(
+    val uid: String,
+    val title: String,
+    val minute: Int,
+    val weekdays: Set<Int> = (0..6).toSet(),
+    val color: String = "#f5a524",
+) {
+    fun occursOn(day: LocalDate) = day.weekdayIndex() in weekdays
+}
 
 enum class TaskKind(val code: String) {
     TASK("task"), HOMEWORK("homework"), ASSIGNMENT("assignment"), EXAM("exam"), READING("reading");

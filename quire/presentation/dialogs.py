@@ -15,8 +15,8 @@ from PySide6.QtWidgets import (
 from ..application.services import Services
 from ..application.errors import DomainError
 from ..application.inputs import (
-    CourseInput, EventInput, JobInput, NotebookInput, PatternInput, ShiftInput, SlotInput,
-    TaskInput,
+    CourseInput, EventInput, JobInput, NotebookInput, PatternInput, RoutineInput, ShiftInput,
+    SlotInput, TaskInput,
 )
 from ..application.records import CourseRecord, NotebookRecord
 from ..application.types import EVERY_DAY, WORK_DAYS, TaskKind
@@ -333,7 +333,7 @@ class NotebookDialog(QDialog):
 
 class EventDialog(QDialog):
     def __init__(self, services: Services, event_id=None, day: date | None = None,
-                 start: int = 9 * 60, parent=None):
+                 start: int = 9 * 60, milestone: bool = False, parent=None):
         super().__init__(parent)
         self.planner = services.planner
         self.event_id = event_id
@@ -345,20 +345,24 @@ class EventDialog(QDialog):
         self.date.setDisplayFormat("ddd d MMM yyyy")
         self.start = _time_edit(start)
         self.end = _time_edit(min(start + 60, 24 * 60 - 1))
+        self.milestone = QCheckBox(_("Milestone: a moment with no duration"))
         self.color = ColorButton("#8a8f98")
         self.details = QPlainTextEdit(placeholderText=_("Details (optional)"))
         self.details.setFixedHeight(90)
 
+        self.to_label = QLabel(_("to"))
         times = QHBoxLayout()
         times.addWidget(self.start)
-        times.addWidget(QLabel(_("to")))
+        times.addWidget(self.to_label)
         times.addWidget(self.end)
         times.addStretch()
+        self.milestone.toggled.connect(self._milestone_toggled)
 
         form = QFormLayout()
         form.addRow(_("Title"), self.title)
         form.addRow(_("Date"), self.date)
         form.addRow(_("Time"), times)
+        form.addRow("", self.milestone)
         form.addRow(_("Colour"), self.color)
         form.addRow(_("Details"), self.details)
 
@@ -372,16 +376,29 @@ class EventDialog(QDialog):
             self.date.setDate(to_qdate(e.day))
             self.start.setTime(min_to_qtime(e.time.start))
             self.end.setTime(min_to_qtime(e.time.end))
+            self.milestone.setChecked(e.is_milestone)
             self.color.setColor(e.color)
             self.details.setPlainText(e.details)
         else:
             self.date.setDate(to_qdate(day or self.planner.today()))
+            self.milestone.setChecked(milestone)
+
+    def _milestone_toggled(self, on: bool):
+        self.end.setVisible(not on)
+        self.to_label.setVisible(not on)
+        if on:
+            self.setWindowTitle(_("Edit milestone") if self.event_id else _("New milestone"))
+            self.title.setPlaceholderText(_("e.g. Wake up"))
+        else:
+            self.setWindowTitle(_("Edit event") if self.event_id else _("New event"))
+            self.title.setPlaceholderText(_("What's happening?"))
 
     def _save(self):
         def save():
             data = EventInput(self.date.date().toPython(), qtime_to_min(self.start.time()),
                               qtime_to_min(self.end.time()), self.title.text().strip(),
-                              self.details.toPlainText(), self.color.color())
+                              self.details.toPlainText(), self.color.color(),
+                              self.milestone.isChecked())
             self.planner.save_event(self.event_id, data)
 
         if attempt(self, save):
@@ -390,6 +407,72 @@ class EventDialog(QDialog):
     def _delete(self):
         if confirm(self, _("Delete event"), _("Delete this event?")):
             self.planner.delete_event(self.event_id)
+            self.accept()
+
+
+class RoutineDialog(QDialog):
+    """A milestone that repeats on chosen weekdays, like "Wake up" at 06:00 every day."""
+
+    def __init__(self, services: Services, routine_id=None, parent=None):
+        super().__init__(parent)
+        self.planner = services.planner
+        self.routine_id = routine_id
+        self.setWindowTitle(_("Edit routine") if routine_id else _("New routine"))
+        self.setMinimumWidth(420)
+
+        self.title = QLineEdit(placeholderText=_("e.g. Wake up"))
+        self.time = _time_edit(6 * 60)
+        self.color = ColorButton("#f5a524")
+        self.days = []
+        days = QHBoxLayout()
+        for weekday, name in enumerate(weekday_names()):
+            box = QCheckBox(name[:3])
+            box.setChecked(True)
+            self.days.append(box)
+            days.addWidget(box)
+        week = QHBoxLayout()
+        for text, picked in ((_("Every day"), EVERY_DAY), (_("Weekdays"), WORK_DAYS)):
+            button = QPushButton(text)
+            button.clicked.connect(lambda checked=False, p=picked: self._pick(p))
+            week.addWidget(button)
+        week.addStretch()
+
+        form = QFormLayout()
+        form.addRow(_("Title"), self.title)
+        form.addRow(_("Time"), self.time)
+        form.addRow(_("Repeats"), days)
+        form.addRow("", week)
+        form.addRow(_("Colour"), self.color)
+
+        layout = QVBoxLayout(self)
+        layout.addLayout(form)
+        layout.addWidget(_buttons(self, self._save, self._delete if routine_id else None))
+
+        if routine_id:
+            r = self.planner.routine(routine_id)
+            self.title.setText(r.title)
+            self.time.setTime(min_to_qtime(r.minute))
+            self.color.setColor(r.color)
+            self._pick(r.weekdays)
+
+    def _pick(self, weekdays):
+        for weekday, box in enumerate(self.days):
+            box.setChecked(weekday in weekdays)
+
+    def _save(self):
+        def save():
+            data = RoutineInput(self.title.text().strip(), qtime_to_min(self.time.time()),
+                                tuple(d for d, box in enumerate(self.days) if box.isChecked()),
+                                self.color.color())
+            self.planner.save_routine(self.routine_id, data)
+
+        if attempt(self, save):
+            self.accept()
+
+    def _delete(self):
+        if confirm(self, _("Delete routine"), _("Delete this routine? Every day it repeats on "
+                                                "goes with it.")):
+            self.planner.delete_routine(self.routine_id)
             self.accept()
 
 
@@ -1169,6 +1252,9 @@ def add_menu(parent, services: Services, day_provider) -> QMenu:
     menu = QMenu(parent)
     menu.addAction(_("Event…"), lambda: EventDialog(services, day=day_provider(),
                                                  parent=parent).exec())
+    menu.addAction(_("Milestone…"), lambda: EventDialog(services, day=day_provider(),
+                                                     milestone=True, parent=parent).exec())
+    menu.addAction(_("Routine…"), lambda: RoutineDialog(services, parent=parent).exec())
     menu.addAction(_("Work shift…"), lambda: ShiftDialog(services, day=day_provider(),
                                                       parent=parent).exec())
     return menu
@@ -1180,9 +1266,12 @@ def new_item_menu(parent, services: Services, day: date, minute: int, pos=None):
 
     menu = QMenu(parent)
     event = menu.addAction(_("Event…"))
+    milestone = menu.addAction(_("Milestone…"))
     shift = menu.addAction(_("Work shift…"))
     chosen = menu.exec(pos or QCursor.pos())
     if chosen is event:
         EventDialog(services, day=day, start=minute, parent=parent).exec()
+    elif chosen is milestone:
+        EventDialog(services, day=day, start=minute, milestone=True, parent=parent).exec()
     elif chosen is shift:
         ShiftDialog(services, day=day, start=minute, parent=parent).exec()

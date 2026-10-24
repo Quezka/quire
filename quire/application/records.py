@@ -11,8 +11,8 @@ from datetime import date, datetime
 
 from ..domain import (
     Absence, AbsenceKind, Book, DocumentKind, Notice, SchoolDocument,
-    Course, Event, Grade, Job, Lesson, Note, Notebook, Payslip, Shift, ShiftPattern, Subject, Task, TaskKind,
-    TimeRange,
+    Course, Event, Grade, Job, Lesson, Note, Notebook, Payslip, Routine, Shift, SleepLog, SleepStats, ShiftPattern, Subject, Task, TaskKind,
+    TimeRange, MILESTONE_MINUTES,
 )
 from ..domain.focus import FocusSettings, Phase
 
@@ -53,6 +53,45 @@ class EventRecord:
     title: str
     details: str
     color: str
+
+    @property
+    def is_milestone(self) -> bool:
+        return self.time.duration == MILESTONE_MINUTES
+
+
+@dataclass(frozen=True)
+class RoutineRecord:
+    id: int
+    title: str
+    minute: int
+    weekdays: tuple[int, ...]
+    color: str
+
+
+@dataclass(frozen=True)
+class SleepRecord:
+    day: date  # the day you woke up
+    asleep: int
+    woke: int
+    minutes: int
+    quality: int | None
+    note: str
+
+
+@dataclass(frozen=True)
+class SleepOverview:
+    """The last nights, the goal and what they add up to."""
+
+    goal_hours: float
+    wake_goal: int  # minute of day
+    bedtime_goal: int
+    nights: tuple[SleepRecord, ...]  # oldest first
+    average_minutes: int
+    average_bedtime: int | None
+    average_wake: int | None
+    average_quality: float | None
+    enough: int
+    shortfall_minutes: int
 
 
 @dataclass(frozen=True)
@@ -319,6 +358,14 @@ def notebook_record(n: Notebook, notes: int = 0) -> NotebookRecord:
 
 def event_record(e: Event) -> EventRecord:
     return EventRecord(e.id, e.day, span(e.time), e.title, e.details, e.color)
+
+
+def sleep_record(s: SleepLog) -> SleepRecord:
+    return SleepRecord(s.day, s.asleep, s.woke, s.minutes, s.quality, s.note)
+
+
+def routine_record(r: Routine) -> RoutineRecord:
+    return RoutineRecord(r.id, r.title, r.minute, tuple(r.weekdays), r.color)
 
 
 def task_record(t: Task) -> TaskRecord:

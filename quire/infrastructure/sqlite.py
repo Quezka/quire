@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 14
+SCHEMA_VERSION = 16
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -31,6 +31,13 @@ CREATE TABLE IF NOT EXISTS events (
     title     TEXT NOT NULL,
     details   TEXT NOT NULL DEFAULT '',
     color     TEXT NOT NULL DEFAULT '#8a8f98'
+);
+CREATE TABLE IF NOT EXISTS routines (
+    id        INTEGER PRIMARY KEY,
+    title     TEXT NOT NULL,
+    start_min INTEGER NOT NULL,
+    weekdays  TEXT NOT NULL DEFAULT '0,1,2,3,4,5,6',
+    color     TEXT NOT NULL DEFAULT '#f5a524'
 );
 CREATE TABLE IF NOT EXISTS tasks (
     id        INTEGER PRIMARY KEY,
@@ -65,6 +72,13 @@ CREATE TABLE IF NOT EXISTS note_images (
 CREATE TABLE IF NOT EXISTS journal (
     day  TEXT PRIMARY KEY,
     body TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS sleep_logs (
+    day     TEXT PRIMARY KEY,
+    asleep  INTEGER NOT NULL,
+    woke    INTEGER NOT NULL,
+    quality INTEGER,
+    note    TEXT NOT NULL DEFAULT ''
 );
 CREATE TABLE IF NOT EXISTS grades (
     external_id TEXT PRIMARY KEY,

@@ -12,8 +12,11 @@ import io.github.quezka.quire.domain.FocusSettings
 import io.github.quezka.quire.domain.ItemKind
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Phase
+import io.github.quezka.quire.domain.Routine
 import io.github.quezka.quire.domain.PomodoroTimer
 import io.github.quezka.quire.domain.Shift
+import io.github.quezka.quire.domain.Sleep
+import io.github.quezka.quire.domain.SleepLog
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
 import io.github.quezka.quire.domain.Work
@@ -49,6 +52,76 @@ class FeaturesTest {
     private val today = LocalDate.of(2026, 9, 23) // a Wednesday
     private fun repo(records: Records = Records(MemoryRowStore())) =
         Repository(records, today = { today }, now = { today.atTime(10, 0) })
+
+    // ---- milestones and routines ----
+
+    @Test fun aMilestoneIsAOneMinuteEvent() {
+        val repo = repo()
+        repo.saveEvent(Event(Codec.newUid(), today, 6 * 60, 6 * 60 + 1, "Take meds"))
+        repo.saveEvent(Event(Codec.newUid(), today, 8 * 60, 9 * 60, "Dentist"))
+        val items = repo.day(today).items.associateBy { it.title }
+        assertTrue(items.getValue("Take meds").isMilestone)
+        assertFalse(items.getValue("Dentist").isMilestone)
+    }
+
+    @Test fun aRoutineRepeatsOnItsWeekdaysAndKeepsTheDesktopsFormat() {
+        val repo = repo()
+        val saved = repo.saveRoutine(Routine(Codec.newUid(), "Wake up", 6 * 60, setOf(0, 1, 2, 3, 4)))
+        val wednesday = repo.day(today).items.single { it.kind == ItemKind.ROUTINE }
+        assertEquals("Wake up", wednesday.title)
+        assertTrue(wednesday.isMilestone)
+        assertEquals(6 * 60 to 6 * 60 + 1, wednesday.start to wednesday.end)
+        assertTrue(repo.day(today.plusDays(3)).items.none { it.kind == ItemKind.ROUTINE }) // Saturday
+        assertEquals(5, repo.week(today.minusDays(2)).sumOf { (_, items) -> items.count { it.kind == ItemKind.ROUTINE } })
+
+        // The record carries the same fields as the desktop's: title, start, weekdays, color.
+        val data = repo.routines().single().let { Codec.routineData(it, null) }
+        assertEquals("Wake up", (data["title"] as JsonPrimitive).content)
+        assertEquals(360, (data["start"] as JsonPrimitive).content.toInt())
+        assertEquals(saved, repo.routine(saved.uid))
+        repo.deleteRoutine(saved.uid)
+        assertTrue(repo.routines().isEmpty())
+    }
+
+    @Test fun routinesRemindLikeEventsAndReachTheBedsideClockAsEvents() {
+        val repo = repo()
+        repo.saveRoutine(Routine(Codec.newUid(), "Wake up", 11 * 60))
+        val plan = ReminderPlan.upcoming(ReminderSettings(), today.atTime(10, 0), { repo.day(it).items })
+        assertTrue(plan.any { it.item.title == "Wake up" })
+        val feed = io.github.quezka.quire.domain.Bedside.build(today.atTime(10, 0), emptyList(), emptyList(),
+            emptyList(), emptyList(), emptyList(), repo.routines())
+        assertEquals("Wake up", feed.next?.title)
+    }
+
+    // ---- sleep ----
+
+    @Test fun aNightCrossesMidnightAndStatsMatchTheDesktop() {
+        val night = SleepLog(today, 23 * 60 + 30, 6 * 60 + 15, 4)
+        assertEquals(6 * 60 + 45, night.minutes)
+        assertTrue(night.valid())
+        assertFalse(SleepLog(today, 600, 610).valid())
+        assertFalse(SleepLog(today, 600, 1400, 9).valid())
+        assertEquals(22 * 60, Sleep.bedtimeFor(6 * 60, 8.0))
+        val stats = Sleep.stats(listOf(SleepLog(today, 23 * 60, 7 * 60, 4), SleepLog(today, 60, 7 * 60, 2)), 8.0)
+        assertEquals(7 * 60, stats.averageMinutes)
+        assertEquals(0, stats.averageBedtime) // midway between 23:00 and 01:00
+        assertEquals(1, stats.enough); assertEquals(120, stats.shortfallMinutes); assertEquals(3.0, stats.averageQuality!!, 0.0)
+    }
+
+    @Test fun sleepLogsAreOnePerDayAndUseTheDesktopsFields() {
+        val repo = repo()
+        repo.saveSleep(SleepLog(today, 23 * 60, 7 * 60, 4, " ok "))
+        repo.saveSleep(SleepLog(today, 23 * 60 + 15, 7 * 60, null, "corrected"))
+        repo.saveSleep(SleepLog(today.minusDays(1), 60, 8 * 60))
+        assertEquals(listOf(today.minusDays(1), today), repo.sleepLogs().map { it.day })
+        assertEquals("corrected", repo.sleep(today)!!.note)
+        assertNull(repo.sleep(today)!!.quality)
+        val record = Codec.sleepData(repo.sleep(today)!!, null)
+        assertEquals(setOf("day", "asleep", "woke", "quality", "note"), record.keys)
+        assertEquals("day:$today", Codec.sleepUid(today))
+        repo.deleteSleep(today)
+        assertNull(repo.sleep(today))
+    }
 
     // ---- work ----
 

@@ -38,6 +38,7 @@ class Notifier(private val context: Context) {
         private val OLD_CHANNELS = listOf("reminders", "focus", "school")
         const val ACTION_REMIND = "io.github.quezka.quire.REMIND"
         const val ACTION_FOCUS = "io.github.quezka.quire.FOCUS"
+        const val ACTION_QUIET = "io.github.quezka.quire.QUIET"
         private const val FOCUS_ID = 2
         private const val SCHOOL_ID = 3
     }
@@ -81,6 +82,7 @@ class Notifier(private val context: Context) {
         val kind = context.getString(when (r.item.kind) {
             ItemKind.CLASS -> R.string.kind_class
             ItemKind.EVENT -> R.string.kind_event
+            ItemKind.ROUTINE -> R.string.kind_routine
             ItemKind.SHIFT -> R.string.kind_shift
         })
         val `when` = if (left <= 0) context.getString(R.string.starting_now)
@@ -151,9 +153,11 @@ class AlarmReceiver : BroadcastReceiver() {
         val container = context.container
         when (intent.action) {
             Notifier.ACTION_FOCUS -> container.focus.tick()
+            Notifier.ACTION_QUIET -> Unit
             else -> container.reminders.fire()
         }
         container.reminders.plan()
+        container.quiet.update()
         container.focus.planAlarm()
         // A start passed, or the clock or time zone changed.
         val pending = goAsync()

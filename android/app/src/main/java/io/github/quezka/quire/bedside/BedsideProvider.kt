@@ -53,10 +53,10 @@ class BedsideProvider : ContentProvider() {
         val c = app.container
         val repo = c.repository
         val now = repo.now()
-        val feed = Bedside.build(now, repo.courses(), repo.events(), repo.jobs(), repo.shifts(), repo.tasks())
+        val feed = Bedside.build(now, repo.courses(), repo.events(), repo.jobs(), repo.shifts(), repo.tasks(), repo.routines())
         val zone = ZoneId.systemDefault()
         fun ms(t: java.time.LocalDateTime) = t.atZone(zone).toInstant().toEpochMilli()
-        fun BedsideItem?.kind() = this?.kind?.name?.lowercase()
+        fun BedsideItem?.kind() = this?.kind?.let { if (it == io.github.quezka.quire.domain.ItemKind.ROUTINE) "event" else it.name.lowercase() }
 
         // The focus timer counts only while it runs; a paused or idle timer shows nothing.
         val focus = c.focus.timer

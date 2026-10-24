@@ -10,6 +10,8 @@ import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
 import io.github.quezka.quire.domain.Notebook
 import io.github.quezka.quire.domain.Payslip
+import io.github.quezka.quire.domain.Routine
+import io.github.quezka.quire.domain.SleepLog
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
@@ -65,6 +67,20 @@ class Repository(
 
     fun events(): List<Event> = records.live("event").mapNotNull(Codec::event)
     fun event(uid: String): Event? = records.get("event", uid)?.let(Codec::event)
+    fun sleepLogs(): List<SleepLog> = records.live("sleep").mapNotNull(Codec::sleep).sortedBy { it.day }
+    fun sleep(day: LocalDate): SleepLog? = records.get("sleep", Codec.sleepUid(day))?.let(Codec::sleep)
+    fun saveSleep(log: SleepLog) {
+        require(log.valid()) { "Not a night's sleep" }
+        val uid = Codec.sleepUid(log.day)
+        records.save("sleep", uid, Codec.sleepData(log.copy(note = log.note.trim()), records.get("sleep", uid)?.data))
+        changed()
+    }
+    fun deleteSleep(day: LocalDate) {
+        records.delete("sleep", Codec.sleepUid(day))
+        changed()
+    }
+    fun routines(): List<Routine> = records.live("routine").map(Codec::routine)
+    fun routine(uid: String): Routine? = records.get("routine", uid)?.let(Codec::routine)
     fun tasks(): List<Task> = distinctImports(records.live("task")).first.map(Codec::task)
     fun task(uid: String): Task? = records.get("task", uid)?.let(Codec::task)
     fun notes(): List<Note> = records.live("note").map(Codec::note)
@@ -82,14 +98,15 @@ class Repository(
     fun journal(day: LocalDate): String = Codec.journalBody(records.get("journal", Codec.journalUid(day)))
 
     fun day(day: LocalDate): DayAgenda {
-        val items = Agenda.itemsOn(day, courses(), events(), jobs(), shifts())
+        val items = Agenda.itemsOn(day, courses(), events(), jobs(), shifts(), routines())
         return DayAgenda(day, items, Agenda.tasksFor(day, today(), tasks()), journal(day))
     }
 
     /** The seven days from [monday], each with its timeline items. */
     fun week(monday: LocalDate): List<Pair<LocalDate, List<AgendaItem>>> {
         val courses = courses(); val events = events(); val jobs = jobs(); val shifts = shifts()
-        return (0L..6L).map { monday.plusDays(it) }.map { it to Agenda.itemsOn(it, courses, events, jobs, shifts) }
+        val routines = routines()
+        return (0L..6L).map { monday.plusDays(it) }.map { it to Agenda.itemsOn(it, courses, events, jobs, shifts, routines) }
     }
 
     fun tasksDue(first: LocalDate, last: LocalDate): List<Task> =
@@ -167,6 +184,19 @@ class Repository(
 
     fun deleteEvent(uid: String) {
         records.delete("event", uid)
+        changed()
+    }
+
+    fun saveRoutine(routine: Routine): Routine {
+        val saved = routine.copy(title = routine.title.trim().ifEmpty { "Untitled routine" },
+            weekdays = routine.weekdays.ifEmpty { (0..6).toSet() })
+        records.save("routine", saved.uid, Codec.routineData(saved, records.get("routine", saved.uid)?.data))
+        changed()
+        return saved
+    }
+
+    fun deleteRoutine(uid: String) {
+        records.delete("routine", uid)
         changed()
     }
 

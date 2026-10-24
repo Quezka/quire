@@ -184,6 +184,22 @@ class FakeInstaller:
         return self.takes_over
 
 
+class FakeQuiet:
+    name = "Fake desktop"
+
+    def __init__(self, available=True):
+        self._available = available
+        self.on = False
+        self.calls = []
+
+    def available(self):
+        return self._available
+
+    def set_quiet(self, on):
+        self.on = on
+        self.calls.append(on)
+
+
 class FakeLoginItem:
     def __init__(self, supported=True):
         self._supported = supported

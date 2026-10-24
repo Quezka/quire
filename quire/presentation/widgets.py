@@ -231,6 +231,7 @@ class Block:
     # shift). It doesn't stretch the shown hours; if it ends before them, it's drawn
     # as a thin strip at the top of its day.
     carry_over: bool = False
+    milestone: bool = False  # a moment, not a span: drawn as a marker with its time
 
 
 class TimeGrid(QWidget):
@@ -422,7 +423,36 @@ class TimeGrid(QWidget):
                       int(a.green() * amount + b.green() * (1 - amount)),
                       int(a.blue() * amount + b.blue() * (1 - amount)))
 
+    def _paint_milestone(self, p, b, r, t, bold):
+        """A milestone: a diamond on the time, the title and the clock time beside it."""
+        color = QColor(b.color)
+        y = self.y_for(b.start)
+        p.setPen(QPen(color, 2, Qt.DashLine))
+        p.drawLine(QPointF(r.left(), y), QPointF(r.right(), y))
+        h = 10.0
+        diamond = QPainterPath()
+        diamond.moveTo(r.left() + h, y - h)
+        diamond.lineTo(r.left() + 2 * h, y)
+        diamond.lineTo(r.left() + h, y + h)
+        diamond.lineTo(r.left(), y)
+        diamond.closeSubpath()
+        p.fillPath(diamond, color)
+        text = f"{b.start // 60:02d}:{b.start % 60:02d}  {b.title}"
+        fm = QFontMetrics(bold)
+        label = fm.elidedText(text, Qt.ElideRight, int(r.width() - 2 * h - 12))
+        box = QRectF(r.left() + 2 * h + 6, y - fm.height() / 2 - 2,
+                     fm.horizontalAdvance(label) + 12, fm.height() + 4)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(t.surface))
+        p.drawRoundedRect(box, 6, 6)
+        p.setFont(bold)
+        p.setPen(QColor(t.text))
+        p.drawText(box.adjusted(6, 0, -6, 0), Qt.AlignLeft | Qt.AlignVCenter, label)
+
     def _paint_block(self, p, b, r, t, bold, small):
+        if b.milestone:
+            self._paint_milestone(p, b, r, t, bold)
+            return
         path = QPainterPath()
         path.addRoundedRect(r, 8, 8)
         p.fillPath(path, self._mix(b.color, t.surface, 0.30 if t.dark else 0.16))

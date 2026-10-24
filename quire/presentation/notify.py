@@ -47,6 +47,16 @@ def _relay() -> _Clicks:
     return _clicks
 
 
+def share_tray(icon: QSystemTrayIcon) -> None:
+    """Show balloons from the app's own tray icon. Without this, the first notification
+    on Windows made a second icon next to it."""
+    global _tray
+    _tray = icon
+    if not getattr(icon, "_quire_click_hooked", False):
+        icon.messageClicked.connect(lambda: _relay().clicked.emit())
+        icon._quire_click_hooked = True
+
+
 def on_click(handler: Callable[[], None]) -> None:
     """Call `handler` (bring the window back) whenever a notification is clicked."""
     _relay().clicked.connect(handler)

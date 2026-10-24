@@ -48,6 +48,7 @@ def run(services: Services, argv: list[str], background: bool = False,
     single.activated.connect(window.bring_back)
     notify.on_click(window.bring_back)  # clicking a notification opens Quire
     if tray is not None:
+        notify.share_tray(tray.icon)
         tray.show()
         # Closing the window keeps Quire in the tray; quitting is explicit.
         app.setQuitOnLastWindowClosed(False)
@@ -55,6 +56,11 @@ def run(services: Services, argv: list[str], background: bool = False,
     # However Quire quits (Ctrl+Q, the tray, an update, logging out), a focus session
     # under way still adds the minutes spent so far.
     app.aboutToQuit.connect(services.focus.stop)
+    # The same for Do Not Disturb: leaving Quire never leaves the desktop silenced.
+    from .quiet import QuietRunner
+    QuietRunner(services, app)
+    services.quiet.release()  # a crash while quiet left it on
+    app.aboutToQuit.connect(services.quiet.release)
     if splash is not None:
         splash.step(_("Ready"), 1.0)
     if not (background and tray is not None):

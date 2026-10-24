@@ -9,7 +9,7 @@ from .formatting import fmt_min, fmt_range
 from .i18n import N_, Translated, _
 from .notify import notify
 
-KIND_NAMES = Translated({ItemKind.CLASS: N_("Class"), ItemKind.EVENT: N_("Event"),
+KIND_NAMES = Translated({ItemKind.CLASS: N_("Class"), ItemKind.EVENT: N_("Event"), ItemKind.ROUTINE: N_("Routine"),
                          ItemKind.SHIFT: N_("Work shift"), ItemKind.WEEKLY_SHIFT: N_("Work shift")})
 
 
@@ -23,7 +23,7 @@ def reminder_body(r: Reminder) -> str:
     item = r.item
     # A shift past midnight comes as its first part, which ends at 24:00: show the start only.
     when = (_("from {time}").format(time=fmt_min(item.time.start))
-            if item.time.end >= 24 * 60 else fmt_range(item.time))
+            if item.time.end >= 24 * 60 or item.is_milestone else fmt_range(item.time))
     parts = [KIND_NAMES[item.kind], when] + ([item.room] if item.room else [])
     text = " · ".join(parts)
     if item.details.strip():

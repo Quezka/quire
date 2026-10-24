@@ -3,6 +3,8 @@ package io.github.quezka.quire.data
 import io.github.quezka.quire.domain.ClassSlot
 import io.github.quezka.quire.domain.Course
 import io.github.quezka.quire.domain.Event
+import io.github.quezka.quire.domain.Routine
+import io.github.quezka.quire.domain.SleepLog
 import io.github.quezka.quire.domain.FocusSession
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
@@ -100,6 +102,39 @@ object Codec {
         "day" to JsonPrimitive(e.day.toString()), "start" to JsonPrimitive(e.start),
         "end" to JsonPrimitive(e.end), "title" to JsonPrimitive(e.title),
         "details" to JsonPrimitive(e.details), "color" to JsonPrimitive(e.color),
+    ))
+
+    // ---- sleep: one record per day, like the journal ----
+
+    fun sleepUid(day: LocalDate) = "day:$day"
+
+    fun sleep(r: SyncRecord): SleepLog? {
+        val d = r.data!!
+        val day = date(d.strOrNull("day")) ?: return null
+        return SleepLog(day, d.int("asleep"), d.int("woke"), (d["quality"] as? JsonPrimitive)?.content?.toIntOrNull(),
+            d.str("note"))
+    }
+
+    fun sleepData(s: SleepLog, previous: JsonObject?) = merged(previous, mapOf(
+        "day" to JsonPrimitive(s.day.toString()), "asleep" to JsonPrimitive(s.asleep),
+        "woke" to JsonPrimitive(s.woke), "note" to JsonPrimitive(s.note),
+        "quality" to (s.quality?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
+    ))
+
+    // ---- routines ----
+
+    fun routine(r: SyncRecord): Routine {
+        val d = r.data!!
+        val days = (d["weekdays"] as? kotlinx.serialization.json.JsonArray)
+            ?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() }?.toSet()
+            ?.takeIf { it.isNotEmpty() } ?: (0..6).toSet()
+        return Routine(r.uid, d.str("title"), d.int("start"), days, d.str("color", "#f5a524"))
+    }
+
+    fun routineData(r: Routine, previous: JsonObject?) = merged(previous, mapOf(
+        "title" to JsonPrimitive(r.title), "start" to JsonPrimitive(r.minute),
+        "color" to JsonPrimitive(r.color),
+        "weekdays" to kotlinx.serialization.json.JsonArray(r.weekdays.sorted().map { JsonPrimitive(it) }),
     ))
 
     // ---- tasks ----

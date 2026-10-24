@@ -44,6 +44,7 @@ import io.github.quezka.quire.ui.NotesScreen
 import io.github.quezka.quire.ui.QuireTheme
 import io.github.quezka.quire.ui.SchoolScreen
 import io.github.quezka.quire.ui.SettingsScreen
+import io.github.quezka.quire.ui.SleepScreen
 import io.github.quezka.quire.ui.TaskEditor
 import io.github.quezka.quire.ui.TasksScreen
 import io.github.quezka.quire.ui.TodayScreen
@@ -52,7 +53,7 @@ import io.github.quezka.quire.ui.WorkScreen
 import java.time.LocalDate
 
 /** Pages reached from the More tab. */
-enum class Page { SCHOOL, WORK, FOCUS, COURSES, SETTINGS }
+enum class Page { SCHOOL, WORK, FOCUS, SLEEP, COURSES, SETTINGS }
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -171,6 +172,7 @@ private fun MorePages(container: Container, version: Int, page: Page?, open: (Pa
             Page.SCHOOL -> SchoolScreen(container, version, back)
             Page.WORK -> WorkScreen(container.repository, version, back)
             Page.FOCUS -> FocusScreen(container, version, back)
+            Page.SLEEP -> SleepScreen(container, version, back)
             Page.COURSES -> CoursesScreen(container.repository, version, back)
             Page.SETTINGS -> SettingsScreen(container, back)
         }

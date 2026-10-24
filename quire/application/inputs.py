@@ -36,6 +36,24 @@ class EventInput:
     title: str
     details: str = ""
     color: str = "#8a8f98"
+    milestone: bool = False  # a point in time with no duration; `end` is ignored
+
+
+@dataclass(frozen=True)
+class SleepInput:
+    day: date  # the day you woke up
+    asleep: int
+    woke: int
+    quality: int | None = None
+    note: str = ""
+
+
+@dataclass(frozen=True)
+class RoutineInput:
+    title: str
+    minute: int
+    weekdays: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
+    color: str = "#f5a524"
 
 
 @dataclass(frozen=True)

@@ -10,7 +10,7 @@ from PySide6.QtWidgets import (
 
 from .. import __version__
 from ..application.errors import ApplicationError
-from ..application.services import ReminderSettings, Services
+from ..application.services import QuietSettings, ReminderSettings, Services
 from . import theme
 from .formatting import money
 from .notify import play_chime
@@ -117,6 +117,30 @@ class SettingsDialog(QDialog):
         remind_hint.setWordWrap(True)
         self._reminders_changed(save=False)
 
+        quiet = services.quiet.settings()
+        self.quiet_on = QCheckBox(_("Silence notifications while things are on"), checked=quiet.enabled)
+        self.quiet_classes = QCheckBox(_("Classes"), checked=quiet.classes)
+        self.quiet_events = QCheckBox(_("Events"), checked=quiet.events)
+        self.quiet_shifts = QCheckBox(_("Work shifts"), checked=quiet.shifts)
+        quiet_kinds = QHBoxLayout()
+        quiet_kinds.setSpacing(18)
+        for box in (self.quiet_classes, self.quiet_events, self.quiet_shifts):
+            quiet_kinds.addWidget(box)
+            box.toggled.connect(lambda _on: self._quiet_changed())
+        quiet_kinds.addStretch()
+        self.quiet_on.toggled.connect(lambda _on: self._quiet_changed())
+        supported = services.quiet.available()
+        quiet_hint = QLabel(
+            _("Turns Do Not Disturb on for {desktop} from the start to the end of each one, "
+              "while Quire is open, and puts it back afterwards. Milestones and routines "
+              "never silence anything.").format(desktop=services.quiet.method())
+            if supported else
+            _("Quire can't switch Do Not Disturb on this desktop yet (GNOME only for now)."),
+            objectName="hint")
+        quiet_hint.setWordWrap(True)
+        self.quiet_on.setEnabled(supported)
+        self._quiet_changed(save=False)
+
         self.sync_status = QLabel(objectName="hint")
         self.sync_status.setWordWrap(True)
         self.sync_setup = QPushButton()
@@ -189,6 +213,10 @@ class SettingsDialog(QDialog):
         form.addRow(_("For"), remind_kinds)
         form.addRow("", remind_hint)
         form.addRow(_("Sound"), chime_row)
+        form.addRow(self._section(_("Do Not Disturb")))
+        form.addRow("", self.quiet_on)
+        form.addRow(_("For"), quiet_kinds)
+        form.addRow("", quiet_hint)
 
         right.addRow(self._section(_("Sync")))
         right.addRow(self.sync_status)
@@ -251,6 +279,15 @@ class SettingsDialog(QDialog):
             self.services.reminders.save_settings(ReminderSettings(
                 self.remind.currentData(), self.remind_events.isChecked(),
                 self.remind_classes.isChecked(), self.remind_shifts.isChecked()))
+
+    def _quiet_changed(self, save: bool = True):
+        on = self.quiet_on.isChecked() and self.quiet_on.isEnabled()
+        for box in (self.quiet_classes, self.quiet_events, self.quiet_shifts):
+            box.setEnabled(on)
+        if save:
+            self.services.quiet.save_settings(QuietSettings(
+                self.quiet_on.isChecked(), self.quiet_classes.isChecked(),
+                self.quiet_events.isChecked(), self.quiet_shifts.isChecked()))
 
     def _show_sync(self):
         from .sync_ui import status_text

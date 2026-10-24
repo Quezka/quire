@@ -67,7 +67,7 @@ class AgendaWidget : GlanceAppWidget() {
         val repo = context.container.repository
         val (now, days) = withContext(Dispatchers.IO) {
             repo.now() to WidgetAgenda.build(repo.now(), repo.courses(), repo.events(), repo.jobs(),
-                repo.shifts(), repo.tasks())
+                repo.shifts(), repo.tasks(), repo.routines())
         }
         provideContent { GlanceTheme { Content(context, now.toLocalDate(), days) } }
     }
@@ -150,7 +150,7 @@ private fun TimedRow(context: Context, entry: WidgetEntry.Timed) {
     val item = entry.item
     val tag = when (item.kind) {
         ItemKind.CLASS -> item.room
-        ItemKind.EVENT -> ""
+        ItemKind.EVENT, ItemKind.ROUTINE -> ""
         ItemKind.SHIFT -> context.getString(R.string.kind_shift)
     }
     Row(GlanceModifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)

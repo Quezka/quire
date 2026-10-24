@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, timedelta
 
 import pytest
 
@@ -46,6 +46,32 @@ def test_course_room_falls_back_to_default():
 def test_event_requires_title():
     with pytest.raises(ValidationError):
         Event(TODAY, TimeRange(540, 600), "").validate()
+
+
+def test_sleep_log_crosses_midnight_and_checks_its_limits():
+    from quire.domain import SleepLog, bedtime_for, sleep_stats
+    night = SleepLog(TODAY, 23 * 60 + 30, 6 * 60 + 15, 4)
+    night.validate()
+    assert night.minutes == 6 * 60 + 45
+    assert night.fell_asleep_on == TODAY - timedelta(days=1)
+    assert SleepLog(TODAY, 1 * 60, 7 * 60).fell_asleep_on == TODAY  # fell asleep after midnight
+    for bad in (SleepLog(TODAY, 600, 610), SleepLog(TODAY, 0, 1100), SleepLog(TODAY, 600, 1400, 9)):
+        with pytest.raises(ValidationError):
+            bad.validate()
+    assert bedtime_for(6 * 60, 8) == 22 * 60 and bedtime_for(1 * 60, 8) == 17 * 60
+
+    stats = sleep_stats([SleepLog(TODAY, 23 * 60, 7 * 60, 4), SleepLog(TODAY, 1 * 60, 7 * 60, 2)], 8)
+    assert stats.nights == 2 and stats.average_minutes == 7 * 60
+    assert stats.average_bedtime == 0  # midway between 23:00 and 01:00
+    assert stats.enough == 1 and stats.shortfall_minutes == 120 and stats.average_quality == 3
+    assert sleep_stats([], 8).nights == 0
+
+
+def test_milestone_has_no_duration_beyond_the_minimum():
+    from quire.domain import milestone_time
+    assert Event(TODAY, milestone_time(360), "Wake up").is_milestone
+    assert not Event(TODAY, TimeRange(360, 420), "Run").is_milestone
+    assert milestone_time(24 * 60).end == 24 * 60  # clamped into the day
 
 
 @pytest.mark.parametrize("due, done, bucket", [

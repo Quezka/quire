@@ -8,13 +8,14 @@ from dataclasses import dataclass
 from datetime import date, datetime
 from enum import Enum
 
-from .records import CourseRecord, JobRecord, NotebookRecord, ShiftRecord, TaskRecord, TimeSpan
+from .records import MILESTONE_MINUTES, CourseRecord, JobRecord, NotebookRecord, ShiftRecord, TaskRecord, TimeSpan
 from .types import DueBucket
 
 
 class ItemKind(Enum):
     CLASS = "class"
     EVENT = "event"
+    ROUTINE = "routine"  # a repeating milestone; ref_id is the routine id
     SHIFT = "shift"  # a one-off shift; ref_id is the shift id
     WEEKLY_SHIFT = "weekly_shift"  # from a job's weekly schedule; ref_id is the job id
 
@@ -33,6 +34,10 @@ class AgendaItem:
     # For items that aren't stored on their own (weekly shifts) or span midnight:
     # the day and minute the whole item starts.
     origin: tuple[date, int] | None = None
+
+    @property
+    def is_milestone(self) -> bool:
+        return self.kind in (ItemKind.EVENT, ItemKind.ROUTINE) and self.time.duration == MILESTONE_MINUTES
 
 
 @dataclass(frozen=True)

@@ -15,6 +15,7 @@ from .errors import ValidationError
 from .payroll import PAY_MODES, TAX_MODELS, PayTerms
 
 MINUTES_PER_DAY = 24 * 60
+MILESTONE_MINUTES = 1  # a milestone is stored as an event one minute long
 UPCOMING_DAYS = 7
 COURSE_COLORS = (
     "#4f7cff", "#e5484d", "#30a46c", "#f5a524", "#8e4ec6",
@@ -94,6 +95,38 @@ class Event:
     def validate(self):
         if not self.title.strip():
             raise ValidationError("Give the event a title.")
+
+    @property
+    def is_milestone(self) -> bool:
+        return self.time.duration == MILESTONE_MINUTES
+
+
+def milestone_time(minute: int) -> TimeRange:
+    """The stored span of a milestone at `minute`: no duration, so the shortest one."""
+    start = min(minute, MINUTES_PER_DAY - MILESTONE_MINUTES)
+    return TimeRange(start, start + MILESTONE_MINUTES)
+
+
+@dataclass
+class Routine:
+    """A milestone that repeats on chosen weekdays, such as "Wake up" at 06:00."""
+
+    title: str
+    minute: int
+    weekdays: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
+    color: str = "#f5a524"
+    id: int | None = None
+
+    def validate(self):
+        if not self.title.strip():
+            raise ValidationError("Give the routine a title.")
+        if not 0 <= self.minute < MINUTES_PER_DAY:
+            raise ValidationError("The time must fall within a single day.")
+        if not self.weekdays or any(not 0 <= d <= 6 for d in self.weekdays):
+            raise ValidationError("Pick at least one day of the week.")
+
+    def occurs_on(self, day: date) -> bool:
+        return day.weekday() in self.weekdays
 
 
 class TaskKind(str, Enum):

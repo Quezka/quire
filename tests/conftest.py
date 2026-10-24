@@ -9,7 +9,7 @@ from quire.bootstrap import build_services
 from quire.infrastructure.credentials import MemoryCredentialStore
 
 from .fakes import (
-    FakeCloud, FakeDiagrams, FakeInstaller, FakeLoginItem, FakeRegister, FakeReleases,
+    FakeCloud, FakeDiagrams, FakeInstaller, FakeLoginItem, FakeQuiet, FakeRegister, FakeReleases,
 )
 
 # A Wednesday.
@@ -68,10 +68,15 @@ def diagrams():
 
 
 @pytest.fixture
-def services(clock, register, credentials, cloud, releases, installer, login_item, diagrams):
+def quiet():
+    return FakeQuiet()
+
+
+@pytest.fixture
+def services(clock, register, credentials, cloud, releases, installer, login_item, diagrams, quiet):
     services, db = build_services(":memory:", clock, register, credentials, cloud,
                                   MemoryCredentialStore(), releases, installer, login_item,
-                                  diagrams)
+                                  diagrams, quiet)
     yield services
     db.close()
 

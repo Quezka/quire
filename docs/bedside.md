@@ -18,5 +18,7 @@ The Android app exposes a read-only `ContentProvider` so that one other app on t
 | `task_title`, `task_due_epoch_day` | the most urgent of those (exams first) |
 | `focus_phase` (`work`/`short_break`/`long_break`), `focus_ends_ms`, `focus_label` | the focus timer while it runs, else null |
 
+Routines (repeating milestones) reach the clock as `event`s, so the contract has no new kind.
+
 The rules are `domain/Bedside.kt` (pure, tested by `BedsideTest`); the provider is `bedside/BedsideProvider.kt`.
 Vesper mirrors the contract in its `domain/QuireFeed.kt` and `data/QuireLink.kt`: keep both sides in step.

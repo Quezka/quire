@@ -4,6 +4,29 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.34.0] - 2026-10-24
+
+### Added
+- **Milestones.** An event can now be a moment with no duration, such as "Wake up at 6:00". Add one from "+ Add →
+  Milestone…" or by double-clicking an empty time. It shows as a marker on the timeline, and the Vesper clock counts
+  down to it like any other event.
+- **Routines.** A milestone can repeat on chosen weekdays ("Wake up" at 6:00, Monday to Friday): "+ Add → Routine…".
+  Routines show on Today and Week, send reminders, sync between devices and reach the Vesper clock.
+- **Sleep tracking.** A new Sleep page (desktop) and Sleep screen under More (phone): log when you fell asleep and
+  woke up, rate the night, set a goal (hours and wake-up time) and see when to be in bed. The last two weeks show as
+  bars with how many nights reached the goal. Nights sync between devices.
+- **Do Not Disturb while things are on.** In Settings, Quire can silence notifications from the start to the end of
+  each class, event or work shift, then put things back. On the phone it sets Do Not Disturb (alarms only) and needs
+  "Do Not Disturb access"; on the desktop it works on GNOME (Ubuntu) while Quire is open. Milestones and routines
+  never silence anything.
+- **Phone:** milestones and routines can be added and edited, and routines show on Today, Week, the widget and the
+  Vesper clock (as events).
+
+### Fixed
+- On the phone, the keyboard covered the day's note on Today; the page now lifts above it.
+- On Windows, Quire could show two tray icons after the first notification; notifications now use the tray icon
+  Quire already has.
+
 ## [0.33.0] - 2026-10-20
 
 ### Added

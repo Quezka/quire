@@ -145,3 +145,25 @@ def test_v13_jobs_gain_monthly_pay_and_the_italian_tax_model(tmp_path):
     assert row["monthly_pay"] is None and row["contract_start"] is None
     assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
     db.close()
+
+
+def test_v14_databases_gain_routines_and_sleep_logs(tmp_path):
+    path = tmp_path / "v14.db"
+    SqliteDatabase(path).close()
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            DROP TABLE routines;
+            DROP TABLE sleep_logs;
+            INSERT INTO events (day, start_min, end_min, title) VALUES ('2026-09-23', 480, 481, 'Meds');
+            PRAGMA user_version = 14;
+        """)
+    db = SqliteDatabase(path)
+    assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    assert db.conn.execute("SELECT title FROM events").fetchone()[0] == "Meds"  # kept
+    db.conn.execute("INSERT INTO routines (title, start_min) VALUES ('Wake up', 360)")
+    row = db.conn.execute("SELECT weekdays, dirty, uid FROM routines").fetchone()
+    assert row["weekdays"] == "0,1,2,3,4,5,6" and row["dirty"] == 1 and row["uid"]  # tracked for sync
+    db.conn.execute("INSERT INTO sleep_logs (day, asleep, woke) VALUES ('2026-09-23', 1380, 420)")
+    row = db.conn.execute("SELECT uid, dirty FROM sleep_logs").fetchone()
+    assert (row["uid"], row["dirty"]) == ("day:2026-09-23", 1)
+    db.close()

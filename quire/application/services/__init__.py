@@ -5,6 +5,8 @@ from dataclasses import dataclass
 from ..bus import ChangeBus
 from ..ports import Storage
 from .focus import FocusService, FocusStats
+from .quiet import QuietService, QuietSettings
+from .sleep import SleepService
 from .notes import NoteService
 from .planner import PlannerService
 from .reminders import Reminder, ReminderService, ReminderSettings
@@ -30,6 +32,8 @@ class Services:
     school_sync: SchoolSyncService  # the register account and syncing
     work: WorkService
     focus: FocusService
+    sleep: SleepService
+    quiet: QuietService  # Do Not Disturb while things are on
     reminders: ReminderService
     sync: SyncService  # between your devices, through a cloud account
     updates: UpdateService  # new versions of Quire itself
@@ -38,5 +42,5 @@ class Services:
     bus: ChangeBus
 
 
-__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "SchoolSyncService", "StartupService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
+__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "QuietService", "QuietSettings", "SchoolSyncService", "SleepService", "StartupService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
            "TimetableService", "AvailableUpdate", "UpdateService", "WorkService"]

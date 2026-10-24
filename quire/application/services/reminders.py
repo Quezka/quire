@@ -67,7 +67,7 @@ class ReminderService:
     def _wanted(self, kind: ItemKind, settings: ReminderSettings) -> bool:
         if kind is ItemKind.CLASS:
             return settings.classes
-        if kind is ItemKind.EVENT:
+        if kind in (ItemKind.EVENT, ItemKind.ROUTINE):
             return settings.events
         return settings.shifts
 

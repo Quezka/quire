@@ -25,6 +25,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -40,6 +41,8 @@ import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Event
+import androidx.compose.material.icons.filled.Flag
+import androidx.compose.material.icons.filled.Repeat
 import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.Work
 import androidx.compose.material3.Card
@@ -103,6 +106,7 @@ fun TodayScreen(repo: Repository, version: Int, openTask: (String) -> Unit, newT
     val day = dayOf(pager.currentPage)
     var editing by remember { mutableStateOf<AgendaItem?>(null) }
     var adding by remember { mutableStateOf<ItemKind?>(null) }
+    var addingMilestone by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
@@ -160,7 +164,13 @@ fun TodayScreen(repo: Repository, version: Int, openTask: (String) -> Unit, newT
                     onClick = { menu = false; newTask(day) })
                 DropdownMenuItem(text = { Text(stringResource(R.string.new_event)) },
                     leadingIcon = { Icon(Icons.Filled.Event, null) },
-                    onClick = { menu = false; adding = ItemKind.EVENT })
+                    onClick = { menu = false; addingMilestone = false; adding = ItemKind.EVENT })
+                DropdownMenuItem(text = { Text(stringResource(R.string.new_milestone)) },
+                    leadingIcon = { Icon(Icons.Filled.Flag, null) },
+                    onClick = { menu = false; addingMilestone = true; adding = ItemKind.EVENT })
+                DropdownMenuItem(text = { Text(stringResource(R.string.new_routine)) },
+                    leadingIcon = { Icon(Icons.Filled.Repeat, null) },
+                    onClick = { menu = false; adding = ItemKind.ROUTINE })
                 DropdownMenuItem(text = { Text(stringResource(R.string.new_shift)) },
                     leadingIcon = { Icon(Icons.Filled.Work, null) },
                     onClick = { menu = false; adding = ItemKind.SHIFT })
@@ -168,7 +178,7 @@ fun TodayScreen(repo: Repository, version: Int, openTask: (String) -> Unit, newT
         }
     }
 
-    AgendaEditors(repo, editing, adding, day) { editing = null; adding = null }
+    AgendaEditors(repo, editing, adding, day, milestone = addingMilestone) { editing = null; adding = null }
 }
 
 /** One day: schedule, tasks, quick add and the day note. */
@@ -178,7 +188,9 @@ private fun DayPage(repo: Repository, version: Int, day: LocalDate, today: Local
     val agenda = remember(version, day) { repo.day(day) }
     val courses = remember(version) { repo.courseIndex() }
     LazyColumn(
-        Modifier.fillMaxSize(),
+        // Edge-to-edge: the window no longer resizes for the keyboard, so lift the list
+        // above it, or the day note (the last item) is typed under the keyboard.
+        Modifier.fillMaxSize().imePadding(),
         contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 96.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -220,6 +232,7 @@ fun AgendaRow(item: AgendaItem, onClick: (() -> Unit)? = null) {
     val kind = stringResource(when (item.kind) {
         ItemKind.CLASS -> R.string.kind_class
         ItemKind.EVENT -> R.string.kind_event
+        ItemKind.ROUTINE -> R.string.kind_routine
         ItemKind.SHIFT -> R.string.kind_shift
     })
     val extra = listOf(item.room, item.teacher, item.details.lineSequence().firstOrNull().orEmpty())
@@ -239,7 +252,7 @@ fun AgendaRow(item: AgendaItem, onClick: (() -> Unit)? = null) {
                 Text(item.title, fontWeight = FontWeight.SemiBold, maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
                 val meta = buildList {
-                    add(span(item.start, item.end)); add(kind); addAll(extra)
+                    add(if (item.isMilestone) minutes(item.start) else span(item.start, item.end)); add(kind); addAll(extra)
                     if (item.continues) add(stringResource(R.string.continues_from_yesterday))
                 }
                 Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall,

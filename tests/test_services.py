@@ -6,7 +6,7 @@ from quire.application.bus import Topic
 from quire.application.dto import ItemKind
 from quire.application.errors import NotFound, ValidationError
 from quire.application.inputs import (
-    CourseInput, EventInput, NotebookInput, NoteInput, SlotInput, TaskInput,
+    CourseInput, EventInput, NotebookInput, NoteInput, RoutineInput, SleepInput, SlotInput, TaskInput,
 )
 from quire.application.types import DueBucket, TaskKind
 
@@ -54,6 +54,70 @@ def test_day_agenda_merges_classes_and_events_in_time_order(services):
     assert [(i.kind, i.title) for i in agenda.items] == [
         (ItemKind.EVENT, "Breakfast"), (ItemKind.CLASS, "Maths")]
     assert agenda.is_today and agenda.has_courses
+
+
+def test_milestone_is_a_one_minute_event_that_ignores_the_end(services):
+    services.planner.save_event(None, EventInput(TODAY, 360, 900, "Wake up", milestone=True))
+    services.planner.save_event(None, EventInput(TODAY, 1439, 0, "Last call", milestone=True))
+    services.planner.save_event(None, EventInput(TODAY, 480, 510, "Breakfast"))
+
+    items = {i.title: i for i in services.planner.day_agenda(TODAY).items}
+    wake = items["Wake up"]
+    assert (wake.time.start, wake.time.end) == (360, 361) and wake.is_milestone
+    assert items["Last call"].time.end == 1440 and items["Last call"].is_milestone
+    assert not items["Breakfast"].is_milestone
+    assert services.planner.event(wake.ref_id).is_milestone
+
+
+def test_routine_repeats_on_its_weekdays_as_a_milestone(services):
+    # TODAY is a Wednesday (2); the routine runs Monday to Friday.
+    rid = services.planner.save_routine(None, RoutineInput("Wake up", 360, (0, 1, 2, 3, 4)))
+    weekend = TODAY + timedelta(days=3)  # Saturday
+
+    on_wednesday = [i for i in services.planner.day_agenda(TODAY).items if i.title == "Wake up"]
+    assert len(on_wednesday) == 1
+    item = on_wednesday[0]
+    assert item.kind is ItemKind.ROUTINE and item.ref_id == rid and item.is_milestone
+    assert (item.time.start, item.time.end) == (360, 361)
+    assert services.planner.day_agenda(weekend).items == ()
+    assert any(i.title == "Wake up" for i in services.planner.items_between(TODAY, TODAY))
+    week = services.planner.week_agenda(TODAY)
+    assert sum(i.title == "Wake up" for i in week.items) == 5
+
+    services.planner.save_routine(rid, RoutineInput("Wake up", 390, (5,)))
+    assert services.planner.routine(rid).minute == 390
+    assert [i.title for i in services.planner.day_agenda(weekend).items] == ["Wake up"]
+    services.planner.delete_routine(rid)
+    assert services.planner.routines() == []
+
+
+def test_sleep_log_goal_and_overview(services):
+    sleep = services.sleep
+    assert sleep.goal() == (8.0, 6 * 60)
+    sleep.save_goal(7.5, 7 * 60)
+    assert sleep.goal() == (7.5, 7 * 60)
+
+    sleep.save(SleepInput(TODAY, 23 * 60, 6 * 60 + 30, 4, " woke twice "))
+    sleep.save(SleepInput(YESTERDAY, 1 * 60, 8 * 60))
+    sleep.save(SleepInput(TODAY, 23 * 60 + 30, 7 * 60, 5))  # the same night, corrected
+    last = sleep.night(TODAY)
+    assert (last.asleep, last.woke, last.minutes, last.quality) == (23 * 60 + 30, 7 * 60, 450, 5)
+
+    overview = sleep.overview()
+    assert [n.day for n in overview.nights] == [YESTERDAY, TODAY]
+    assert overview.bedtime_goal == 23 * 60 + 30 - 0  # 07:00 minus 7.5 h
+    assert overview.average_minutes == (450 + 420) // 2 and overview.enough == 2
+    sleep.delete(TODAY)
+    assert sleep.night(TODAY) is None
+    with pytest.raises(ValidationError):
+        sleep.save(SleepInput(TODAY, 600, 610))
+
+
+def test_routine_needs_a_title_and_a_day(services):
+    with pytest.raises(ValidationError):
+        services.planner.save_routine(None, RoutineInput(" ", 360))
+    with pytest.raises(ValidationError):
+        services.planner.save_routine(None, RoutineInput("Run", 360, ()))
 
 
 def test_overdue_tasks_only_follow_you_to_today(services):

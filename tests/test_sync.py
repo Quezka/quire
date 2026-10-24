@@ -9,7 +9,7 @@ from quire.application.bus import Topic
 from quire.application.errors import CloudAuthError, SyncError, SyncNotSetUp, ValidationError
 from quire.application.ports import SyncRecord
 from quire.application.inputs import (
-    CourseInput, EventInput, JobInput, NotebookInput, NoteInput, PatternInput, ShiftInput,
+    CourseInput, EventInput, JobInput, NotebookInput, NoteInput, PatternInput, RoutineInput, ShiftInput, SleepInput,
     SlotInput, TaskInput,
 )
 from quire.application.types import TaskKind
@@ -353,6 +353,52 @@ def test_focus_sessions_from_older_apps_count_as_finished(tmp_path, pair, shared
     c.sync.sync()
     assert c.focus.stats().today_sessions == 1
     db_c.close()
+
+
+def test_routines_and_milestones_reach_the_other_device(pair):
+    a, b = pair
+    rid = a.planner.save_routine(None, RoutineInput("Wake up", 360, (0, 1, 2, 3, 4), "#e5484d"))
+    a.planner.save_event(None, EventInput(TODAY, 480, 0, "Take meds", milestone=True))
+    tick()
+    a.sync.sync()
+    b.sync.sync()
+
+    routines = b.planner.routines()
+    assert [(r.title, r.minute, r.weekdays, r.color) for r in routines] == [
+        ("Wake up", 360, (0, 1, 2, 3, 4), "#e5484d")]
+    meds = [i for i in b.planner.day_agenda(TODAY).items if i.title == "Take meds"]
+    assert meds and meds[0].is_milestone
+
+    tick()
+    b.planner.save_routine(routines[0].id, RoutineInput("Wake up", 375, (0, 1, 2, 3, 4)))
+    b.sync.sync()
+    a.sync.sync()
+    assert a.planner.routine(rid).minute == 375
+    tick()
+    a.planner.delete_routine(rid)
+    a.sync.sync()
+    b.sync.sync()
+    assert b.planner.routines() == []
+
+
+def test_sleep_logs_reach_the_other_device_one_per_day(pair):
+    a, b = pair
+    a.sleep.save(SleepInput(TODAY, 23 * 60, 7 * 60, 4, "ok"))
+    b.sleep.save(SleepInput(TODAY, 22 * 60 + 45, 6 * 60 + 45))  # the same night, logged on both
+    tick()
+    a.sleep.save(SleepInput(TODAY, 23 * 60 + 15, 7 * 60, 3, "corrected"))
+    a.sync.sync()
+    b.sync.sync()
+    a.sync.sync()
+    for device in (a, b):
+        night = device.sleep.night(TODAY)
+        assert (night.asleep, night.woke, night.quality, night.note) == (23 * 60 + 15, 7 * 60, 3, "corrected")
+        assert len(device.sleep.overview().nights) == 1
+    tick()
+    b.sleep.delete(TODAY)
+    b.sync.sync()
+    a.sync.sync()
+    assert a.sleep.night(TODAY) is None
 
 
 def test_notebooks_and_the_notes_in_them_reach_the_other_device(pair):
