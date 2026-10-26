@@ -108,6 +108,9 @@ class NotesView(Page):
         self.group_btn.setChecked(QSettings().value("notes/grouped", False, type=bool))
         self.group_btn.toggled.connect(self._grouping_toggled)
         self._collapsed: set[tuple] = set()
+        self._group_keys: set[tuple] = set()  # every group heading in the list, shown or not
+        self.collapse_btn = icon_button("collapse", _("Collapse all groups"))
+        self.collapse_btn.clicked.connect(self._toggle_all_groups)
         self.list = QListWidget()
         self.list.setItemDelegate(TwoLineDelegate(self.list))
         self.list.setMouseTracking(True)
@@ -125,6 +128,7 @@ class NotesView(Page):
         filters.addWidget(self.edit_notebook_btn)
         filters.addWidget(self.notebook_btn)
         filters.addWidget(self.group_btn)
+        filters.addWidget(self.collapse_btn)
         left = Card(padding=12)
         left.setFixedWidth(310)
         left.add(self.search)
@@ -301,6 +305,8 @@ class NotesView(Page):
         self.list.blockSignals(True)
         self.list.clear()
         count = 0
+        self._group_keys = set()
+        self.collapse_btn.setVisible(self.group_btn.isChecked())
         if self.group_btn.isChecked():
             per_home: dict = {}
             for g in self.notes.grouped(text, course_id, notebook_id):
@@ -309,6 +315,7 @@ class NotesView(Page):
                 first = home_groups[0]
                 home_hidden = False
                 if not filtered:  # a single filtered class or notebook needs no heading
+                    self._group_keys.add(("home", home))
                     home_hidden = ("home", home) in self._collapsed
                     owner = first.course or first.notebook
                     self._add_header(1, owner.name if owner else _("Not filed"), ("home", home),
@@ -320,6 +327,7 @@ class NotesView(Page):
                     topic_hidden = home_hidden
                     if not only_loose:
                         topic_key = ("topic", home, g.topic)
+                        self._group_keys.add(topic_key)
                         collapsed = topic_key in self._collapsed
                         if not home_hidden:
                             self._add_header(2, g.topic or _("No topic"), topic_key, len(g.notes),
@@ -381,6 +389,14 @@ class NotesView(Page):
 
     def _grouping_toggled(self, on: bool):
         QSettings().setValue("notes/grouped", on)
+        self.reload_list()
+
+    def _toggle_all_groups(self):
+        """Close every group; when they are all closed already, open them all again."""
+        if self._group_keys <= self._collapsed:
+            self._collapsed -= self._group_keys
+        else:
+            self._collapsed |= self._group_keys
         self.reload_list()
 
     def _header_clicked(self, item: QListWidgetItem):

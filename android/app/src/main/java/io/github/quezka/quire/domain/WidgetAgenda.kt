@@ -31,6 +31,8 @@ object WidgetAgenda {
         val today = now.toLocalDate()
         val minute = now.hour * 60 + now.minute
         val open = tasks.filter { !it.done && it.due != null }
+        // Ticked off today: kept on the list, struck through, until the day is over (tap to undo).
+        val doneToday = tasks.filter { it.done && it.due == today }
         val result = mutableListOf<WidgetDay>()
         var total = 0
         for (offset in 0L until DAYS) {
@@ -40,6 +42,7 @@ object WidgetAgenda {
                 .sortedWith(compareBy({ it.due }, { it.kind != TaskKind.EXAM }, { it.title.lowercase() }))) {
                 entries += WidgetEntry.Due(t, overdue = t.due!! < today)
             }
+            if (offset == 0L) for (t in doneToday.sortedBy { it.title.lowercase() }) entries += WidgetEntry.Due(t, overdue = false)
             for (item in Agenda.itemsOn(day, courses, events, jobs, shifts, routines)) {
                 if (offset == 0L && item.end <= minute) continue
                 entries += WidgetEntry.Timed(item)

@@ -7,7 +7,7 @@ import json
 
 from ..domain import (
     Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
-    Lesson, Note, Notebook, NoteImage, Notice, NoticeAttachment, Routine, SchoolDocument, Shift, ShiftPattern, SleepLog,
+    Lesson, Note, Notebook, NoteImage, Notice, NoticeAttachment, Routine, SchoolDocument, Shift, ShiftPattern, SleepLog, WaterLog,
     Subject, Task,
     TaskKind, TimeRange,
 )
@@ -348,6 +348,24 @@ class SqliteSleepRepository(_Repo):
 
     def delete(self, day):
         self._write("DELETE FROM sleep_logs WHERE day = ?", day.isoformat())
+
+
+class SqliteWaterRepository(_Repo):
+    @staticmethod
+    def _log(r) -> WaterLog:
+        return WaterLog(date.fromisoformat(r["day"]), r["at_min"], r["ml"], r["id"])
+
+    def between(self, first, last):
+        return [self._log(r) for r in self._all(
+            "SELECT * FROM water_logs WHERE day BETWEEN ? AND ? ORDER BY day, at_min, id",
+            first.isoformat(), last.isoformat())]
+
+    def add(self, log: WaterLog) -> int:
+        return self._write("INSERT INTO water_logs (day, at_min, ml) VALUES (?, ?, ?)",
+                           log.day.isoformat(), log.at, log.ml)
+
+    def delete(self, log_id):
+        self._write("DELETE FROM water_logs WHERE id = ?", log_id)
 
 
 class SqliteSchoolRecordRepository(_Repo):

@@ -93,6 +93,32 @@ class FeaturesTest {
         assertEquals("Wake up", feed.next?.title)
     }
 
+    // ---- water ----
+
+    @Test fun theWaterGoalMatchesTheDesktop() {
+        assertEquals(2200, io.github.quezka.quire.domain.Water.goal(175.0, 70.0))
+        assertEquals(1800, io.github.quezka.quire.domain.Water.goal(160.0, 50.0))
+        assertEquals(1200, io.github.quezka.quire.domain.Water.goal(100.0, 21.0))
+        assertNull(io.github.quezka.quire.domain.Water.goal(10.0, 70.0))
+        val w = io.github.quezka.quire.domain.Water
+        assertEquals(0, w.expected(2200, 8 * 60)); assertEquals(1100, w.expected(2200, 15 * 60)); assertEquals(2200, w.expected(2200, 22 * 60))
+        assertTrue(w.reminderDue(2200, 400, 15 * 60, null))
+        assertFalse(w.reminderDue(2200, 1000, 15 * 60, null))
+        assertFalse(w.reminderDue(2200, 400, 15 * 60, 14 * 60))
+        assertTrue(w.reminderDue(2200, 400, 15 * 60, 13 * 60))
+        assertFalse(w.reminderDue(2200, 400, 23 * 60, null))
+        assertFalse(w.reminderDue(2200, 2200, 20 * 60, null))
+    }
+
+    @Test fun glassesAreLoggedPerDayAndCanBeRemoved() {
+        val repo = repo()
+        repo.addWater(250); repo.addWater(500)
+        assertEquals(750, repo.waterOn(today).sumOf { it.ml })
+        repo.deleteWater(repo.waterOn(today).first().uid)
+        assertEquals(500, repo.waterOn(today).sumOf { it.ml })
+        assertTrue(repo.waterOn(today.minusDays(1)).isEmpty())
+    }
+
     // ---- sleep ----
 
     @Test fun aNightCrossesMidnightAndStatsMatchTheDesktop() {
@@ -106,6 +132,24 @@ class FeaturesTest {
         assertEquals(7 * 60, stats.averageMinutes)
         assertEquals(0, stats.averageBedtime) // midway between 23:00 and 01:00
         assertEquals(1, stats.enough); assertEquals(120, stats.shortfallMinutes); assertEquals(3.0, stats.averageQuality!!, 0.0)
+    }
+
+    @Test fun sleepRegularityStreakAndWindDownMatchTheDesktop() {
+        val steady = (0..4).map { SleepLog(today.minusDays(it.toLong()), 23 * 60 + (if (it % 2 == 1) 10 else 0), 7 * 60) }
+        assertEquals("steady", Sleep.stats(steady, 8.0).regularity)
+        val wandering = (0..5).map { SleepLog(today.minusDays(it.toLong()), (21 + 2 * (it % 3)) * 60, 7 * 60) }
+        assertEquals("irregular", Sleep.stats(wandering, 8.0).regularity)
+        assertEquals("", Sleep.stats(steady.take(2), 8.0).regularity)
+
+        val nights = (0..3).map { SleepLog(today.minusDays(it.toLong()), 22 * 60 + 30, 7 * 60) }
+        assertEquals(4, Sleep.streak(nights, 8.0))
+        val broken = nights.toMutableList().also { it[2] = SleepLog(today.minusDays(2), 3 * 60, 7 * 60) }
+        assertEquals(2, Sleep.streak(broken, 8.0))
+        assertEquals(1, Sleep.streak(listOf(nights[0], nights[3]), 8.0)) // a gap in the days breaks it
+
+        assertTrue(Sleep.shouldWindDown(21 * 60 + 45, 22 * 60)); assertFalse(Sleep.shouldWindDown(20 * 60, 22 * 60))
+        assertFalse(Sleep.shouldWindDown(22 * 60, 22 * 60)); assertFalse(Sleep.shouldWindDown(23 * 60, 22 * 60))
+        assertTrue(Sleep.shouldWindDown(23 * 60 + 40, 0))
     }
 
     @Test fun sleepLogsAreOnePerDayAndUseTheDesktopsFields() {

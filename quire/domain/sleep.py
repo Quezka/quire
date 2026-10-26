@@ -63,6 +63,33 @@ class SleepStats:
     average_quality: float | None
     enough: int  # nights that reached the goal
     shortfall_minutes: int  # total missing against the goal over the period
+    bedtime_spread: int = 0  # how far bedtimes wander, in minutes (standard deviation)
+    streak: int = 0  # nights in a row, up to the latest, that reached the goal
+
+
+REGULAR_SPREAD = 30  # bedtimes within about half an hour: steady
+LOOSE_SPREAD = 60
+
+
+def regularity(spread: int) -> str:
+    """"steady", "mixed" or "irregular", from the spread of bedtimes."""
+    return "steady" if spread <= REGULAR_SPREAD else "mixed" if spread <= LOOSE_SPREAD else "irregular"
+
+
+def streak_of(logs: list[SleepLog], goal_hours: float) -> int:
+    goal = round(goal_hours * 60)
+    run, previous = 0, None
+    for log in sorted(logs, key=lambda x: x.day, reverse=True):
+        if log.minutes < goal * ENOUGH_RATIO or (previous is not None and (previous - log.day).days != 1):
+            break
+        run, previous = run + 1, log.day
+    return run
+
+
+def should_wind_down(minute: int, bedtime: int, lead: int = 30) -> bool:
+    """Within `lead` minutes before bedtime (measured around midnight)."""
+    ahead = (bedtime - minute) % MINUTES_PER_DAY
+    return 0 < ahead <= lead
 
 
 def sleep_stats(logs: list[SleepLog], goal_hours: float) -> SleepStats:
@@ -73,9 +100,12 @@ def sleep_stats(logs: list[SleepLog], goal_hours: float) -> SleepStats:
     bed = sum(_evening_minutes(log.asleep) for log in logs) // n
     wake = sum(log.woke for log in logs) // n
     rated = [log.quality for log in logs if log.quality]
+    evenings = [_evening_minutes(log.asleep) for log in logs]
+    mean = sum(evenings) / n
+    spread = round((sum((e - mean) ** 2 for e in evenings) / n) ** 0.5)
     return SleepStats(
         n, sum(log.minutes for log in logs) // n,
         (bed + 12 * 60) % MINUTES_PER_DAY, wake,
         sum(rated) / len(rated) if rated else None,
         sum(log.minutes >= goal * ENOUGH_RATIO for log in logs),
-        sum(max(0, goal - log.minutes) for log in logs))
+        sum(max(0, goal - log.minutes) for log in logs), spread, streak_of(logs, goal_hours))

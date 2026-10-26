@@ -172,13 +172,16 @@ private fun DueRow(context: Context, entry: WidgetEntry.Due, today: LocalDate) {
     Row(GlanceModifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
         verticalAlignment = Alignment.CenterVertically) {
         Box(GlanceModifier.size(32.dp).clickable(actionRunCallback<CompleteTask>(
-            actionParametersOf(TaskUid to task.uid))), contentAlignment = Alignment.Center) {
-            Image(ImageProvider(R.drawable.ic_widget_circle), context.getString(R.string.mark_done),
+            actionParametersOf(TaskUid to task.uid, TaskDone to !task.done))), contentAlignment = Alignment.Center) {
+            Image(ImageProvider(if (task.done) R.drawable.ic_widget_check else R.drawable.ic_widget_circle),
+                context.getString(if (task.done) R.string.mark_not_done else R.string.mark_done),
                 GlanceModifier.size(20.dp))
         }
         Spacer(GlanceModifier.width(6.dp))
         Column(GlanceModifier.defaultWeight().clickable(openApp(context, 2))) {
-            Text(task.title, maxLines = 1, style = TextStyle(color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium))
+            Text(task.title, maxLines = 1, style = TextStyle(color = if (task.done) Muted else Ink, fontSize = 14.sp,
+                fontWeight = FontWeight.Medium,
+                textDecoration = if (task.done) androidx.glance.text.TextDecoration.LineThrough else null))
             val kind = context.getString(kindLabel(task.kind))
             val note = if (entry.overdue) context.getString(R.string.was_due,
                 relativeDate(context, task.due!!, today).lowercase(Locale.getDefault())) else kind
@@ -192,11 +195,16 @@ private fun openApp(context: Context, tab: Int, newTask: Boolean = false) = acti
         .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP))
 
 private val TaskUid = ActionParameters.Key<String>("uid")
+private val TaskDone = ActionParameters.Key<Boolean>("done")
 
-/** The circle beside a task: marks it done without opening the app. */
+/** The circle beside a task: marks it done (a tick, struck through) without opening the app;
+ *  tapping the tick undoes it. The widget is redrawn here, because the app's own delayed
+ *  redraw can be lost once this callback returns and the process is frozen. */
 class CompleteTask : ActionCallback {
     override suspend fun onAction(context: Context, glanceId: GlanceId, parameters: ActionParameters) {
         val uid = parameters[TaskUid] ?: return
-        withContext(Dispatchers.IO) { context.container.repository.setDone(uid, true) }
+        val done = parameters[TaskDone] ?: true
+        withContext(Dispatchers.IO) { context.container.repository.setDone(uid, done) }
+        AgendaWidget().updateAll(context.applicationContext)
     }
 }

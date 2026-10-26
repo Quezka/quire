@@ -27,6 +27,7 @@ from .sync_ui import SyncRunner
 from .updates_ui import UpdateChecker
 from .views.focus import FocusView
 from .views.sleep import SleepView
+from .views.water import WaterView
 from .views.work import WorkView
 from .i18n import N_, _
 
@@ -82,7 +83,7 @@ class Sidebar(QFrame):
 class MainWindow(QMainWindow):
     PAGES = [("today", N_("Today")), ("week", N_("Week")), ("coursework", N_("Coursework")),
              ("notes", N_("Notes")), ("school", N_("School")), ("briefcase", N_("Work")),
-             ("timer", N_("Focus")), ("moon", N_("Sleep"))]
+             ("timer", N_("Focus")), ("moon", N_("Sleep")), ("drop", N_("Water"))]
 
     def __init__(self, services: Services, tray=None):
         super().__init__()
@@ -104,12 +105,13 @@ class MainWindow(QMainWindow):
         self.work = WorkView(services, relay)
         self.focus = FocusView(services, relay)
         self.sleep = SleepView(services, relay)
+        self.water = WaterView(services, relay)
 
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         for i, (page, (icon_name, label)) in enumerate(zip(
                 [self.today, self.week, self.coursework, self.notes, self.school, self.work,
-                 self.focus, self.sleep],
+                 self.focus, self.sleep, self.water],
                 self.PAGES)):
             self.stack.addWidget(page)
             self.sidebar.add_page(icon_name, _(label), f"Ctrl+{i + 1}")

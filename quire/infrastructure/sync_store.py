@@ -47,6 +47,7 @@ SYNCED = (
     Synced("notebook", "notebooks", RANDOM_UID),  # groups of notes, before the notes
     Synced("note", "notes", RANDOM_UID),
     Synced("journal", "journal", "'day:' || NEW.day"),
+    Synced("water", "water_logs", RANDOM_UID),  # one record per glass
     Synced("sleep", "sleep_logs", "'day:' || NEW.day"),  # one night per day, like the journal
     Synced("shift", "shifts", RANDOM_UID),
     Synced("focus", "focus_sessions", RANDOM_UID),
@@ -200,6 +201,8 @@ class SqliteSyncStore:
             return {"mime": r["mime"], "data": base64.b64encode(bytes(r["data"])).decode()}
         if kind == "journal":
             return {"day": r["day"], "body": r["body"]}
+        if kind == "water":
+            return {"day": r["day"], "at": r["at_min"], "ml": r["ml"]}
         if kind == "sleep":
             return {"day": r["day"], "asleep": r["asleep"], "woke": r["woke"],
                     "quality": r["quality"], "note": r["note"]}
@@ -298,6 +301,8 @@ class SqliteSyncStore:
             values = {"mime": d["mime"], "data": base64.b64decode(d["data"])}
         elif s.kind == "journal":
             values = {"day": d["day"], "body": d.get("body", "")}
+        elif s.kind == "water":
+            values = {"day": d["day"], "at_min": d["at"], "ml": d["ml"]}
         elif s.kind == "sleep":
             values = {"day": d["day"], "asleep": d["asleep"], "woke": d["woke"],
                       "quality": d.get("quality"), "note": d.get("note", "")}

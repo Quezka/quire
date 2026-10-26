@@ -53,6 +53,13 @@ class CompatibilityTest {
         assertEquals("woke once", night.note)
     }
 
+    @Test fun waterFromTheDesktopIsRead() {
+        val glass = repository().waterLogs().single()
+        assertEquals(300, glass.ml)
+        assertEquals(12 * 60, glass.at) // the desktop fixture's clock says 12:00
+        assertEquals(today, glass.day)
+    }
+
     @Test fun everyDesktopKindIsRead() {
         val repo = repository()
         assertEquals(6, repo.courses().size)

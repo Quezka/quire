@@ -39,6 +39,10 @@ class Notifier(private val context: Context) {
         const val ACTION_REMIND = "io.github.quezka.quire.REMIND"
         const val ACTION_FOCUS = "io.github.quezka.quire.FOCUS"
         const val ACTION_QUIET = "io.github.quezka.quire.QUIET"
+        const val ACTION_WATER = "io.github.quezka.quire.WATER"
+        const val ACTION_SLEEP = "io.github.quezka.quire.SLEEP"
+        private const val SLEEP_ID = 5
+        private const val WATER_ID = 4
         private const val FOCUS_ID = 2
         private const val SCHOOL_ID = 3
     }
@@ -110,6 +114,22 @@ class Notifier(private val context: Context) {
             .setContentIntent(openApp(MainActivity.TAB_FOCUS)).setAutoCancel(true))
     }
 
+    fun windDown(bedtime: Int) {
+        post(SLEEP_ID, NotificationCompat.Builder(context, REMINDERS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.sleep_wind_down_title))
+            .setContentText(context.getString(R.string.sleep_wind_down_text, minutes(bedtime)))
+            .setContentIntent(openApp(0)).setAutoCancel(true))
+    }
+
+    fun water(drunk: Int, goal: Int) {
+        post(WATER_ID, NotificationCompat.Builder(context, REMINDERS)
+            .setSmallIcon(R.drawable.ic_notification)
+            .setContentTitle(context.getString(R.string.water_reminder_title))
+            .setContentText(context.getString(R.string.water_reminder_text, drunk, goal))
+            .setContentIntent(openApp(0)).setAutoCancel(true))
+    }
+
     fun school(report: SchoolReport) {
         if (!report.hasNews) return
         val lines = buildList {
@@ -154,10 +174,14 @@ class AlarmReceiver : BroadcastReceiver() {
         when (intent.action) {
             Notifier.ACTION_FOCUS -> container.focus.tick()
             Notifier.ACTION_QUIET -> Unit
+            Notifier.ACTION_WATER -> container.water.check()
+            Notifier.ACTION_SLEEP -> container.sleepNudge.check()
             else -> container.reminders.fire()
         }
         container.reminders.plan()
         container.quiet.update()
+        container.water.plan()
+        container.sleepNudge.plan()
         container.focus.planAlarm()
         // A start passed, or the clock or time zone changed.
         val pending = goAsync()

@@ -5,6 +5,7 @@ import io.github.quezka.quire.domain.Course
 import io.github.quezka.quire.domain.Event
 import io.github.quezka.quire.domain.Routine
 import io.github.quezka.quire.domain.SleepLog
+import io.github.quezka.quire.domain.WaterLog
 import io.github.quezka.quire.domain.FocusSession
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
@@ -120,6 +121,17 @@ object Codec {
         "woke" to JsonPrimitive(s.woke), "note" to JsonPrimitive(s.note),
         "quality" to (s.quality?.let { JsonPrimitive(it) } ?: kotlinx.serialization.json.JsonNull),
     ))
+
+    // ---- water: one record per glass ----
+
+    fun water(r: SyncRecord): WaterLog? {
+        val d = r.data!!
+        val day = date(d.strOrNull("day")) ?: return null
+        return WaterLog(r.uid, day, d.int("at"), d.int("ml"))
+    }
+
+    fun waterData(w: WaterLog, previous: JsonObject?) = merged(previous, mapOf(
+        "day" to JsonPrimitive(w.day.toString()), "at" to JsonPrimitive(w.at), "ml" to JsonPrimitive(w.ml)))
 
     // ---- routines ----
 

@@ -7,6 +7,7 @@ from ..ports import Storage
 from .focus import FocusService, FocusStats
 from .quiet import QuietService, QuietSettings
 from .sleep import SleepService
+from .water import WaterService
 from .notes import NoteService
 from .planner import PlannerService
 from .reminders import Reminder, ReminderService, ReminderSettings
@@ -33,6 +34,7 @@ class Services:
     work: WorkService
     focus: FocusService
     sleep: SleepService
+    water: WaterService
     quiet: QuietService  # Do Not Disturb while things are on
     reminders: ReminderService
     sync: SyncService  # between your devices, through a cloud account
@@ -42,5 +44,5 @@ class Services:
     bus: ChangeBus
 
 
-__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "QuietService", "QuietSettings", "SchoolSyncService", "SleepService", "StartupService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
+__all__ = ["Services", "FocusService", "FocusStats", "NoteService", "PlannerService", "Reminder", "ReminderService", "ReminderSettings", "SchoolRecordsService", "QuietService", "QuietSettings", "SchoolSyncService", "SleepService", "WaterService", "StartupService", "SyncResult", "SyncService", "SyncStatus", "TaskService",
            "TimetableService", "AvailableUpdate", "UpdateService", "WorkService"]

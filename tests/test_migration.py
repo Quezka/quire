@@ -147,6 +147,19 @@ def test_v13_jobs_gain_monthly_pay_and_the_italian_tax_model(tmp_path):
     db.close()
 
 
+def test_v16_databases_gain_water_logs(tmp_path):
+    path = tmp_path / "v16.db"
+    SqliteDatabase(path).close()
+    with sqlite3.connect(path) as conn:
+        conn.executescript("DROP TABLE water_logs; PRAGMA user_version = 16;")
+    db = SqliteDatabase(path)
+    assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    db.conn.execute("INSERT INTO water_logs (day, at_min, ml) VALUES ('2026-09-23', 600, 250)")
+    row = db.conn.execute("SELECT dirty, uid FROM water_logs").fetchone()
+    assert row["dirty"] == 1 and row["uid"]  # tracked for sync from the start
+    db.close()
+
+
 def test_v14_databases_gain_routines_and_sleep_logs(tmp_path):
     path = tmp_path / "v14.db"
     SqliteDatabase(path).close()

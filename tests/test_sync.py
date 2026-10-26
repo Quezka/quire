@@ -9,7 +9,7 @@ from quire.application.bus import Topic
 from quire.application.errors import CloudAuthError, SyncError, SyncNotSetUp, ValidationError
 from quire.application.ports import SyncRecord
 from quire.application.inputs import (
-    CourseInput, EventInput, JobInput, NotebookInput, NoteInput, PatternInput, RoutineInput, ShiftInput, SleepInput,
+    CourseInput, EventInput, JobInput, NotebookInput, NoteInput, PatternInput, RoutineInput, ShiftInput, SleepInput, WaterProfileInput,
     SlotInput, TaskInput,
 )
 from quire.application.types import TaskKind
@@ -379,6 +379,25 @@ def test_routines_and_milestones_reach_the_other_device(pair):
     a.sync.sync()
     b.sync.sync()
     assert b.planner.routines() == []
+
+
+def test_water_entries_reach_the_other_device(pair):
+    a, b = pair
+    a.water.save_profile(WaterProfileInput(175, 70))
+    b.water.save_profile(WaterProfileInput(175, 70))
+    a.water.add(250)
+    tick()
+    b.water.add(500)
+    a.sync.sync()
+    b.sync.sync()
+    a.sync.sync()
+    for device in (a, b):
+        assert sorted(e.ml for e in device.water.overview().entries) == [250, 500]
+    tick()
+    a.water.undo_last()
+    a.sync.sync()
+    b.sync.sync()
+    assert b.water.overview().drunk == a.water.overview().drunk
 
 
 def test_sleep_logs_reach_the_other_device_one_per_day(pair):

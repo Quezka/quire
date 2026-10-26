@@ -11,7 +11,7 @@ from datetime import date, datetime
 
 from ..domain import (
     Absence, AbsenceKind, Book, DocumentKind, Notice, SchoolDocument,
-    Course, Event, Grade, Job, Lesson, Note, Notebook, Payslip, Routine, Shift, SleepLog, SleepStats, ShiftPattern, Subject, Task, TaskKind,
+    Course, Event, Grade, Job, Lesson, Note, Notebook, Payslip, Routine, Shift, SleepLog, SleepStats, WaterLog, ShiftPattern, Subject, Task, TaskKind,
     TimeRange, MILESTONE_MINUTES,
 )
 from ..domain.focus import FocusSettings, Phase
@@ -69,6 +69,33 @@ class RoutineRecord:
 
 
 @dataclass(frozen=True)
+class WaterProfile:
+    height_cm: float | None
+    weight_kg: float | None
+    glass_ml: int
+    remind: bool
+    start: int  # minute of day the reminders begin
+    end: int
+
+
+@dataclass(frozen=True)
+class WaterEntry:
+    id: int
+    at: int
+    ml: int
+
+
+@dataclass(frozen=True)
+class WaterOverview:
+    profile: WaterProfile
+    goal: int | None  # None until height and weight are set
+    drunk: int
+    expected: int  # what the pace says you should have had by now
+    entries: tuple[WaterEntry, ...]  # today, oldest first
+    week: tuple[tuple[date, int], ...]  # the last 7 days, oldest first
+
+
+@dataclass(frozen=True)
 class SleepRecord:
     day: date  # the day you woke up
     asleep: int
@@ -92,6 +119,13 @@ class SleepOverview:
     average_quality: float | None
     enough: int
     shortfall_minutes: int
+    bedtime_spread: int = 0
+    regularity: str = ""  # "steady", "mixed" or "irregular"
+    streak: int = 0
+    last_week_average: int | None = None  # the average of the seven nights before these seven
+    focus_after_enough: int | None = None  # average focus minutes on days after a night that reached the goal
+    focus_after_short: int | None = None  # ... after one that didn't
+    asleep_since: int | None = None  # minute of day you said you were going to sleep, while it's unfinished
 
 
 @dataclass(frozen=True)

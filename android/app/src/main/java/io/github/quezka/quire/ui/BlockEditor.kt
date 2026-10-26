@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
@@ -70,6 +71,13 @@ import io.github.quezka.quire.domain.BlockKind
 import io.github.quezka.quire.domain.Markdown
 import io.github.quezka.quire.domain.NoteBlock
 import io.github.quezka.quire.domain.NoteBlocks
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.ime
+import androidx.compose.foundation.relocation.BringIntoViewRequester
+import androidx.compose.foundation.relocation.bringIntoViewRequester
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.TextLayoutResult
+import kotlinx.coroutines.delay
 
 // ---- state ------------------------------------------------------------------------------
 
@@ -342,6 +350,7 @@ private class InlineMarkdown(val hide: Boolean, val accent: Color, val faint: Co
 
 // ---- the editor --------------------------------------------------------------------------
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placeholder: String,
                 modifier: Modifier = Modifier) {
@@ -355,6 +364,8 @@ fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placehol
         state.blocks.forEachIndexed { index, eb ->
             key(eb.id) {
                 val requester = remember { FocusRequester() }
+                val reveal = remember { BringIntoViewRequester() }
+                var layout by remember { mutableStateOf<TextLayoutResult?>(null) }
                 val b = eb.block
                 val selected = state.focused == eb.id
                 LaunchedEffect(state.pendingFocus) {
@@ -362,6 +373,17 @@ fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placehol
                     if (pending != null && pending.first == eb.id) {
                         runCatching { requester.requestFocus() }
                         state.pendingFocus = null
+                    }
+                }
+                // Keep the caret on screen while typing, when a new line appears and when the
+                // keyboard opens: the editor sits in a scrolling column, which doesn't follow
+                // the caret by itself.
+                val keyboard = WindowInsets.ime.getBottom(LocalDensity.current)
+                LaunchedEffect(selected, eb.field.text, eb.field.selection, keyboard) {
+                    val result = layout
+                    if (selected && result != null && eb.field.text.length >= eb.field.selection.end) {
+                        delay(60) // after the keyboard has resized the window
+                        runCatching { reveal.bringIntoView(result.getCursorRect(eb.field.selection.end)) }
                     }
                 }
                 when (b.kind) {
@@ -390,6 +412,7 @@ fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placehol
                             else -> type.bodyLarge
                         }.let { if (it.color == Color.Unspecified) it.copy(color = c.onSurface) else it }
                         Row(Modifier.fillMaxWidth()
+                            .bringIntoViewRequester(reveal)
                             .padding(top = if (b.kind == BlockKind.HEADING && index > 0) 10.dp else 0.dp)
                             .then(if (b.kind == BlockKind.CODE) Modifier.background(c.surfaceVariant, RoundedCornerShape(4.dp)).padding(horizontal = 8.dp) else Modifier),
                             verticalAlignment = Alignment.Top) {
@@ -405,6 +428,7 @@ fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placehol
                                     else -> reading
                                 },
                                 keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
+                                onTextLayout = { layout = it },
                                 modifier = Modifier.weight(1f)
                                     .focusRequester(requester)
                                     .onFocusChanged { if (it.isFocused) state.focused = eb.id }

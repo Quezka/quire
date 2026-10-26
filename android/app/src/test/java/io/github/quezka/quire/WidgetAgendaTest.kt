@@ -41,7 +41,10 @@ class WidgetAgendaTest {
         val today = days[0].entries
         assertTrue((today[0] as WidgetEntry.Due).overdue)
         assertEquals("Late", (today[0] as WidgetEntry.Due).task.title)
-        assertTrue(today[1] is WidgetEntry.Timed)
+        // Ticked off today stays, struck through, after the open ones and before the timeline.
+        assertEquals("Done", (today[1] as WidgetEntry.Due).task.title)
+        assertTrue((today[1] as WidgetEntry.Due).task.done)
+        assertTrue(today[2] is WidgetEntry.Timed)
         assertEquals(listOf("Tomorrow"), days[1].entries.map { (it as WidgetEntry.Due).task.title })
     }
 

@@ -12,6 +12,7 @@ import io.github.quezka.quire.domain.Notebook
 import io.github.quezka.quire.domain.Payslip
 import io.github.quezka.quire.domain.Routine
 import io.github.quezka.quire.domain.SleepLog
+import io.github.quezka.quire.domain.WaterLog
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
@@ -77,6 +78,19 @@ class Repository(
     }
     fun deleteSleep(day: LocalDate) {
         records.delete("sleep", Codec.sleepUid(day))
+        changed()
+    }
+    fun waterLogs(): List<WaterLog> = records.live("water").mapNotNull(Codec::water).sortedWith(compareBy({ it.day }, { it.at }))
+    fun waterOn(day: LocalDate): List<WaterLog> = waterLogs().filter { it.day == day }
+    fun addWater(ml: Int) {
+        require(ml in 1..io.github.quezka.quire.domain.WATER_MAX_SIP) { "Not a sensible amount" }
+        val n = now()
+        val log = WaterLog(Codec.newUid(), n.toLocalDate(), n.hour * 60 + n.minute, ml)
+        records.save("water", log.uid, Codec.waterData(log, null))
+        changed()
+    }
+    fun deleteWater(uid: String) {
+        records.delete("water", uid)
         changed()
     }
     fun routines(): List<Routine> = records.live("routine").map(Codec::routine)

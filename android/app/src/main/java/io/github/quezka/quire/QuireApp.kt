@@ -8,6 +8,8 @@ import io.github.quezka.quire.data.SqliteRowStore
 import io.github.quezka.quire.focus.FocusController
 import io.github.quezka.quire.notify.Notifier
 import io.github.quezka.quire.notify.QuietManager
+import io.github.quezka.quire.notify.SleepManager
+import io.github.quezka.quire.notify.WaterManager
 import io.github.quezka.quire.notify.ReminderManager
 import io.github.quezka.quire.school.Classeviva
 import io.github.quezka.quire.school.KeystoreBox
@@ -51,6 +53,8 @@ class Container(
     val reminders = ReminderManager(repository, settings, notifier)
     val focus = FocusController(repository, settings, notifier)
     val quiet = QuietManager(context, repository, settings, notifier)
+    val water = WaterManager(repository, settings, notifier)
+    val sleepNudge = SleepManager(repository, settings, notifier)
     val school = SchoolSync(Classeviva(), repository, RegisterStore(settings), settings, KeystoreBox())
     val updater = Updater(context)
 
@@ -66,6 +70,8 @@ class Container(
         repository.onChanged = { reminders.plan(); quiet.update(); AgendaWidget.refresh(context) }
         reminders.plan()
         quiet.update()
+        water.plan()
+        sleepNudge.plan()
         focus.tick(announce = false)
         focus.planAlarm()
     }

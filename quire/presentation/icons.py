@@ -51,6 +51,7 @@ _PATHS = {
                     '<path d="M16 2v4M8 2v4M3 10h18"/><rect x="8" y="14" width="4" height="4" rx="1"/>',
     "star": '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14'
             ' 2 9.27l6.91-1.01L12 2z"/>',
+    "collapse": '<path d="M7 4l5 5 5-5M7 20l5-5 5 5"/>',
     "layers": '<path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/>'
               '<path d="M2 12l10 5 10-5"/>',
     "book": '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>'
@@ -62,6 +63,7 @@ _PATHS = {
     "zoom-in": '<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M11 8v6M8 11h6"/>',
     "zoom-out": '<circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35M8 11h6"/>',
     "fit-day": '<path d="M7 15l5 5 5-5M7 9l5-5 5 5"/><path d="M4 12h16"/>',
+    "drop": '<path d="M12 2.5C12 2.5 5 10 5 15a7 7 0 0 0 14 0c0-5-7-12.5-7-12.5z"/>',
     "moon": '<path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/>',
     "timer": '<circle cx="12" cy="13" r="8"/><path d="M12 9v4l2 2M9 2h6M12 2v3"/>',
     "play": '<path d="M7 4l13 8-13 8z"/>',

@@ -49,6 +49,16 @@ class SleepInput:
 
 
 @dataclass(frozen=True)
+class WaterProfileInput:
+    height_cm: float
+    weight_kg: float
+    glass_ml: int = 250
+    remind: bool = True
+    start: int = 8 * 60
+    end: int = 22 * 60
+
+
+@dataclass(frozen=True)
 class RoutineInput:
     title: str
     minute: int

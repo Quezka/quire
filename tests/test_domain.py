@@ -67,6 +67,26 @@ def test_sleep_log_crosses_midnight_and_checks_its_limits():
     assert sleep_stats([], 8).nights == 0
 
 
+def test_water_goal_follows_body_surface_area_and_reminders_follow_the_pace():
+    from quire.domain import expected_ml, reminder_due, water_goal_ml
+    assert water_goal_ml(175, 70) == 2200
+    assert water_goal_ml(160, 50) == 1800
+    assert water_goal_ml(190, 100) > water_goal_ml(175, 70) > water_goal_ml(160, 50)
+    assert water_goal_ml(100, 21) == 1200  # never below the floor
+    for bad in ((10, 70), (175, 5)):
+        with pytest.raises(ValidationError):
+            water_goal_ml(*bad)
+
+    assert expected_ml(2200, 8 * 60) == 0 and expected_ml(2200, 22 * 60) == 2200
+    assert expected_ml(2200, 15 * 60) == 1100  # half way through 08:00-22:00
+    assert reminder_due(2200, 400, 15 * 60, None)  # 700 behind
+    assert not reminder_due(2200, 1000, 15 * 60, None)  # only 100 behind
+    assert not reminder_due(2200, 400, 15 * 60, 14 * 60)  # reminded an hour ago
+    assert reminder_due(2200, 400, 15 * 60, 13 * 60)
+    assert not reminder_due(2200, 400, 23 * 60, None)  # asleep
+    assert not reminder_due(2200, 2200, 20 * 60, None)  # done for the day
+
+
 def test_milestone_has_no_duration_beyond_the_minimum():
     from quire.domain import milestone_time
     assert Event(TODAY, milestone_time(360), "Wake up").is_milestone

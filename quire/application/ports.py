@@ -12,7 +12,7 @@ from typing import Protocol
 from dataclasses import dataclass
 
 from ..domain import (
-    Absence, Book, Course, Event, FocusSession, Grade, Job, Lesson, Note, Notebook, NoteImage, Notice, Routine, SleepLog,
+    Absence, Book, Course, Event, FocusSession, Grade, Job, Lesson, Note, Notebook, NoteImage, Notice, Routine, SleepLog, WaterLog,
     SchoolDocument,
     Shift, Subject, Task, TaskKind,
 )
@@ -42,6 +42,12 @@ class SleepRepository(Protocol):
     def between(self, first: date, last: date) -> list[SleepLog]: ...
     def put(self, log: SleepLog) -> None: ...
     def delete(self, day: date) -> None: ...
+
+
+class WaterRepository(Protocol):
+    def between(self, first: date, last: date) -> list[WaterLog]: ...
+    def add(self, log: WaterLog) -> int: ...
+    def delete(self, log_id: int) -> None: ...
 
 
 class QuietSwitch(Protocol):

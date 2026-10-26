@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.35.0" date="2026-10-26">
+      <description>
+        <p>Water tracking with a goal from your height and weight. Sleep gets one-tap logging, streaks and a bedtime reminder. Collapse all note groups. Phone fixes: the cursor stays in view while typing, Enter leaves a box, and ticked tasks stay checked in the widget.</p>
+      </description>
+    </release>
     <release version="0.34.0" date="2026-10-24">
       <description>
         <p>Milestones: events with no duration, like "Wake up at 6:00", and routines that repeat them on chosen weekdays. Sleep tracking. Do Not Disturb while a class, event or shift is on. The phone gets all of it. Fixed a second tray icon on Windows and the keyboard covering the day note on the phone.</p>

@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 16
+SCHEMA_VERSION = 17
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -80,6 +80,13 @@ CREATE TABLE IF NOT EXISTS sleep_logs (
     quality INTEGER,
     note    TEXT NOT NULL DEFAULT ''
 );
+CREATE TABLE IF NOT EXISTS water_logs (
+    id     INTEGER PRIMARY KEY,
+    day    TEXT NOT NULL,
+    at_min INTEGER NOT NULL,
+    ml     INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_water_day ON water_logs(day);
 CREATE TABLE IF NOT EXISTS grades (
     external_id TEXT PRIMARY KEY,
     subject     TEXT NOT NULL,

@@ -4,6 +4,24 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.35.0] - 2026-10-26
+
+### Added
+- **Water tracking** (desktop and phone). A daily goal from your height and weight, a ring for the day with one-tap
+  glasses (and undo), the last seven days, and a nudge when you fall behind the pace. Glasses sync between devices.
+- **Sleep, more useful.** One tap when you go to bed and one when you wake, instead of typing times. It also shows
+  how steady your bedtimes are, nights in a row on goal, this week against last week, and (on the desktop) how much
+  you focus after a full night against a short one. A reminder comes half an hour before the bedtime goal.
+- **Collapse all note groups** with one button on the desktop Notes page (press again to open them all).
+- **Phone widget:** tasks you tick off stay on the list struck through with a check until the day is over, and tapping
+  the check undoes it.
+
+### Fixed
+- Phone: the cursor now stays in view while you type in a long note, and when a new line is added.
+- Phone: pressing Enter or Done in a one-line box lets go of focus and the keyboard.
+- Phone: ticking a task in the widget now redraws the widget straight away.
+- Drop-down lists open directly under their box instead of over it.
+
 ## [0.34.0] - 2026-10-24
 
 ### Added

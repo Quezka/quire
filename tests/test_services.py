@@ -6,7 +6,7 @@ from quire.application.bus import Topic
 from quire.application.dto import ItemKind
 from quire.application.errors import NotFound, ValidationError
 from quire.application.inputs import (
-    CourseInput, EventInput, NotebookInput, NoteInput, RoutineInput, SleepInput, SlotInput, TaskInput,
+    CourseInput, EventInput, NotebookInput, NoteInput, RoutineInput, SleepInput, SlotInput, TaskInput, WaterProfileInput,
 )
 from quire.application.types import DueBucket, TaskKind
 
@@ -111,6 +111,32 @@ def test_sleep_log_goal_and_overview(services):
     assert sleep.night(TODAY) is None
     with pytest.raises(ValidationError):
         sleep.save(SleepInput(TODAY, 600, 610))
+
+
+def test_water_goal_log_undo_and_reminders(services):
+    water = services.water
+    assert water.overview().goal is None and water.reminder() is None  # no profile yet
+    assert water.save_profile(WaterProfileInput(175, 70, 300)) == 2200
+    water.add(300)
+    water.add(250)
+    o = water.overview()
+    assert (o.goal, o.drunk, [e.ml for e in o.entries]) == (2200, 550, [300, 250])
+    assert o.profile.glass_ml == 300 and o.week[-1] == (TODAY, 550) and len(o.week) == 7
+    water.undo_last()
+    assert water.overview().drunk == 300
+    water.delete(water.overview().entries[0].id)
+    assert water.overview().drunk == 0
+
+    # The fixed test clock says 12:00: 800 ml behind pace on an empty day, so it speaks once.
+    assert water.reminder() == "0/2200"
+    assert water.reminder() is None  # not again within 90 minutes
+    water.save_profile(WaterProfileInput(175, 70, 250, remind=False))
+    assert services.water.profile().remind is False
+    for bad in (WaterProfileInput(10, 70), WaterProfileInput(175, 70, 5), WaterProfileInput(175, 70, 250, True, 900, 600)):
+        with pytest.raises(ValidationError):
+            water.save_profile(bad)
+    with pytest.raises(ValidationError):
+        water.add(5000)
 
 
 def test_routine_needs_a_title_and_a_day(services):

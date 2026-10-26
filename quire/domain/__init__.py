@@ -6,7 +6,8 @@ from .model import (
     NoteImage, Notebook, Routine, Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange, average, derive_note_title,
     image_markdown, image_uids, milestone_time, net_pay, normalize_topic, note_snippet, reschedule, work_shifts,
 )
-from .sleep import SleepLog, SleepStats, bedtime_for, sleep_stats
+from .water import WaterLog, expected_ml, reminder_due, water_goal_ml
+from .sleep import SleepLog, SleepStats, bedtime_for, regularity, should_wind_down, sleep_stats
 from .payroll import PayTerms, Payslip, monthly_gross, monthly_share, take_home, year_payslips
 from .register import (
     ABSENCE_LIMIT, GRADE_MAX, GRADE_MIN, Absence, AbsenceKind, Book, DocumentKind, Notice,
@@ -14,7 +15,8 @@ from .register import (
 )
 
 __all__ = [
-    "SleepLog", "SleepStats", "bedtime_for", "sleep_stats",
+    "WaterLog", "expected_ml", "reminder_due", "water_goal_ml",
+    "SleepLog", "SleepStats", "bedtime_for", "regularity", "should_wind_down", "sleep_stats",
     "FocusSession", "FocusSettings", "Phase", "PhaseEnded", "PomodoroTimer",
     "DomainError", "NotFound", "ValidationError", "COURSE_COLORS", "EVERY_DAY", "MILESTONE_MINUTES", "PASS_MARK", "UPCOMING_DAYS", "WORK_DAYS", "ClassSlot", "Course",
     "DueBucket", "Event", "Grade", "Job", "Lesson", "Note", "Notebook", "Routine", "Shift", "ShiftPattern", "Subject", "Task", "TaskKind", "TimeRange", "average",

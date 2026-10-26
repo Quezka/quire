@@ -15,6 +15,7 @@ class Topic(Enum):
     WORK = "work"
     FOCUS = "focus"
     SLEEP = "sleep"
+    WATER = "water"
 
 
 Listener = Callable[[Topic], None]

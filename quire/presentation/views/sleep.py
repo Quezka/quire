@@ -1,10 +1,10 @@
 """Sleep log: last night, the goal, and the last two weeks at a glance."""
 from __future__ import annotations
 
-from PySide6.QtCore import QRectF, Qt
+from PySide6.QtCore import QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
-    QButtonGroup, QDateEdit, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
+    QButtonGroup, QCheckBox, QDateEdit, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
     QPushButton, QTimeEdit, QVBoxLayout, QWidget,
 )
 
@@ -17,6 +17,7 @@ from ..bridge import ChangeRelay
 from ..dialogs import attempt, to_qdate
 from ..formatting import fmt_duration, fmt_min
 from ..i18n import _
+from ..notify import notify
 from ..widgets import min_to_qtime, qtime_to_min
 from .common import Card, Page, label, primary_button
 
@@ -65,6 +66,24 @@ class SleepView(Page):
         self.planner = services.planner
         self.title.setText(_("Sleep"))
 
+        # ---- one tap: going to sleep / awake ----
+        self.now_status = label("", "muted")
+        self.now_status.setWordWrap(True)
+        self.sleep_btn = primary_button(_("I'm going to sleep"), "moon")
+        self.sleep_btn.clicked.connect(self._going_to_sleep)
+        self.awake_btn = primary_button(_("I'm awake"), None)
+        self.awake_btn.clicked.connect(self._awake)
+        self.cancel_btn = QPushButton(_("Cancel"))
+        self.cancel_btn.clicked.connect(self.sleep.cancel_going_to_sleep)
+        tap = QHBoxLayout()
+        tap.addWidget(self.sleep_btn)
+        tap.addWidget(self.awake_btn)
+        tap.addWidget(self.cancel_btn)
+        tap.addStretch()
+        tonight = Card(_("Tonight"))
+        tonight.add(self.now_status)
+        tonight.body.addLayout(tap)
+
         # ---- the night ----
         self.date = QDateEdit(calendarPopup=True)
         self.date.setDisplayFormat("ddd d MMM yyyy")
@@ -110,6 +129,9 @@ class SleepView(Page):
         goal_card = Card(_("Goal"))
         goal_card.body.addLayout(goal_form)
         goal_card.add(self.bedtime)
+        self.remind = QCheckBox(_("Remind me before bedtime"), checked=self.sleep.remind_enabled())
+        self.remind.toggled.connect(self.sleep.set_remind)
+        goal_card.add(self.remind)
 
         # ---- the last nights ----
         self.bars = SleepBars()
@@ -120,6 +142,7 @@ class SleepView(Page):
         chart_card.add(self.summary)
 
         left = QVBoxLayout()
+        left.addWidget(tonight)
         left.addWidget(night_card)
         left.addWidget(goal_card)
         left.addStretch()
@@ -129,6 +152,9 @@ class SleepView(Page):
         row.addWidget(chart_card, 3, Qt.AlignTop)
         self.root.addLayout(row, 1)
 
+        self._timer = QTimer(self, interval=60_000)  # the wind-down nudge, while Quire is open
+        self._timer.timeout.connect(self._remind)
+        self._timer.start()
         self.date.setDate(to_qdate(self.planner.today()))
         self.date.dateChanged.connect(self._load_night)
         self.hours.editingFinished.connect(self._save_goal)
@@ -144,8 +170,27 @@ class SleepView(Page):
         if topic is Topic.SLEEP:
             self.refresh()
 
+    def _remind(self):
+        bedtime = self.sleep.reminder()
+        if bedtime is not None:
+            notify(_("Time to wind down"), _("Aim to be asleep by {time}.").format(time=fmt_min(bedtime)))
+
+    def _going_to_sleep(self):
+        self.sleep.go_to_sleep()
+
+    def _awake(self):
+        if attempt(self, self.sleep.wake_up):
+            self.date.setDate(to_qdate(self.planner.today()))
+            self._load_night()
+
     def refresh(self):
         o = self.sleep.overview()
+        asleep = o.asleep_since is not None
+        self.sleep_btn.setVisible(not asleep)
+        self.awake_btn.setVisible(asleep)
+        self.cancel_btn.setVisible(asleep)
+        self.now_status.setText(_("Asleep since {time}. Tap when you're up.").format(time=fmt_min(o.asleep_since))
+                                if asleep else _("Tap when you go to bed, and again when you wake: no typing."))
         self.bars.set_overview(o)
         self.bedtime.setText(_("Be asleep by {time} to wake at {wake}.").format(
             time=fmt_min(o.bedtime_goal), wake=fmt_min(o.wake_goal)))
@@ -162,7 +207,23 @@ class SleepView(Page):
             parts.append(_("usually asleep around {time}").format(time=fmt_min(o.average_bedtime)))
         if o.average_quality is not None:
             parts.append(_("average quality {value:.1f} of 5").format(value=o.average_quality))
-        self.summary.setText(" · ".join(parts))
+        lines = [" · ".join(parts)]
+        if o.regularity:
+            lines.append({"steady": _("Your bedtimes are steady."),
+                          "mixed": _("Your bedtimes wander a bit (about {m} min).").format(m=o.bedtime_spread),
+                          "irregular": _("Your bedtimes are all over the place (about {m} min). A fixed time helps most.")
+                          .format(m=o.bedtime_spread)}[o.regularity])
+        if o.streak >= 2:
+            lines.append(_("{n} nights in a row on goal.").format(n=o.streak))
+        if o.last_week_average is not None:
+            change = o.average_minutes - o.last_week_average
+            if abs(change) >= 10:
+                lines.append(_("{time} {more} a night than the week before.").format(
+                    time=fmt_duration(abs(change)), more=_("more") if change > 0 else _("less")))
+        if o.focus_after_enough is not None:
+            lines.append(_("You focus {a} min on days after a full night, {b} min after a short one.").format(
+                a=o.focus_after_enough, b=o.focus_after_short))
+        self.summary.setText("\n".join(lines))
 
     def _load_goal(self):
         hours, wake = self.sleep.goal()

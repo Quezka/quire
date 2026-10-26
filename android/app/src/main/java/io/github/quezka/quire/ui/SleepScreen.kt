@@ -14,7 +14,6 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
-import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.Button
@@ -55,8 +54,10 @@ fun SleepScreen(container: Container, version: Int, back: () -> Unit) {
         PageBar(stringResource(R.string.nav_sleep), back)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
+            TonightPanel(container, version) { day = today }
             NightPanel(repo, day, today, version) { day = it }
             Panel(stringResource(R.string.sleep_goal)) {
+                var remind by remember { mutableStateOf(container.sleepNudge.remindEnabled()) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
                     OutlinedButton(onClick = {
                         goalHours = (goalHours - 0.5).coerceAtLeast(3.0); settings.set("sleep.hours", goalHours.toString())
@@ -69,6 +70,10 @@ fun SleepScreen(container: Container, version: Int, back: () -> Unit) {
                         { goalWake = it; settings.set("sleep.wake", it.toString()) })
                 }
                 Hint(stringResource(R.string.sleep_bed_by, minutes(Sleep.bedtimeFor(goalWake, goalHours)), minutes(goalWake)))
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text(stringResource(R.string.sleep_remind), Modifier.weight(1f))
+                    androidx.compose.material3.Switch(remind, { remind = it; container.sleepNudge.setRemind(it) })
+                }
             }
             Panel(stringResource(R.string.sleep_two_weeks)) {
                 if (logs.isEmpty()) Hint(stringResource(R.string.sleep_nothing))
@@ -77,6 +82,12 @@ fun SleepScreen(container: Container, version: Int, back: () -> Unit) {
                     Text(stringResource(R.string.sleep_average, durationText(stats.averageMinutes)),
                         style = MaterialTheme.typography.titleSmall)
                     Hint(stringResource(R.string.sleep_enough, stats.enough, stats.nights))
+                    when (stats.regularity) {
+                        "steady" -> Hint(stringResource(R.string.sleep_steady))
+                        "mixed" -> Hint(stringResource(R.string.sleep_mixed, stats.bedtimeSpread))
+                        "irregular" -> Hint(stringResource(R.string.sleep_irregular, stats.bedtimeSpread))
+                    }
+                    if (stats.streak >= 2) Hint(stringResource(R.string.sleep_streak, stats.streak))
                     if (stats.shortfallMinutes > 0) Hint(stringResource(R.string.sleep_short, durationText(stats.shortfallMinutes)))
                     stats.averageBedtime?.let { Hint(stringResource(R.string.sleep_usually, minutes(it))) }
                 }
@@ -118,6 +129,29 @@ private fun NightPanel(repo: io.github.quezka.quire.data.Repository, day: LocalD
             }
             androidx.compose.foundation.layout.Spacer(Modifier.weight(1f))
             Button(onClick = { repo.saveSleep(log) }, enabled = log.valid()) { Text(stringResource(R.string.sleep_save)) }
+        }
+    }
+}
+
+/** One tap when you go to bed and one when you wake: the night is logged without typing. */
+@Composable
+private fun TonightPanel(container: Container, version: Int, logged: () -> Unit) {
+    val manager = container.sleepNudge
+    var since by remember(version) { mutableStateOf(manager.asleepSince()) }
+    var failed by remember { mutableStateOf(false) }
+    Panel(stringResource(R.string.sleep_tonight)) {
+        Hint(if (since != null) stringResource(R.string.sleep_asleep_since, minutes(since!!.hour * 60 + since!!.minute))
+            else stringResource(R.string.sleep_tap_hint))
+        if (failed) Text(stringResource(R.string.sleep_forgot), color = MaterialTheme.colorScheme.error)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (since == null) Button(onClick = { manager.goToSleep(); since = manager.asleepSince(); failed = false }) {
+                Text(stringResource(R.string.sleep_going))
+            } else {
+                Button(onClick = {
+                    if (manager.wakeUp() != null) { since = null; failed = false; logged() } else failed = true
+                }) { Text(stringResource(R.string.sleep_awake)) }
+                TextButton(onClick = { manager.cancel(); since = null; failed = false }) { Text(stringResource(R.string.cancel)) }
+            }
         }
     }
 }

@@ -242,6 +242,8 @@ def stylesheet(t: Theme) -> str:
         border-radius: 4px; }}
     QSpinBox::up-arrow {{ image: url({chevron_up}); width: 11px; height: 11px; }}
     QSpinBox::down-arrow {{ image: url({chevron}); width: 11px; height: 11px; }}
+    /* The list opens straight under the box, not over it with the current item aligned. */
+    QComboBox {{ combobox-popup: 0; }}
     QComboBox QAbstractItemView {{ background: {t.surface}; border: 1px solid {t.border};
         border-radius: 8px; padding: 4px; selection-background-color: {t.accent_soft};
         selection-color: {t.text}; }}
