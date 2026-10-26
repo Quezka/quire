@@ -4,6 +4,10 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.36.0] - 2026-10-26
+
+- The look now comes from the suite's shared toolkit: darker text and firmer borders, larger captions, and a High contrast option in Settings. "Automatic" interface size is 115%.
+
 ## [0.35.1] - 2026-10-26
 
 ### Fixed

@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.36.0" date="2026-10-26">
+      <description>
+        <p>The look now comes from the suite's shared toolkit: darker text and firmer borders, larger captions, and a High contrast option in Settings. Automatic interface size is 115%.</p>
+      </description>
+    </release>
     <release version="0.35.1" date="2026-10-26">
       <description>
         <p>The Sleep and Water pages scroll when the window is short.</p>
