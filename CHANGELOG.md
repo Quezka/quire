@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.35.1] - 2026-10-26
+
+### Fixed
+- The Sleep and Water pages scroll when the window is short, instead of making it taller than a small laptop screen.
+
 ## [0.35.0] - 2026-10-26
 
 ### Added
