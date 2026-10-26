@@ -6,6 +6,9 @@ from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QToolButton, QVBoxLayout, QWidget,
 )
 
+from quezka_ui.widgets import Card, button, icon_button, label, primary_button, scrolling  # noqa: F401
+from quezka_ui.widgets import Page as _Page
+
 from ...application.dto import AgendaItem, ItemKind
 from .. import theme
 from ..formatting import fmt_min, fmt_range
@@ -13,75 +16,11 @@ from ..widgets import Block
 from ..i18n import _
 
 
-class Page(QWidget):
-    """A top-level page: padded, themed background, header row on top."""
+class Page(_Page):
+    """The suite's page, with Quire's looser spacing."""
 
     def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setObjectName("page")
-        self.setAttribute(Qt.WA_StyledBackground, True)
-        self.root = QVBoxLayout(self)
-        self.root.setContentsMargins(28, 22, 28, 24)
-        self.root.setSpacing(18)
-        self.title = QLabel(objectName="pageTitle")
-        self.subtitle = QLabel(objectName="pageSubtitle")
-        titles = QVBoxLayout()
-        titles.setSpacing(2)
-        titles.addWidget(self.title)
-        titles.addWidget(self.subtitle)
-        self.header = QHBoxLayout()
-        self.header.setSpacing(8)
-        self.leading = QHBoxLayout()
-        self.leading.setSpacing(2)
-        self.header.addLayout(self.leading)
-        self.header.addLayout(titles)
-        self.header.addStretch()
-        self.root.addLayout(self.header)
-
-    def add_actions(self, *widgets):
-        for w in widgets:
-            self.header.addWidget(w, 0, Qt.AlignVCenter)
-
-
-def scrolling(layout) -> "QScrollArea":
-    """The layout inside a frameless scroll area, so a page whose content is taller than the
-    window scrolls instead of forcing the window to grow (small laptop screens)."""
-    from PySide6.QtWidgets import QFrame as _Frame, QScrollArea, QWidget as _Widget
-
-    inner = _Widget()
-    inner.setObjectName("scrollBody")
-    inner.setStyleSheet("#scrollBody { background: transparent; }")
-    layout.setContentsMargins(0, 0, 8, 0)
-    inner.setLayout(layout)
-    area = QScrollArea()
-    area.setWidgetResizable(True)
-    area.setFrameShape(_Frame.NoFrame)
-    area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
-    area.setWidget(inner)
-    area.viewport().setAutoFillBackground(False)
-    return area
-
-
-class Card(QFrame):
-    """Rounded surface with an optional title row."""
-
-    def __init__(self, title: str | None = None, padding: int = 16, parent=None):
-        super().__init__(parent)
-        self.setObjectName("card")
-        self.body = QVBoxLayout(self)
-        self.body.setContentsMargins(padding, padding, padding, padding)
-        self.body.setSpacing(10)
-        self.title_row = QHBoxLayout()
-        self.title_row.setSpacing(8)
-        if title:
-            self.title_label = QLabel(title, objectName="cardTitle")
-            self.title_row.addWidget(self.title_label)
-            self.title_row.addStretch()
-            self.body.addLayout(self.title_row)
-
-    def add(self, widget, stretch: int = 0):
-        self.body.addWidget(widget, stretch)
-        return widget
+        super().__init__(parent, spacing=18)
 
 
 def badge(text: str = "") -> QLabel:
@@ -90,40 +29,12 @@ def badge(text: str = "") -> QLabel:
     return label
 
 
-def icon_button(name: str, tooltip: str, checkable: bool = False,
-                checked_role: str | None = "accent") -> QToolButton:
-    button = QToolButton(objectName="icon", toolTip=tooltip, checkable=checkable)
-    button.setCursor(Qt.PointingHandCursor)
-    theme.set_icon(button, name, "muted", checked_role if checkable else None)
-    return button
-
-
 def menu_button(text: str, menu, icon_name: str | None = None,
                 primary: bool = False) -> QPushButton:
     """A header button that opens a menu (e.g. "+ Add" → Event / Work shift)."""
     result = primary_button(text, icon_name or "plus") if primary else button(text, icon_name)
     result.setMenu(menu)
     return result
-
-
-def primary_button(text: str, icon_name: str | None = "plus") -> QPushButton:
-    button = QPushButton(text, objectName="primary")
-    button.setCursor(Qt.PointingHandCursor)
-    if icon_name:
-        theme.set_icon(button, icon_name, "on_accent", size=16)
-    return button
-
-
-def button(text: str, icon_name: str | None = None) -> QPushButton:
-    result = QPushButton(text)
-    result.setCursor(Qt.PointingHandCursor)
-    if icon_name:
-        theme.set_icon(result, icon_name, "muted", size=16)
-    return result
-
-
-def label(text: str = "", role: str = "muted") -> QLabel:
-    return QLabel(text, objectName=role)
 
 
 def zoom_controls(page: QWidget, zoom) -> QWidget:

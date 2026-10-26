@@ -1,30 +1,20 @@
 """Starts the Qt event loop around an already-wired set of services."""
 from __future__ import annotations
 
-from PySide6.QtGui import QIcon
-from PySide6.QtWidgets import QApplication
+from pathlib import Path
 
-from .. import APP_ID
+from PySide6.QtWidgets import QApplication
+from quezka_ui.app import create_application as _create
+
+from .. import APP_ID, APP_NAME
 from ..application.services import Services
-from . import fit, i18n, leave_on_enter, theme, uiscale
 from .i18n import _
-from .icons import APP_ICON
+
+ICON = Path(__file__).resolve().parent.parent / "assets" / "icon.svg"
 
 
 def create_application(argv: list[str]) -> QApplication:
-    QApplication.setApplicationName("Quire")
-    QApplication.setOrganizationName("Quire")
-    QApplication.setDesktopFileName(APP_ID)
-    if QApplication.instance() is None:
-        uiscale.apply_before_app()  # Qt reads the scale factor once, as the app is created
-    app = QApplication.instance() or QApplication(argv)
-    fit.install(app)  # any dialog taller than the screen scrolls
-    app.setStyle("Fusion")
-    leave_on_enter.install(app)  # Enter in a one-line box lets go of it
-    app.setWindowIcon(QIcon(str(APP_ICON)))
-    i18n.install(app=app)  # before any window is built: texts are translated as they're made
-    theme.install(app)
-    return app
+    return _create(argv, name=APP_NAME, app_id=APP_ID, icon=ICON, locale_package="quire.presentation.locales")
 
 
 def run(services: Services, argv: list[str], background: bool = False,

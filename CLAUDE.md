@@ -2,6 +2,7 @@
 
 Python 3.10+ / PySide6 desktop app (Linux + Windows). Clean Architecture; see README "Architecture".
 
+- The look (theme, icons, translation core, UI scale, dialog fitting, Enter-leaves-the-box, page widgets) comes from the shared `quezka-ui` package (`../suite-kit`); `presentation/theme.py`, `icons.py`, `i18n.py`, `uiscale.py`, `fit.py`, `leave_on_enter.py` are aliases to it. Change those in the kit, not here; this app keeps its catalogues (`locales/`), Quire-only widgets (`widgets.py`, `views/common.py` extras) and its icon.
 - Layers: `quire/domain` → `quire/application` → `quire/infrastructure` + `quire/presentation`; wired in `quire/bootstrap.py`.
 - Dependency rule is enforced by `tests/test_architecture.py`; never import PySide6/sqlite3 into domain or application, never import infrastructure into presentation.
 - Run: `.venv/bin/quire --demo`. Test: `.venv/bin/python -m pytest -q`.
