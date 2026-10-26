@@ -4,6 +4,10 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.36.1] - 2026-10-26
+
+- The interface size set to Automatic is the system's own size again (100%); the shared toolkit had made it 115%, which was too big. Larger sizes stay one choice away in Settings.
+
 ## [0.36.0] - 2026-10-26
 
 - The look now comes from the suite's shared toolkit: darker text and firmer borders, larger captions, and a High contrast option in Settings. "Automatic" interface size is 115%.
