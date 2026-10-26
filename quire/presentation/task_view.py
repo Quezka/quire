@@ -31,7 +31,7 @@ class TaskView(QDialog):
         self.services = services
         self.task_id = task_id
         self.setWindowTitle(_("Task"))
-        self.setMinimumWidth(500)
+        self.setMinimumWidth(425)
 
         self.chips = QHBoxLayout()
         self.chips.setSpacing(6)

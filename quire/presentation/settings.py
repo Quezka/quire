@@ -42,7 +42,7 @@ class SettingsDialog(QDialog):
         self.sync_runner = sync_runner
         self.updater = updater
         self.setWindowTitle(_("Settings"))
-        self.setMinimumWidth(900)
+        self.setMinimumWidth(765)
 
         self.appearance = QComboBox()
         for mode, text in (("system", _("Match system")), ("light", _("Light")),

@@ -25,7 +25,7 @@ class CourseworkView(Page):
         self.title.setText(_("Coursework"))
 
         self.course = QComboBox()
-        self.course.setMinimumWidth(190)
+        self.course.setMinimumWidth(162)
         fill_course_combo(self.course, services.timetable.courses(), _("All courses"))
         self.course.currentIndexChanged.connect(self.refresh)
         self.show_done = button(_("Show completed"), "check")

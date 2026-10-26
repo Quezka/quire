@@ -36,7 +36,7 @@ class Sidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("sidebar")
-        self.setFixedWidth(216)
+        self.setFixedWidth(181)
         self.group = QButtonGroup(self)
         self.group.setExclusive(True)
 
@@ -67,7 +67,7 @@ class Sidebar(QFrame):
         button = QToolButton(objectName="nav", text=f"  {text}", checkable=checkable)
         button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
         button.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
-        button.setIconSize(QSize(18, 18))
+        button.setIconSize(QSize(16, 16))
         button.setCursor(Qt.PointingHandCursor)
         theme.set_icon(button, icon_name, "muted", "accent" if checkable else None)
         return button

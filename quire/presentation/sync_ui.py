@@ -141,7 +141,7 @@ class SyncSetupDialog(QDialog):
         self.services = services
         self._worker = None
         self.setWindowTitle(_("Set up sync"))
-        self.setMinimumWidth(560)
+        self.setMinimumWidth(476)
 
         title = QLabel(_("Sync your computers"), objectName="sheetTitle")
         self.server_steps = QLabel(_(

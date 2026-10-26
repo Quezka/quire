@@ -258,7 +258,7 @@ class NoticeDialog(QDialog):
         self.notice = notice
         self._workers = []
         self.setWindowTitle(_("Notice"))
-        self.setMinimumWidth(520)
+        self.setMinimumWidth(442)
 
         title = QLabel(notice.title, objectName="sheetTitle", wordWrap=True)
         title.setTextInteractionFlags(Qt.TextSelectableByMouse)
@@ -533,7 +533,7 @@ class SubjectDialog(QDialog):
         self.subject = subject
         self.period = period
         self.setWindowTitle(subject)
-        self.setMinimumWidth(560)
+        self.setMinimumWidth(476)
 
         title = QLabel(subject, objectName="sheetTitle")
         self.summary = label("", "muted")

@@ -93,7 +93,7 @@ class CourseDialog(QDialog):
         self.course_id = course_id
         self._external_id = None
         self.setWindowTitle(_("Edit course") if course_id else _("New course"))
-        self.setMinimumWidth(600)
+        self.setMinimumWidth(510)
 
         self.name = QLineEdit(placeholderText=_("e.g. Biology"))
         self.teacher = QLineEdit(placeholderText=_("optional"))
@@ -291,7 +291,7 @@ class NotebookDialog(QDialog):
         self.result: NotebookRecord | None = None  # the saved notebook (None if deleted)
         self.deleted = False
         self.setWindowTitle(_("Edit notebook") if notebook else _("New notebook"))
-        self.setMinimumWidth(400)
+        self.setMinimumWidth(340)
         self.name = QLineEdit(objectName="titleEdit", placeholderText=_("e.g. Ideas, Trips, Project X"))
         used = {n.color for n in services.notes.notebooks()}
         self.color = ColorButton(notebook.color if notebook else
@@ -338,7 +338,7 @@ class EventDialog(QDialog):
         self.planner = services.planner
         self.event_id = event_id
         self.setWindowTitle(_("Edit event") if event_id else _("New event"))
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(357)
 
         self.title = QLineEdit(placeholderText=_("What's happening?"))
         self.date = QDateEdit(calendarPopup=True)
@@ -418,7 +418,7 @@ class RoutineDialog(QDialog):
         self.planner = services.planner
         self.routine_id = routine_id
         self.setWindowTitle(_("Edit routine") if routine_id else _("New routine"))
-        self.setMinimumWidth(420)
+        self.setMinimumWidth(357)
 
         self.title = QLineEdit(placeholderText=_("e.g. Wake up"))
         self.time = _time_edit(6 * 60)
@@ -486,7 +486,7 @@ class TaskDialog(QDialog):
         self.tasks = services.tasks
         self.task_id = task_id
         self.setWindowTitle(_("Edit task") if task_id else _("New task"))
-        self.setMinimumWidth(540)
+        self.setMinimumWidth(459)
 
         self.title = QLineEdit(placeholderText=_("What needs doing?"), objectName="titleEdit")
         self.kind = QComboBox()
@@ -635,7 +635,7 @@ class JobDialog(QDialog):
         self.work = services.work
         self.job_id = job_id
         self.setWindowTitle(_("Edit job") if job_id else _("New job"))
-        self.setMinimumWidth(620)
+        self.setMinimumWidth(527)
 
         self.name = QLineEdit(placeholderText=_("e.g. Pizzeria Da Mario"))
         used = {j.color for j in self.work.jobs()}
@@ -1031,7 +1031,7 @@ class ShiftDialog(QDialog):
         self.replaces = replaces
         self.setWindowTitle(_("Edit shift") if shift_id else
                             _("Change this week's shift") if replaces else _("New shift"))
-        self.setMinimumWidth(480)
+        self.setMinimumWidth(408)
 
         self.job = QComboBox()
         new_job = QPushButton(_("New job…"))

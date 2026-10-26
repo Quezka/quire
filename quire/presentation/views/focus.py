@@ -44,7 +44,7 @@ class FocusView(Page):
         # ---- timer ----
         self.ring = ProgressRing()
         self.start_btn = primary_button(C_("button", "Start"), "play")
-        self.start_btn.setMinimumWidth(130)
+        self.start_btn.setMinimumWidth(110)
         self.start_btn.clicked.connect(self._toggle)
         reset = icon_button("reset", _("Reset the cycle"))
         reset.clicked.connect(self._reset)
@@ -59,7 +59,7 @@ class FocusView(Page):
 
         # Pick one of your tasks, or type anything else you're working on.
         self.task = QComboBox(editable=True)
-        self.task.setMinimumWidth(320)
+        self.task.setMinimumWidth(272)
         self.task.setInsertPolicy(QComboBox.NoInsert)
         self.task.lineEdit().setPlaceholderText(_("Pick a task or type a project…"))
         self.task.lineEdit().setClearButtonEnabled(True)
