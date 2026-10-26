@@ -36,6 +36,7 @@ PLURALS = {
 }
 
 MESSAGES = {
+    "High contrast (black and white, thick lines)": "Alto contrasto (bianco e nero, linee spesse)",
     'Interface size': 'Dimensione dell’interfaccia',
     'Automatic': 'Automatica',
     'Applies after a restart. Automatic makes everything a little smaller on small screens.': 'Si applica dopo il riavvio. La modalità automatica rimpicciolisce un po’ tutto sugli schermi piccoli.',
