@@ -18,7 +18,7 @@ from ..formatting import fmt_min
 from ..i18n import _
 from ..notify import notify
 from ..widgets import ProgressRing, min_to_qtime, qtime_to_min
-from .common import Card, Page, label, primary_button
+from .common import Card, Page, label, primary_button, scrolling
 
 
 class WeekBars(QWidget):
@@ -133,7 +133,7 @@ class WaterView(Page):
         row.setSpacing(18)
         row.addWidget(today, 3)
         row.addLayout(right, 2)
-        self.root.addLayout(row, 1)
+        self.root.addWidget(scrolling(row), 1)
 
         relay.changed.connect(self._changed)
         self._load_profile()

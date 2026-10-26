@@ -34,16 +34,19 @@ def test_milestones_routines_and_sleep_render(window, app, services):
     assert {b.title for b in blocks} >= {"Take meds"}
     assert not window.grab().isNull()
 
-    dialog = RoutineDialog(services, rid)
+    dialog = RoutineDialog(services, rid, parent=window)
     assert dialog.title.text() == "Wake up" and [box.isChecked() for box in dialog.days][:5] == [True] * 5
     dialog.show()
-    milestone = EventDialog(services, day=TODAY, milestone=True)
+    milestone = EventDialog(services, day=TODAY, milestone=True, parent=window)
     milestone.show()
     assert milestone.milestone.isChecked() and not milestone.end.isVisible()
     milestone.milestone.setChecked(False)
     assert milestone.end.isVisible()
     for d in (dialog, milestone):
         d.close()
+        d.deleteLater()
+    from PySide6.QtCore import QCoreApplication, QEvent
+    QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
     sleep = next(w for w in (window.stack.widget(i) for i in range(window.stack.count()))
                  if isinstance(w, SleepView))

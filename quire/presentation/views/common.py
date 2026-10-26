@@ -43,6 +43,25 @@ class Page(QWidget):
             self.header.addWidget(w, 0, Qt.AlignVCenter)
 
 
+def scrolling(layout) -> "QScrollArea":
+    """The layout inside a frameless scroll area, so a page whose content is taller than the
+    window scrolls instead of forcing the window to grow (small laptop screens)."""
+    from PySide6.QtWidgets import QFrame as _Frame, QScrollArea, QWidget as _Widget
+
+    inner = _Widget()
+    inner.setObjectName("scrollBody")
+    inner.setStyleSheet("#scrollBody { background: transparent; }")
+    layout.setContentsMargins(0, 0, 8, 0)
+    inner.setLayout(layout)
+    area = QScrollArea()
+    area.setWidgetResizable(True)
+    area.setFrameShape(_Frame.NoFrame)
+    area.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+    area.setWidget(inner)
+    area.viewport().setAutoFillBackground(False)
+    return area
+
+
 class Card(QFrame):
     """Rounded surface with an optional title row."""
 

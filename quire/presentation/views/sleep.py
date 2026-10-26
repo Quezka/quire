@@ -19,7 +19,7 @@ from ..formatting import fmt_duration, fmt_min
 from ..i18n import _
 from ..notify import notify
 from ..widgets import min_to_qtime, qtime_to_min
-from .common import Card, Page, label, primary_button
+from .common import Card, Page, label, primary_button, scrolling
 
 
 class SleepBars(QWidget):
@@ -150,7 +150,7 @@ class SleepView(Page):
         row.setSpacing(18)
         row.addLayout(left, 2)
         row.addWidget(chart_card, 3, Qt.AlignTop)
-        self.root.addLayout(row, 1)
+        self.root.addWidget(scrolling(row), 1)
 
         self._timer = QTimer(self, interval=60_000)  # the wind-down nudge, while Quire is open
         self._timer.timeout.connect(self._remind)
