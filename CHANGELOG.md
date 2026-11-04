@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.41.0] - 2026-11-04
+
+### Changed
+- **The phone app has the same indigo and colours as the computer.** The home-screen widget keeps following the system's colours.
+
 ## [0.40.0] - 2026-11-04
 
 ### Changed
