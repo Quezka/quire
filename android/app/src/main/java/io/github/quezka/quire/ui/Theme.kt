@@ -28,7 +28,7 @@ private val SuiteType = Typography().run {
 }
 
 /** The desktop's palette (quire/presentation/theme.py). */
-private val Light = lightColorScheme(
+internal val Light = lightColorScheme(
     primary = Color(0xFF5B5BD6), onPrimary = Color.White,
     primaryContainer = Color(0xFFE6E6FB), onPrimaryContainer = Color(0xFF3B3BA8),
     secondaryContainer = Color(0xFFE6E6FB), onSecondaryContainer = Color(0xFF3B3BA8),
@@ -41,7 +41,7 @@ private val Light = lightColorScheme(
     error = Color(0xFFE5484D), tertiary = Color(0xFF30A46C),
 )
 
-private val Dark = darkColorScheme(
+internal val Dark = darkColorScheme(
     primary = Color(0xFF8182F0), onPrimary = Color.White,
     primaryContainer = Color(0xFF262747), onPrimaryContainer = Color(0xFFC9CAFB),
     secondaryContainer = Color(0xFF262747), onSecondaryContainer = Color(0xFFC9CAFB),

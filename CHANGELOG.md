@@ -4,6 +4,12 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.40.0] - 2026-11-04
+
+### Changed
+- **The icons are Material Symbols**, outlined, and filled for what is selected.
+- **The home-screen widget is Material 3**: it takes the system's Material You colours on Android 12 and later (Quire's own before that) and follows light and dark, with rows on tonal cards, a tonal add button and Material icons.
+
 ## [0.39.0] - 2026-11-04
 
 ### Added

@@ -2,10 +2,11 @@ package io.github.quezka.quire.widget
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.glance.ColorFilter
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
@@ -21,13 +22,13 @@ import androidx.glance.appwidget.GlanceAppWidgetReceiver
 import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
+import androidx.glance.appwidget.appWidgetBackground
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.appwidget.lazy.LazyColumn
 import androidx.glance.appwidget.lazy.items
 import androidx.glance.appwidget.provideContent
 import androidx.glance.appwidget.updateAll
 import androidx.glance.background
-import androidx.glance.color.ColorProvider
 import androidx.glance.layout.Alignment
 import androidx.glance.layout.Box
 import androidx.glance.layout.Column
@@ -39,6 +40,7 @@ import androidx.glance.layout.height
 import androidx.glance.layout.padding
 import androidx.glance.layout.size
 import androidx.glance.layout.width
+import androidx.glance.material3.ColorProviders
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
@@ -49,6 +51,8 @@ import io.github.quezka.quire.domain.ItemKind
 import io.github.quezka.quire.domain.WidgetAgenda
 import io.github.quezka.quire.domain.WidgetDay
 import io.github.quezka.quire.domain.WidgetEntry
+import io.github.quezka.quire.ui.Dark
+import io.github.quezka.quire.ui.Light
 import io.github.quezka.quire.ui.kindLabel
 import io.github.quezka.quire.ui.minutes
 import io.github.quezka.quire.ui.parseColor
@@ -74,7 +78,12 @@ class AgendaWidget : GlanceAppWidget() {
             repo.now() to WidgetAgenda.build(repo.now(), repo.courses(), repo.events(), repo.jobs(),
                 repo.shifts(), repo.tasks(), repo.routines())
         }
-        provideContent { GlanceTheme { Content(context, now.toLocalDate(), days) } }
+        provideContent {
+            // The system's Material You colours where there are any (Android 12), else Quire's own.
+            GlanceTheme(if (Build.VERSION.SDK_INT >= 31) GlanceTheme.colors else QuireWidgetColors) {
+                AgendaContent(context, now.toLocalDate(), days)
+            }
+        }
     }
 
     companion object {
@@ -100,43 +109,43 @@ class AgendaWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = AgendaWidget()
 }
 
-private val Ink = ColorProvider(day = Color(0xFF16181D), night = Color(0xFFECEDEF))
-private val Muted = ColorProvider(day = Color(0xFF636A75), night = Color(0xFF9BA1AB))
-private val Surface = ColorProvider(day = Color(0xFFFFFFFF), night = Color(0xFF18191C))
-private val Accent = ColorProvider(day = Color(0xFF5B5BD6), night = Color(0xFF8182F0))
-private val Alert = ColorProvider(day = Color(0xFFE5484D), night = Color(0xFFFF6369))
+internal val QuireWidgetColors = ColorProviders(light = Light, dark = Dark)
 
 @Composable
-private fun Content(context: Context, today: LocalDate, days: List<WidgetDay>) {
+internal fun AgendaContent(context: Context, today: LocalDate, days: List<WidgetDay>) {
+    val colors = GlanceTheme.colors
     val compact = LocalSize.current.height < 150.dp  // a short widget gives its room to the agenda
-    Column(GlanceModifier.fillMaxSize().background(Surface).cornerRadius(20.dp)) {
-        Row(GlanceModifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = if (compact) 4.dp else 10.dp, bottom = if (compact) 0.dp else 4.dp),
+    val corners = if (Build.VERSION.SDK_INT >= 31) GlanceModifier.cornerRadius(android.R.dimen.system_app_widget_background_radius)
+        else GlanceModifier.cornerRadius(24.dp)
+    Column(GlanceModifier.fillMaxSize().appWidgetBackground().background(colors.widgetBackground).then(corners)) {
+        Row(GlanceModifier.fillMaxWidth().padding(start = 16.dp, end = 12.dp, top = if (compact) 6.dp else 14.dp, bottom = if (compact) 2.dp else 6.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Column(GlanceModifier.defaultWeight().clickable(openApp(context, 0))) {
                 if (!compact) Text(today.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault()))
                     .replaceFirstChar { it.titlecase(Locale.getDefault()) },
-                    style = TextStyle(color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium))
+                    style = TextStyle(color = colors.primary, fontSize = 12.sp, fontWeight = FontWeight.Medium))
                 Text(today.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())),
-                    maxLines = 1, style = TextStyle(color = Ink, fontSize = if (compact) 15.sp else 20.sp, fontWeight = FontWeight.Bold))
+                    maxLines = 1, style = TextStyle(color = colors.onSurface, fontSize = if (compact) 16.sp else 22.sp, fontWeight = FontWeight.Normal))
             }
-            Box(GlanceModifier.size(40.dp).clickable(openApp(context, 2, newTask = true)),
-                contentAlignment = Alignment.Center) {
+            // A small tonal button, with Material's rounded square.
+            Box(GlanceModifier.size(if (compact) 36.dp else 44.dp).background(colors.primaryContainer).cornerRadius(14.dp)
+                .clickable(openApp(context, 2, newTask = true)), contentAlignment = Alignment.Center) {
                 Image(ImageProvider(R.drawable.ic_widget_add), context.getString(R.string.add_task),
-                    GlanceModifier.size(28.dp))
+                    GlanceModifier.size(24.dp), colorFilter = ColorFilter.tint(colors.onPrimaryContainer))
             }
         }
         if (days.isEmpty()) {
             Box(GlanceModifier.fillMaxSize().clickable(openApp(context, 0)), contentAlignment = Alignment.Center) {
                 Text(context.getString(R.string.widget_empty),
-                    style = TextStyle(color = Muted, fontSize = 14.sp))
+                    style = TextStyle(color = colors.onSurfaceVariant, fontSize = 14.sp))
             }
         } else {
-            LazyColumn(GlanceModifier.fillMaxSize().padding(horizontal = 8.dp)) {
+            LazyColumn(GlanceModifier.fillMaxSize().padding(horizontal = 10.dp)) {
                 for (day in days) {
                     item {
-                        Text(relativeDate(context, day.day, today).uppercase(Locale.getDefault()),
-                            GlanceModifier.fillMaxWidth().padding(start = 8.dp, top = 8.dp, bottom = 2.dp),
-                            style = TextStyle(color = Muted, fontSize = 11.sp, fontWeight = FontWeight.Medium))
+                        Text(relativeDate(context, day.day, today),
+                            GlanceModifier.fillMaxWidth().padding(start = 8.dp, top = 10.dp, bottom = 4.dp),
+                            style = TextStyle(color = colors.primary, fontSize = 12.sp, fontWeight = FontWeight.Medium))
                     }
                     items(day.entries) { entry ->
                         when (entry) {
@@ -152,46 +161,60 @@ private fun Content(context: Context, today: LocalDate, days: List<WidgetDay>) {
 }
 
 @Composable
-private fun TimedRow(context: Context, entry: WidgetEntry.Timed) {
+internal fun TimedRow(context: Context, entry: WidgetEntry.Timed) {
     val item = entry.item
     val tag = when (item.kind) {
         ItemKind.CLASS -> item.room
         ItemKind.EVENT, ItemKind.ROUTINE -> ""
         ItemKind.SHIFT -> context.getString(R.string.kind_shift)
     }
-    Row(GlanceModifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp)
-        .clickable(openApp(context, 0)),
-        verticalAlignment = Alignment.CenterVertically) {
-        Box(GlanceModifier.width(4.dp).height(32.dp).background(parseColor(item.color)).cornerRadius(2.dp)) {}
-        Spacer(GlanceModifier.width(10.dp))
-        Column(GlanceModifier.defaultWeight()) {
-            Text(item.title, maxLines = 1, style = TextStyle(color = Ink, fontSize = 14.sp, fontWeight = FontWeight.Medium))
-            Text(listOf("${minutes(item.start)}–${minutes(item.end)}", tag).filter { it.isNotBlank() }.joinToString(" · "),
-                maxLines = 1, style = TextStyle(color = Muted, fontSize = 12.sp))
+    val colors = GlanceTheme.colors
+    RowCard {
+        Row(GlanceModifier.fillMaxWidth().background(colors.surfaceVariant).cornerRadius(14.dp)
+            .padding(horizontal = 10.dp, vertical = 8.dp).clickable(openApp(context, 0)),
+            verticalAlignment = Alignment.CenterVertically) {
+            Box(GlanceModifier.width(4.dp).height(32.dp).background(parseColor(item.color)).cornerRadius(2.dp)) {}
+            Spacer(GlanceModifier.width(10.dp))
+            Column(GlanceModifier.defaultWeight()) {
+                Text(item.title, maxLines = 1, style = TextStyle(color = colors.onSurface, fontSize = 14.sp, fontWeight = FontWeight.Medium))
+                Text(listOf("${minutes(item.start)}–${minutes(item.end)}", tag).filter { it.isNotBlank() }.joinToString(" · "),
+                    maxLines = 1, style = TextStyle(color = colors.onSurfaceVariant, fontSize = 12.sp))
+            }
         }
     }
 }
 
+/** The gap between the rows of the list. */
 @Composable
-private fun DueRow(context: Context, entry: WidgetEntry.Due, today: LocalDate) {
+private fun RowCard(content: @Composable () -> Unit) {
+    Box(GlanceModifier.fillMaxWidth().padding(vertical = 2.dp)) { content() }
+}
+
+@Composable
+internal fun DueRow(context: Context, entry: WidgetEntry.Due, today: LocalDate) {
     val task = entry.task
-    Row(GlanceModifier.fillMaxWidth().padding(horizontal = 8.dp, vertical = 4.dp),
-        verticalAlignment = Alignment.CenterVertically) {
-        Box(GlanceModifier.size(32.dp).clickable(actionRunCallback<CompleteTask>(
-            actionParametersOf(TaskUid to task.uid, TaskDone to !task.done))), contentAlignment = Alignment.Center) {
-            Image(ImageProvider(if (task.done) R.drawable.ic_widget_check else R.drawable.ic_widget_circle),
-                context.getString(if (task.done) R.string.mark_not_done else R.string.mark_done),
-                GlanceModifier.size(20.dp))
-        }
-        Spacer(GlanceModifier.width(6.dp))
-        Column(GlanceModifier.defaultWeight().clickable(openApp(context, 2))) {
-            Text(task.title, maxLines = 1, style = TextStyle(color = if (task.done) Muted else Ink, fontSize = 14.sp,
-                fontWeight = FontWeight.Medium,
-                textDecoration = if (task.done) androidx.glance.text.TextDecoration.LineThrough else null))
-            val kind = context.getString(kindLabel(task.kind))
-            val note = if (entry.overdue) context.getString(R.string.was_due,
-                relativeDate(context, task.due!!, today).lowercase(Locale.getDefault())) else kind
-            Text(note, maxLines = 1, style = TextStyle(color = if (entry.overdue) Alert else Muted, fontSize = 12.sp))
+    val colors = GlanceTheme.colors
+    RowCard {
+        Row(GlanceModifier.fillMaxWidth().background(colors.surfaceVariant).cornerRadius(14.dp)
+            .padding(start = 4.dp, end = 10.dp, top = 4.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically) {
+            Box(GlanceModifier.size(36.dp).clickable(actionRunCallback<CompleteTask>(
+                actionParametersOf(TaskUid to task.uid, TaskDone to !task.done))), contentAlignment = Alignment.Center) {
+                Image(ImageProvider(if (task.done) R.drawable.ic_widget_check else R.drawable.ic_widget_circle),
+                    context.getString(if (task.done) R.string.mark_not_done else R.string.mark_done),
+                    GlanceModifier.size(22.dp),
+                    colorFilter = ColorFilter.tint(if (task.done) colors.primary else colors.onSurfaceVariant))
+            }
+            Spacer(GlanceModifier.width(4.dp))
+            Column(GlanceModifier.defaultWeight().clickable(openApp(context, 2))) {
+                Text(task.title, maxLines = 1, style = TextStyle(color = if (task.done) colors.onSurfaceVariant else colors.onSurface,
+                    fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                    textDecoration = if (task.done) androidx.glance.text.TextDecoration.LineThrough else null))
+                val kind = context.getString(kindLabel(task.kind))
+                val note = if (entry.overdue) context.getString(R.string.was_due,
+                    relativeDate(context, task.due!!, today).lowercase(Locale.getDefault())) else kind
+                Text(note, maxLines = 1, style = TextStyle(color = if (entry.overdue) colors.error else colors.onSurfaceVariant, fontSize = 12.sp))
+            }
         }
     }
 }

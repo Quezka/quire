@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- The widget's "new task" button: an accent circle with a plus. -->
+<!-- The widget's "new task" button (Material Symbols, tinted by the widget). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
-    android:width="28dp" android:height="28dp" android:viewportWidth="28" android:viewportHeight="28">
-    <path android:fillColor="#5B5BD6" android:pathData="M14,14m-14,0a14,14 0,1 1,28 0a14,14 0,1 1,-28 0" />
-    <path android:fillColor="#FFFFFF" android:pathData="M13,8h2v5h5v2h-5v5h-2v-5H8v-2h5z" />
+    android:width="24dp" android:height="24dp" android:viewportWidth="960" android:viewportHeight="960">
+    <group android:translateY="960">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M434.5-434.5H191.87v-91H434.5v-242.63h91v242.63h242.63v91H525.5v242.63h-91V-434.5Z" />
+    </group>
 </vector>
