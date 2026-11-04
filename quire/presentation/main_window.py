@@ -1,8 +1,10 @@
 from __future__ import annotations
 
+import sys
+
 from datetime import date
 
-from PySide6.QtCore import QSettings, QSize, Qt, QUrl
+from PySide6.QtCore import QSettings, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence
 from PySide6.QtWidgets import (
     QApplication, QButtonGroup, QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMenu, QMessageBox,
@@ -27,6 +29,7 @@ from .sync_ui import SyncRunner
 from .updates_ui import UpdateChecker
 from .views.focus import FocusView
 from .views.sleep import SleepView
+from ..application.bus import Topic
 from .views.finance import FinanceView
 from .views.medicine import MedicineView
 from .views.water import WaterView
@@ -124,6 +127,9 @@ class MainWindow(QMainWindow):
         self.school.newsChanged.connect(self._school_news)
         self.focus.statusChanged.connect(self._focus_status)
         self.reminders = Reminders(services.reminders, self)
+        self._calendar_timer = QTimer(self, singleShot=True, interval=3000, timeout=self._publish_calendar)
+        relay.changed.connect(self._agenda_changed)
+        self._calendar_timer.start()  # at start: the days have moved on since last time
         self.sync = SyncRunner(services, relay, self)
         self.updater = UpdateChecker(services, self)  # not `update`: that's QWidget's
 
@@ -323,6 +329,16 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
         if self.tray is not None:
             QApplication.quit()
+
+    def _agenda_changed(self, topic):
+        if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS, Topic.WORK):
+            self._calendar_timer.start()  # a burst of changes (a sync) writes the file once
+
+    def _publish_calendar(self):
+        try:
+            self.services.calendar.publish()
+        except OSError as e:
+            print("calendar file:", e, file=sys.stderr)
 
     def bring_back(self):
         """Show the window again (tray click, or Quire launched a second time)."""

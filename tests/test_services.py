@@ -561,3 +561,44 @@ def test_a_month_adds_up_exactly_by_category_and_against_the_budget():
         svc.add(T(date(2026, 11, 3), "0"))
     assert svc.csv(2026, 11)[1] == ["2026-11-01", "1000.00", "Pay", ""]
     assert svc.csv(2026, 11)[2][1] == "-0.10"
+
+
+def test_the_agenda_becomes_a_calendar_file_with_stable_ids(tmp_path):
+    from datetime import date, datetime
+    from quire.application.inputs import EventInput
+    from quire.bootstrap import build_services
+    from quire.domain.ical import CalendarEntry, to_ics
+    from quire.infrastructure.system_calendar import EvolutionCalendar
+    from quire.infrastructure.credentials import MemoryCredentialStore
+    from .fakes import FakeRegister
+
+    text = to_ics([CalendarEntry("a@quire", "Gita, a Bologna; sì\nbis", date(2026, 11, 4), all_day=True),
+                   CalendarEntry("b@quire", "Lezione", date(2026, 11, 4), 480, 540, False, "x" * 200, "B12")],
+                  "Quire", datetime(2026, 11, 4, 9, 0))
+    assert "SUMMARY:Gita\\, a Bologna\; sì\\nbis\r\n" in text
+    assert "DTSTART;VALUE=DATE:20261104\r\nDTEND;VALUE=DATE:20261105\r\n" in text
+    assert "DTSTART:20261104T080000\r\nDTEND:20261104T090000\r\nDESCRIPTION:" in text and "LOCATION:B12" in text
+    assert all(len(line.encode()) <= 75 for line in text.split("\r\n")) and "\r\n x" in text  # folded
+
+    system = EvolutionCalendar(tmp_path / "data", tmp_path / "sources")
+    services, _db = build_services(tmp_path / "q.db", register=FakeRegister(), credentials=MemoryCredentialStore(),
+                                   calendar=system)
+    today = services.planner.today()
+    services.planner.save_event(None, EventInput(today, 0, 0, "Festa", all_day=True))
+    services.planner.save_event(None, EventInput(today, 600, 660, "Dentista", "", "#000000"))
+    services.calendar.publish()
+    assert not system.file.exists() and not list((tmp_path).glob("sources/*"))  # off by default: nothing written
+    services.calendar.set_enabled(True)
+    first = system.file.read_bytes().decode()
+    assert "SUMMARY:Festa" in first and "SUMMARY:Dentista" in first and system.file.stat().st_mode & 0o077 == 0
+    source = (tmp_path / "sources" / system.SOURCE).read_text()
+    assert f"CustomFile=file://{system.file}" in source and "BackendName=local" in source and "Writable=false" in source
+    before = system.file.stat().st_mtime_ns
+    services.calendar.publish()
+    assert system.file.stat().st_mtime_ns == before  # unchanged: not rewritten, so nothing reloads
+    assert "\r\n" in first
+    uids = {line for line in first.split("\r\n") if line.startswith("UID:")}
+    services.calendar.publish()
+    assert len(uids) >= 2
+    services.calendar.set_enabled(False)
+    assert not (tmp_path / "sources" / system.SOURCE).exists()

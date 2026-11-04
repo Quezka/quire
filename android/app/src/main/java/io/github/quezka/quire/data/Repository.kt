@@ -13,6 +13,9 @@ import io.github.quezka.quire.domain.Payslip
 import io.github.quezka.quire.domain.Routine
 import io.github.quezka.quire.domain.SleepLog
 import io.github.quezka.quire.domain.WaterLog
+import io.github.quezka.quire.domain.DoseLog
+import io.github.quezka.quire.domain.Medicine
+import io.github.quezka.quire.domain.Transaction
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
@@ -91,6 +94,44 @@ class Repository(
     }
     fun deleteWater(uid: String) {
         records.delete("water", uid)
+        changed()
+    }
+    fun medicines(): List<Medicine> = records.live("medicine").map(Codec::medicine).sortedBy { it.name.lowercase() }
+    fun doseLogs(): List<DoseLog> = records.live("dose").mapNotNull(Codec::dose)
+    fun saveMedicine(m: Medicine) {
+        records.save("medicine", m.uid, Codec.medicineData(m, records.get("medicine", m.uid)?.data))
+        changed()
+    }
+    fun deleteMedicine(uid: String) {
+        doseLogs().filter { it.medicineUid == uid }.forEach { records.delete("dose", it.uid) }
+        records.delete("medicine", uid)
+        changed()
+    }
+    /** Tick a dose as taken or skipped; doing it again changes it, never adds a second one. */
+    fun markDose(medicineUid: String, day: LocalDate, planned: Int, taken: Boolean) {
+        val n = now()
+        val at = if (day == n.toLocalDate()) n.hour * 60 + n.minute else planned.coerceAtLeast(0)
+        val existing = doseLogs().firstOrNull { it.medicineUid == medicineUid && it.day == day && it.planned == planned }
+        val log = DoseLog(existing?.uid ?: Codec.newUid(), medicineUid, day, planned, taken, at)
+        records.save("dose", log.uid, Codec.doseData(log, records.get("dose", log.uid)?.data))
+        changed()
+    }
+    fun unmarkDose(medicineUid: String, day: LocalDate, planned: Int) {
+        doseLogs().filter { it.medicineUid == medicineUid && it.day == day && it.planned == planned }
+            .forEach { records.delete("dose", it.uid) }
+        changed()
+    }
+    fun transactions(first: LocalDate, last: LocalDate): List<Transaction> =
+        records.live("money").mapNotNull(Codec::transaction).filter { it.day in first..last }.sortedBy { it.day }
+    fun transactionCategories(): List<String> =
+        records.live("money").mapNotNull(Codec::transaction).map { it.category }.filter { it.isNotBlank() }
+            .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key }
+    fun saveTransaction(t: Transaction) {
+        records.save("money", t.uid, Codec.transactionData(t, records.get("money", t.uid)?.data))
+        changed()
+    }
+    fun deleteTransaction(uid: String) {
+        records.delete("money", uid)
         changed()
     }
     fun routines(): List<Routine> = records.live("routine").map(Codec::routine)

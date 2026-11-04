@@ -932,4 +932,9 @@ MESSAGES = {
     '{what}, at {time}': '{what}, alle {time}',
     'Where it went': 'Dove sono andati',
     'Your medicines': 'I tuoi farmaci',
+    "Show my agenda in the computer's calendar": 'Mostra la mia agenda nel calendario del computer',
+    'Open in the calendar app': "Apri nell'app calendario",
+    'One way: classes, events, shifts and due dates appear there as Quire changes them. You keep editing them here.': 'In una sola direzione: lezioni, eventi, turni e scadenze compaiono lì man mano che Quire li cambia. Li modifichi sempre qui.',
+    'Windows has no way to follow a file: each time you open it, your calendar app imports the agenda as it is then.': "Windows non può seguire un file: ogni volta che lo apri, l'app calendario importa l'agenda com'è in quel momento.",
+    'Calendar': 'Calendario',
 }

@@ -10,7 +10,7 @@ from .application.ports import (
     UpdateInstaller,
 )
 from .application.services import (
-    FinanceService, FocusService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
+    CalendarService, FinanceService, FocusService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
     SchoolSyncService, Services, StartupService, SyncService, TaskService, TimetableService,
     UpdateService, WorkService,
 )
@@ -20,6 +20,7 @@ from .infrastructure.credentials import KeyringCredentialStore
 from .infrastructure.cloud import RoutingCloud
 from .infrastructure.ligature import LigatureApp
 from .infrastructure.login_item import platform_login_item
+from .infrastructure.system_calendar import platform_calendar
 from .infrastructure.quiet import platform_quiet
 from .infrastructure.repositories import (
     SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteWaterRepository, SqliteMedicineRepository, SqliteTransactionRepository, SqliteFocusLogRepository, SqliteJobRepository,
@@ -42,6 +43,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                    login_item: LoginItem | None = None,
                    diagrams: DiagramEditor | None = None,
                    quiet: QuietSwitch | None = None,
+                   calendar=None,
                    ) -> tuple[Services, SqliteDatabase]:
     db = SqliteDatabase(db_path)
     clock = clock or SystemClock()
@@ -60,10 +62,11 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     register = register or ClassevivaRegister()
     planner = PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts,
                               SqliteRoutineRepository(db))
+    tasks_service = TaskService(tasks, courses, clock, bus)
     services = Services(
         timetable=TimetableService(courses, bus),
         planner=planner,
-        tasks=TaskService(tasks, courses, clock, bus),
+        tasks=tasks_service,
         notes=NoteService(notes, courses, clock, bus, images, diagrams or LigatureApp(),
                           notebooks),
         school=SchoolRecordsService(courses, tasks, records, clock, register.name.lower()),
@@ -76,6 +79,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         water=WaterService(SqliteWaterRepository(db), settings, clock, bus),
         medicine=MedicineService(SqliteMedicineRepository(db), clock, bus),
         finance=FinanceService(SqliteTransactionRepository(db), settings, clock, bus),
+        calendar=CalendarService(planner, tasks_service, calendar or platform_calendar(), settings, clock),
         quiet=QuietService(planner, settings, clock, quiet or platform_quiet()),
         reminders=ReminderService(planner, settings, clock),
         sync=SyncService(SqliteSyncStore(db), cloud or RoutingCloud(),

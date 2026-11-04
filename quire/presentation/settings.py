@@ -12,6 +12,7 @@ from .. import __version__
 from ..application.errors import ApplicationError
 from ..application.services import QuietSettings, ReminderSettings, Services
 from . import theme
+from .dialogs import attempt
 from .formatting import money
 from .notify import play_chime
 from . import uiscale
@@ -122,6 +123,19 @@ class SettingsDialog(QDialog):
         self._reminders_changed(save=False)
 
         quiet = services.quiet.settings()
+        self.calendar_on = QCheckBox(_("Show my agenda in the computer's calendar"),
+                                     checked=services.calendar.enabled())
+        self.calendar_on.toggled.connect(lambda on: attempt(self, lambda: services.calendar.set_enabled(on)))
+        calendar_open = QPushButton(_("Open in the calendar app"))
+        calendar_open.clicked.connect(lambda: attempt(self, services.calendar.open))
+        calendar_row = QHBoxLayout()
+        calendar_row.addWidget(calendar_open)
+        calendar_row.addStretch()
+        calendar_hint = QLabel(_("One way: classes, events, shifts and due dates appear there as Quire changes them. "
+                                 "You keep editing them here.") if services.calendar.can_subscribe() else
+                               _("Windows has no way to follow a file: each time you open it, your calendar app "
+                                 "imports the agenda as it is then."), objectName="hint")
+        calendar_hint.setWordWrap(True)
         self.quiet_on = QCheckBox(_("Silence notifications while things are on"), checked=quiet.enabled)
         self.quiet_classes = QCheckBox(_("Classes"), checked=quiet.classes)
         self.quiet_events = QCheckBox(_("Events"), checked=quiet.events)
@@ -230,6 +244,10 @@ class SettingsDialog(QDialog):
         right.addRow(self._section(_("Sync")))
         right.addRow(self.sync_status)
         right.addRow(sync_row)
+        right.addRow(self._section(_("Calendar")))
+        right.addRow(self.calendar_on)
+        right.addRow(calendar_row)
+        right.addRow(calendar_hint)
         right.addRow(self._section(_("Updates")))
         right.addRow(update_row)
         right.addRow(self._section(_("Startup")))

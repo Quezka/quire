@@ -4,6 +4,16 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.38.0] - 2026-11-04
+
+### Added
+- **Medicines**, on the computer and the phone: what to take and when, ticking each dose as taken or skipped, how the week went, and a notification when a dose is due. Quire only remembers what you tell it: it isn't medical advice and it doesn't check doses.
+- **Money**, on the computer and the phone: what came in and went out by month and category, with exact sums. On the computer also a monthly budget and CSV export.
+- **Your agenda in the computer's calendar**: Settings → Calendar. On Linux, classes, events, shifts and due dates appear in GNOME Calendar and Evolution as a read-only calendar that follows Quire. On Windows the file is handed to your calendar app, which imports it as it is then. It goes one way: you keep editing in Quire.
+
+### Changed
+- **More Material You on the computer**: surfaces tinted by the accent colour, a pill for the current page, round buttons and softer corners. High contrast keeps its own stark look.
+
 ## [0.37.0] - 2026-11-04
 
 ### Added

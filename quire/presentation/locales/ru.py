@@ -934,4 +934,9 @@ MESSAGES = {
     '{what}, at {time}': '{what}, в {time}',
     'Where it went': 'Куда ушли деньги',
     'Your medicines': 'Ваши лекарства',
+    "Show my agenda in the computer's calendar": 'Показывать моё расписание в календаре компьютера',
+    'Open in the calendar app': 'Открыть в приложении календаря',
+    'One way: classes, events, shifts and due dates appear there as Quire changes them. You keep editing them here.': 'В одну сторону: уроки, события, смены и сроки появляются там по мере изменений в Quire. Редактируете вы их здесь.',
+    'Windows has no way to follow a file: each time you open it, your calendar app imports the agenda as it is then.': 'Windows не умеет следить за файлом: каждый раз при открытии приложение календаря импортирует расписание в текущем виде.',
+    'Calendar': 'Календарь',
 }
