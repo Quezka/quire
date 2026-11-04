@@ -307,6 +307,42 @@ class FeaturesTest {
 
     private val login = """{"token":"t","ident":"S1234567X","firstName":"ARSENII","lastName":"DOMASHENKO"}"""
 
+    @Test fun aNoticeCanBeReadInFullAndKeepsItsTextAcrossSyncs() {
+        val board = """{"items":[{"evtCode":"CF","pubId":77,"cntTitle":"Circolare  n. 12","cntCategory":"Generale",
+            "pubDT":"2026-10-01T08:00:00+02:00","readStatus":false,"cntStatus":"active",
+            "attachments":[{"attachNum":1,"fileName":"circolare12.pdf"}]}]}"""
+        val read = """{"item":{"text":"<p>Domani uscita&nbsp;anticipata.</p><ul><li>Prima ora</li></ul>"}}"""
+        val asked = mutableListOf<String>()
+        val register = Classeviva({ method, url, _, _ ->
+            val path = url.removePrefix(Classeviva.BASE)
+            asked += "$method $path"
+            when {
+                path.startsWith("/auth/login") -> 200 to login
+                path.endsWith("/noticeboard") -> 200 to board
+                "/noticeboard/read/" in path -> 200 to read
+                else -> 404 to "{}"
+            }
+        }, today = { today }, download = { url, _ -> 200 to url.toByteArray() })
+        val settings = MemorySettings()
+        val school = SchoolSync(register, repo(), RegisterStore(settings), settings, PlainBox())
+        school.connect("S1234567X", "secret")
+        school.apply(school.fetch())
+        val notice = school.data().notices.single()
+        assertEquals("Circolare n. 12", notice.title)
+        assertEquals("circolare12.pdf", notice.attachments.single().name)
+        assertNull(notice.text)
+        val text = school.openNotice(notice.id)
+        assertEquals("Domani uscita anticipata.\n• Prima ora", text)
+        assertTrue(asked.any { it == "POST /students/1234567/noticeboard/read/CF/77/101" })
+        assertTrue(school.data().notices.single().read)
+        asked.clear()
+        assertEquals(text, school.openNotice(notice.id)) // kept: no need to ask again, also offline
+        assertTrue(asked.isEmpty())
+        school.apply(school.fetch())
+        assertEquals(text, school.data().notices.single().text) // a sync doesn't lose it
+        assertTrue(String(school.noticeAttachment(notice.id, 1)).endsWith("/students/1234567/noticeboard/attach/CF/77/1"))
+    }
+
     @Test fun anEarlyExitWithoutAnHourIsReadAndTheHourYouEnterStays() {
         // Exactly what Classeviva sent for the real early exit on 28 September.
         val absences = """{"events":[{"evtId":12720496,"evtCode":"ABU0","evtDate":"2026-09-28","evtHPos":null,

@@ -372,10 +372,12 @@ private fun Topics(lessons: List<io.github.quezka.quire.domain.Lesson>) {
 private fun Notices(container: Container, notices: List<io.github.quezka.quire.domain.Notice>) {
     val context = LocalContext.current
     val today = java.time.LocalDate.now()
+    var open by remember { androidx.compose.runtime.mutableStateOf<io.github.quezka.quire.domain.Notice?>(null) }
+    open?.let { NoticeDialog(container, it) { open = null } }
     LazyColumn(contentPadding = PaddingValues(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
         if (notices.isEmpty()) item { Hint(stringResource(R.string.no_notices)) }
         items(notices.sortedByDescending { it.published }, key = { it.id }) { n ->
-            Row(Modifier.fillMaxWidth().animateItem().clickable { container.school.markNoticeRead(n.id) }
+            Row(Modifier.fillMaxWidth().animateItem().clickable { open = n }
                 .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
                 val dot by animateFloatAsState(if (n.read) 0f else 1f, tween(Motion.MEDIUM), label = "unread")
                 Box(Modifier.size(8.dp).background(MaterialTheme.colorScheme.primary.copy(alpha = dot), RoundedCornerShape(4.dp)))
@@ -387,4 +389,63 @@ private fun Notices(container: Container, notices: List<io.github.quezka.quire.d
             }
         }
     }
+}
+
+/** A notice from the school: its full text, fetched when opened and kept, and its attachments. */
+@Composable
+private fun NoticeDialog(container: Container, notice: io.github.quezka.quire.domain.Notice, close: () -> Unit) {
+    val context = LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    var text by remember(notice.id) { androidx.compose.runtime.mutableStateOf<String?>(notice.text) }
+    var problem by remember(notice.id) { androidx.compose.runtime.mutableStateOf<String?>(null) }
+    var busy by remember(notice.id) { androidx.compose.runtime.mutableStateOf(false) }
+    androidx.compose.runtime.LaunchedEffect(notice.id) {
+        runCatching { kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) { container.school.openNotice(notice.id) } }
+            .onSuccess { text = it }
+            .onFailure { if (text == null) problem = it.message ?: context.getString(R.string.notice_failed) }
+    }
+    fun openAttachment(a: io.github.quezka.quire.domain.NoticeAttachment) {
+        busy = true
+        scope.launch {
+            runCatching {
+                kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                    val folder = java.io.File(context.cacheDir, "scans").apply { mkdirs() }
+                    val name = a.name.substringAfterLast('/').ifBlank { "notice-${a.number}.pdf" }
+                    java.io.File(folder, name).apply { writeBytes(container.school.noticeAttachment(notice.id, a.number)) }
+                }
+            }.onSuccess { file ->
+                val uri = androidx.core.content.FileProvider.getUriForFile(context, "${context.packageName}.files", file)
+                val type = android.webkit.MimeTypeMap.getSingleton()
+                    .getMimeTypeFromExtension(file.extension.lowercase()) ?: "application/octet-stream"
+                runCatching {
+                    context.startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW)
+                        .setDataAndType(uri, type).addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                }.onFailure { problem = context.getString(R.string.notice_no_viewer) }
+            }.onFailure { problem = it.message ?: context.getString(R.string.notice_failed) }
+            busy = false
+        }
+    }
+    androidx.compose.material3.AlertDialog(
+        onDismissRequest = close,
+        title = { Text(notice.title, style = MaterialTheme.typography.titleMedium) },
+        text = {
+            Column(Modifier.verticalScroll(androidx.compose.foundation.rememberScrollState()),
+                verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                when {
+                    text != null -> androidx.compose.foundation.text.selection.SelectionContainer {
+                        Text(text!!.ifBlank { stringResource(R.string.notice_no_text) })
+                    }
+                    problem == null -> Hint(stringResource(R.string.notice_loading))
+                }
+                problem?.let { Text(it, color = MaterialTheme.colorScheme.error) }
+                for (a in notice.attachments) {
+                    androidx.compose.material3.OutlinedButton(onClick = { openAttachment(a) }, enabled = !busy,
+                        modifier = Modifier.fillMaxWidth()) {
+                        Text(a.name.ifBlank { stringResource(R.string.notice_attachment) }, maxLines = 2)
+                    }
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = close) { Text(stringResource(R.string.notice_close)) } },
+    )
 }

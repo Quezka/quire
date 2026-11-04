@@ -48,6 +48,8 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.FormatIndentDecrease
 import androidx.compose.material.icons.automirrored.filled.FormatIndentIncrease
 import androidx.compose.material.icons.automirrored.filled.FormatListBulleted
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowLeft
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.CameraAlt
@@ -633,6 +635,8 @@ private fun FormatBar(editor: BlockEditorState) {
         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)
             .horizontalScroll(rememberScrollState()).padding(horizontal = 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
+            FormatButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, R.string.cursor_back) { editor.moveCursor(false) }
+            FormatButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, R.string.cursor_forward) { editor.moveCursor(true) }
             FormatButton(Icons.Filled.Title, R.string.heading) { editor.setKind(BlockKind.HEADING, 2) }
             FormatButton(Icons.Filled.FormatBold, R.string.bold) { editor.wrap("**", context.getString(R.string.bold_placeholder)) }
             FormatButton(Icons.Filled.FormatItalic, R.string.italic) { editor.wrap("*", context.getString(R.string.italic_placeholder)) }

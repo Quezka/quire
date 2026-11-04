@@ -65,4 +65,23 @@ class BlockEditorStateTest {
         s.insertText("line one\nline two")
         assertEquals("# Notes\nline one\nline two\nend", s.markdown())
     }
+
+    @Test fun theCursorMovesAcrossLines() {
+        val s = BlockEditorState("ab\ncd")
+        s.focused = s.blocks[0].id
+        s.blocks[0].field = s.blocks[0].field.copy(selection = TextRange(1))
+        s.moveCursor(true)
+        assertEquals(2, s.blocks[0].field.selection.start)
+        s.moveCursor(true)  // off the end of the line: to the start of the next
+        assertEquals(s.blocks[1].id, s.pendingFocus?.first)
+        assertEquals(0, s.blocks[1].field.selection.start)
+        s.focused = s.blocks[1].id
+        s.moveCursor(false)  // and back
+        assertEquals(s.blocks[0].id, s.pendingFocus?.first)
+        assertEquals(2, s.blocks[0].field.selection.start)
+        s.focused = s.blocks[0].id
+        assertEquals(false, s.moveCursorLine(false))  // nothing above
+        assertEquals(true, s.moveCursorLine(true))
+        assertEquals(2, s.blocks[1].field.selection.start)
+    }
 }

@@ -355,4 +355,12 @@
     <string name="sleep_wind_down_title">Пора готовиться ко сну</string>
     <string name="sleep_wind_down_text">Постарайтесь уснуть к %1$s.</string>
     <string name="all_day">Весь день</string>
+    <string name="cursor_back">Переместить курсор назад</string>
+    <string name="cursor_forward">Переместить курсор вперёд</string>
+    <string name="notice_failed">Не удалось открыть это объявление.</string>
+    <string name="notice_no_viewer">На этом телефоне нет приложения, которое может открыть этот файл.</string>
+    <string name="notice_no_text">В этом объявлении нет текста: посмотрите вложения.</string>
+    <string name="notice_loading">Загрузка…</string>
+    <string name="notice_attachment">Вложение</string>
+    <string name="notice_close">Закрыть</string>
 </resources>

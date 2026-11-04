@@ -9,6 +9,7 @@ import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
 import androidx.glance.GlanceTheme
+import androidx.glance.LocalSize
 import androidx.glance.Image
 import androidx.glance.ImageProvider
 import androidx.glance.action.ActionParameters
@@ -17,6 +18,7 @@ import androidx.glance.appwidget.action.actionStartActivity
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
+import androidx.glance.appwidget.SizeMode
 import androidx.glance.appwidget.action.ActionCallback
 import androidx.glance.appwidget.action.actionRunCallback
 import androidx.glance.appwidget.cornerRadius
@@ -63,6 +65,9 @@ import java.util.Locale
 
 /** The home-screen agenda: what's coming up in the next days, tasks and timeline together. */
 class AgendaWidget : GlanceAppWidget() {
+    // Laid out again at the size it really has, so it can be dragged smaller or bigger.
+    override val sizeMode = SizeMode.Exact
+
     override suspend fun provideGlance(context: Context, id: GlanceId) {
         val repo = context.container.repository
         val (now, days) = withContext(Dispatchers.IO) {
@@ -103,15 +108,16 @@ private val Alert = ColorProvider(day = Color(0xFFE5484D), night = Color(0xFFFF6
 
 @Composable
 private fun Content(context: Context, today: LocalDate, days: List<WidgetDay>) {
+    val compact = LocalSize.current.height < 150.dp  // a short widget gives its room to the agenda
     Column(GlanceModifier.fillMaxSize().background(Surface).cornerRadius(20.dp)) {
-        Row(GlanceModifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = 10.dp, bottom = 4.dp),
+        Row(GlanceModifier.fillMaxWidth().padding(start = 16.dp, end = 8.dp, top = if (compact) 4.dp else 10.dp, bottom = if (compact) 0.dp else 4.dp),
             verticalAlignment = Alignment.CenterVertically) {
             Column(GlanceModifier.defaultWeight().clickable(openApp(context, 0))) {
-                Text(today.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault()))
+                if (!compact) Text(today.format(DateTimeFormatter.ofPattern("EEEE", Locale.getDefault()))
                     .replaceFirstChar { it.titlecase(Locale.getDefault()) },
                     style = TextStyle(color = Accent, fontSize = 12.sp, fontWeight = FontWeight.Medium))
                 Text(today.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())),
-                    style = TextStyle(color = Ink, fontSize = 20.sp, fontWeight = FontWeight.Bold))
+                    maxLines = 1, style = TextStyle(color = Ink, fontSize = if (compact) 15.sp else 20.sp, fontWeight = FontWeight.Bold))
             }
             Box(GlanceModifier.size(40.dp).clickable(openApp(context, 2, newTask = true)),
                 contentAlignment = Alignment.Center) {

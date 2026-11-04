@@ -339,4 +339,12 @@
     <string name="sleep_wind_down_title">È ora di rilassarsi</string>
     <string name="sleep_wind_down_text">Punta a dormire entro le %1$s.</string>
     <string name="all_day">Tutto il giorno</string>
+    <string name="cursor_back">Sposta il cursore indietro</string>
+    <string name="cursor_forward">Sposta il cursore avanti</string>
+    <string name="notice_failed">Impossibile aprire questa circolare.</string>
+    <string name="notice_no_viewer">Nessuna app su questo telefono può aprire questo file.</string>
+    <string name="notice_no_text">Questa circolare non ha testo: guarda gli allegati.</string>
+    <string name="notice_loading">Caricamento…</string>
+    <string name="notice_attachment">Allegato</string>
+    <string name="notice_close">Chiudi</string>
 </resources>

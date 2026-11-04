@@ -8,6 +8,7 @@ import io.github.quezka.quire.domain.AbsenceKind
 import io.github.quezka.quire.domain.Grade
 import io.github.quezka.quire.domain.Lesson
 import io.github.quezka.quire.domain.Notice
+import io.github.quezka.quire.domain.NoticeAttachment
 import io.github.quezka.quire.domain.RegisterData
 import io.github.quezka.quire.domain.Subject
 import io.github.quezka.quire.sync.Settings
@@ -75,6 +76,10 @@ class RegisterStore(private val settings: Settings) {
                 for (n in d.notices) add(buildJsonObject {
                     put("id", n.id); put("title", n.title); put("category", n.category)
                     put("published", n.published.toString()); put("read", n.read)
+                    n.text?.let { put("text", it) }
+                    put("attachments", buildJsonArray {
+                        for (a in n.attachments) add(buildJsonObject { put("number", a.number); put("name", a.name) })
+                    })
                 })
             })
             put("subjects", buildJsonArray {
@@ -110,7 +115,9 @@ class RegisterStore(private val settings: Settings) {
             },
             notices = o.objects("notices").mapNotNull { n ->
                 Notice(n.str("id"), n.str("title"), n.str("category"),
-                    day(n.str("published")) ?: return@mapNotNull null, n.bool("read"))
+                    day(n.str("published")) ?: return@mapNotNull null, n.bool("read"),
+                    n.objects("attachments").map { a -> NoticeAttachment(a.int("number") ?: 1, a.str("name")) },
+                    n.str("text").ifEmpty { null })
             },
             subjects = o.objects("subjects").map { x ->
                 Subject(x.str("id"), x.str("name"),

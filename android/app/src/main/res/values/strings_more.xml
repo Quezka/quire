@@ -339,4 +339,12 @@
     <string name="sleep_wind_down_title">Time to wind down</string>
     <string name="sleep_wind_down_text">Aim to be asleep by %1$s.</string>
     <string name="all_day">All day</string>
+    <string name="cursor_back">Move the cursor back</string>
+    <string name="cursor_forward">Move the cursor forward</string>
+    <string name="notice_failed">Couldn\'t open this notice.</string>
+    <string name="notice_no_viewer">No app on this phone can open this file.</string>
+    <string name="notice_no_text">This notice has no text: see its attachments.</string>
+    <string name="notice_loading">Loading…</string>
+    <string name="notice_attachment">Attachment</string>
+    <string name="notice_close">Close</string>
 </resources>

@@ -100,7 +100,26 @@ data class Notice(
     val category: String,
     val published: LocalDate,
     val read: Boolean,
+    val attachments: List<NoticeAttachment> = emptyList(),
+    val text: String? = null, // what it says, kept once it has been opened
 )
+
+data class NoticeAttachment(val number: Int, val name: String)
+
+/** Notice text as plain text: some schools write it with HTML markup. Mirrors the desktop's. */
+fun noticePlainText(source: String): String {
+    var text = source
+    if (Regex("<[a-zA-Z/][^>]*>").containsMatchIn(text)) {
+        text = text.replace(Regex("(?i)<br\\s*/?>|</(p|div|li|tr|h[1-6])>"), "\n")
+            .replace(Regex("(?i)<li[^>]*>"), "• ")
+            .replace(Regex("<[^>]+>"), "")
+    }
+    text = text.replace("&nbsp;", " ").replace("&lt;", "<").replace("&gt;", ">").replace("&quot;", "\"")
+        .replace("&#39;", "'").replace("&egrave;", "è").replace("&agrave;", "à").replace("&ograve;", "ò")
+        .replace("&igrave;", "ì").replace("&ugrave;", "ù").replace("&eacute;", "é").replace("&amp;", "&")
+        .replace("\r\n", "\n").replace('\u00A0', ' ')
+    return text.replace(Regex("[ \t]+\n"), "\n").replace(Regex("\n{3,}"), "\n\n").trim()
+}
 
 data class Subject(val id: String, val name: String, val teachers: List<String>)
 

@@ -180,6 +180,39 @@ class BlockEditorState(body: String, private val onChange: () -> Unit = {}) {
         apply(BlockEdit(all, (index - 1).coerceAtLeast(0), all[(index - 1).coerceAtLeast(0)].text.length))
     }
 
+    // ---- moving the cursor between lines ------------------------------------------------
+
+    /** One character back or forward, across lines: each line is its own text field, so neither the
+     *  keyboard's cursor keys nor the toolbar's arrows would leave a line by themselves. */
+    fun moveCursor(forward: Boolean) {
+        val index = focusedIndex().takeIf { it >= 0 } ?: return
+        val block = blocks[index]
+        val selection = block.field.selection
+        val at = if (forward) selection.max else selection.min
+        when {
+            !selection.collapsed -> place(index, at)
+            forward && at < block.field.text.length -> place(index, at + 1)
+            !forward && at > 0 -> place(index, at - 1)
+            forward && index + 1 < blocks.size -> place(index + 1, 0)
+            !forward && index > 0 -> place(index - 1, blocks[index - 1].field.text.length)
+        }
+    }
+
+    /** To the line above or below, at the same place in it as far as it goes. */
+    fun moveCursorLine(down: Boolean): Boolean {
+        val index = focusedIndex().takeIf { it >= 0 } ?: return false
+        val target = if (down) index + 1 else index - 1
+        if (target !in blocks.indices) return false
+        place(target, blocks[index].field.selection.start.coerceAtMost(blocks[target].field.text.length))
+        return true
+    }
+
+    private fun place(index: Int, offset: Int) {
+        val block = blocks[index]
+        block.field = block.field.copy(selection = TextRange(offset))
+        if (block.id != focused) pendingFocus = block.id to offset
+    }
+
     // ---- the toolbar -------------------------------------------------------------------
 
     private fun focusedIndex() = indexOf(focused).takeIf { it >= 0 } ?: (blocks.size - 1)
@@ -378,8 +411,9 @@ fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placehol
                 // Keep the caret on screen while typing, when a new line appears and when the
                 // keyboard opens: the editor sits in a scrolling column, which doesn't follow
                 // the caret by itself.
+                // Not on every move of the cursor: scrolling while a finger drags its handle stops the drag.
                 val keyboard = WindowInsets.ime.getBottom(LocalDensity.current)
-                LaunchedEffect(selected, eb.field.text, eb.field.selection, keyboard) {
+                LaunchedEffect(selected, eb.field.text, keyboard) {
                     val result = layout
                     if (selected && result != null && eb.field.text.length >= eb.field.selection.end) {
                         delay(60) // after the keyboard has resized the window
@@ -438,6 +472,15 @@ fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placehol
                                         when {
                                             e.key == Key.Backspace && sel.collapsed && sel.start == 0 -> { state.backspace(index); true }
                                             e.key == Key.Tab && b.isList -> { state.indent(!e.isShiftPressed); true }
+                                            e.key == Key.DirectionLeft && sel.collapsed && sel.start == 0 && index > 0 -> {
+                                                state.moveCursor(false); true
+                                            }
+                                            e.key == Key.DirectionRight && sel.collapsed && sel.start == eb.field.text.length &&
+                                                index < state.blocks.size - 1 -> { state.moveCursor(true); true }
+                                            e.key == Key.DirectionUp && (layout?.getLineForOffset(sel.start) ?: 0) == 0 ->
+                                                state.moveCursorLine(false)
+                                            e.key == Key.DirectionDown && (layout?.let { it.getLineForOffset(sel.start.coerceAtMost(it.layoutInput.text.length)) == it.lineCount - 1 } ?: true) ->
+                                                state.moveCursorLine(true)
                                             else -> false
                                         }
                                     },

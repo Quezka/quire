@@ -152,10 +152,11 @@ class SchoolSync(
             val id = external("absence", a.id)
             a.copy(id = id, ownHour = knownAbsences[id]?.ownHour) // an hour you entered stays
         }
+        val textOfNotices = before.notices.filter { it.text != null }.associate { it.id to it.text }
         val readNotices = before.notices.filter { it.read }.map { it.id }.toSet()
         val notices = snap.notices?.map { n ->
             val id = external("notice", n.id)
-            n.copy(id = id, read = n.read || id in readNotices)
+            n.copy(id = id, read = n.read || id in readNotices, text = textOfNotices[id])
         }
         val lessons = snap.lessons?.let { fresh ->
             val (first, last) = snap.lessonWindow
@@ -250,6 +251,37 @@ class SchoolSync(
         val data = store.load()
         store.save(data.copy(absences = data.absences.map { if (it.id == id) it.copy(ownHour = hour) else it }))
         repo.refreshed()
+    }
+
+    /** What a notice says, kept here once read so it opens at once next time. Network the first time. */
+    fun openNotice(id: String): String {
+        store.load().notices.firstOrNull { it.id == id }?.text?.let { markNoticeRead(id); return it }
+        val (code, pubId) = noticeCodes(id)
+        signIn()
+        val text = register.openNotice(code, pubId)
+        val data = store.load()
+        store.save(data.copy(notices = data.notices.map { if (it.id == id) it.copy(text = text, read = true) else it }))
+        repo.refreshed()
+        return text
+    }
+
+    /** An attachment of a notice, as bytes. Network. */
+    fun noticeAttachment(id: String, number: Int): ByteArray {
+        val (code, pubId) = noticeCodes(id)
+        signIn()
+        return register.noticeAttachment(code, pubId, number)
+    }
+
+    private fun noticeCodes(id: String): Pair<String, String> {
+        val parts = id.split(":")  // "<source>:notice:<code>:<pub>"
+        return parts[parts.size - 2] to parts.last()
+    }
+
+    private fun signIn() {
+        val username = settings.get("school.username") ?: throw RegisterException("Connect your Classeviva account first.")
+        val password = settings.get("school.password")?.let(box::open)
+            ?: throw RegisterAuthException("Connect your Classeviva account again.")
+        register.login(username, password)
     }
 
     fun markNoticeRead(id: String) {

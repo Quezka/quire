@@ -5,6 +5,8 @@ import io.github.quezka.quire.domain.AbsenceKind
 import io.github.quezka.quire.domain.Grade
 import io.github.quezka.quire.domain.Lesson
 import io.github.quezka.quire.domain.Notice
+import io.github.quezka.quire.domain.NoticeAttachment
+import io.github.quezka.quire.domain.noticePlainText
 import io.github.quezka.quire.domain.School
 import io.github.quezka.quire.domain.Subject
 import io.github.quezka.quire.domain.TaskKind
@@ -42,6 +44,22 @@ data class RemoteAssignment(
 /** HTTP for the register: (method, url, body, headers) -> (status, text). */
 typealias RegisterHttp = (String, String, String?, Map<String, String>) -> Pair<Int, String>
 
+/** Fetching a file from the register: (url, headers) -> (status, bytes). */
+typealias RegisterDownload = (String, Map<String, String>) -> Pair<Int, ByteArray>
+
+val registerDownload: RegisterDownload = { url, headers ->
+    val connection = URL(url).openConnection() as HttpURLConnection
+    try {
+        connection.connectTimeout = 20_000
+        connection.readTimeout = 60_000
+        headers.forEach(connection::setRequestProperty)
+        val status = connection.responseCode
+        status to (if (status < 400) connection.inputStream.use { it.readBytes() } else ByteArray(0))
+    } finally {
+        connection.disconnect()
+    }
+}
+
 val registerHttp: RegisterHttp = { method, url, body, headers ->
     val connection = URL(url).openConnection() as HttpURLConnection
     try {
@@ -66,7 +84,8 @@ val registerHttp: RegisterHttp = { method, url, body, headers ->
  * infrastructure/classeviva.py. It isn't officially documented; see
  * https://github.com/Lioydiano/Classeviva-Official-Endpoints.
  */
-class Classeviva(private val http: RegisterHttp = registerHttp, private val today: () -> LocalDate = LocalDate::now) {
+class Classeviva(private val http: RegisterHttp = registerHttp, private val today: () -> LocalDate = LocalDate::now,
+                 private val download: RegisterDownload = registerDownload) {
     private var token: String? = null
     private var student: String? = null
 
@@ -213,7 +232,27 @@ class Classeviva(private val http: RegisterHttp = registerHttp, private val toda
         if (n.str("cntStatus") == "deleted") return@mapNotNull null
         val published = date(n.str("pubDT").ifEmpty { n.str("cntValidFrom") }) ?: today()
         Notice("${n.str("evtCode")}:${n.str("pubId")}", n.str("cntTitle").split(Regex("\\s+"))
-            .filter { it.isNotEmpty() }.joinToString(" "), n.str("cntCategory"), published, n.bool("readStatus"))
+            .filter { it.isNotEmpty() }.joinToString(" "), n.str("cntCategory"), published, n.bool("readStatus"),
+            n.list("attachments").mapIndexed { i, a -> NoticeAttachment(a.int("attachNum") ?: (i + 1), a.str("fileName")) })
+    }
+
+    /** What a notice says. 101 is the "read" action the official app sends; the reply carries the text. */
+    fun openNotice(code: String, pubId: String): String {
+        val id = student ?: throw RegisterException("Not signed in to Classeviva.")
+        val item = send("POST", "/students/$id/noticeboard/read/$code/$pubId/101")["item"] as? JsonObject
+        return noticePlainText(item?.str("text").orEmpty())
+    }
+
+    fun noticeAttachment(code: String, pubId: String, number: Int): ByteArray {
+        val id = student ?: throw RegisterException("Not signed in to Classeviva.")
+        val headers = HEADERS + listOfNotNull(token?.let { "Z-Auth-Token" to it })
+        val (status, bytes) = try {
+            download("$BASE/students/$id/noticeboard/attach/$code/$pubId/$number", headers)
+        } catch (e: IOException) {
+            throw RegisterException("Couldn't reach Classeviva. Check your internet connection.")
+        }
+        if (status >= 400) throw RegisterException("Classeviva answered with an error ($status).")
+        return bytes
     }
 
     fun schoolDays(): List<LocalDate> = get("/calendar/all").list("calendar")

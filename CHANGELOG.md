@@ -4,6 +4,28 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.37.0] - 2026-11-04
+
+### Added
+- **All-day events**, on the computer and the phone: a switch in the event editor. They sit above the timeline instead of filling it, never remind you and never turn on Do Not Disturb.
+- **The noticeboard on the phone can be read**: tapping a notice opens its whole text and its attachments. Once opened, the text stays on the phone, also offline.
+- **Export several notes into one PDF**: pick them with Ctrl or Shift and right-click; each starts on a new page.
+- **A new note right where you want it**: a + appears on a class, notebook or topic heading under the mouse. In School, right-click a lesson for a note on its topic.
+- **Water**: any amount, not only the quick buttons; remove a single entry with a right-click; choose your own daily goal instead of the one from height and weight; days in a row and the week's average.
+- Phone notes: arrow buttons in the formatting bar move the cursor, also from one line to the next, and so do the keyboard's cursor keys.
+
+### Changed
+- Formatting buttons in notes work as switches: they light up when the format is on where the cursor is, and pressing them again turns it off.
+- Classes and notebooks in the notes list start closed. Searching looks inside them, and a note you open is shown.
+- Long lesson topics take as many lines as they need instead of being cut.
+- The phone widget can be made much smaller, and redraws for the size it really has.
+
+### Fixed
+- The Water page starts a new day at midnight even if Quire stays open.
+- Changing the interface size and pressing Restart now works, and the new copy waits for the old one to close.
+- A button's menu opens exactly under the button (kit 0.5.2).
+- Scrolling no longer interrupts dragging the cursor handle in phone notes.
+
 ## [0.36.4] - 2026-10-27
 
 Fixed: the compact text size now reaches labels, buttons, menus and lists too (the desktop theme was keeping them at the system's larger size), so the whole interface really is smaller.
