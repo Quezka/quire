@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from datetime import timedelta
+from datetime import date, timedelta
 
 from ...domain import ValidationError, WaterLog, expected_ml, reminder_due, water_goal_ml
 from ...domain.water import DEFAULT_END, DEFAULT_GLASS, DEFAULT_START, check_manual_goal, water_streak
@@ -61,16 +61,20 @@ class WaterService:
 
     # ---- the log ----
 
-    def add(self, ml: int) -> None:
+    def add(self, ml: int, day: date | None = None) -> None:
+        """Log a drink now or, for a day you forgot, on that day at the same time of day."""
         now = self._clock.now()
-        log = WaterLog(now.date(), now.hour * 60 + now.minute, int(ml))
+        day = day or now.date()
+        if day > now.date():
+            raise ValidationError("You can't log a day that hasn't come yet.")
+        log = WaterLog(day, now.hour * 60 + now.minute, int(ml))
         log.validate()
         self._logs.add(log)
         self._bus.publish(Topic.WATER)
 
-    def undo_last(self) -> None:
-        today = self._clock.today()
-        entries = self._logs.between(today, today)
+    def undo_last(self, day: date | None = None) -> None:
+        day = day or self._clock.today()
+        entries = self._logs.between(day, day)
         if entries:
             self._logs.delete(entries[-1].id)
             self._bus.publish(Topic.WATER)
@@ -79,17 +83,19 @@ class WaterService:
         self._logs.delete(entry_id)
         self._bus.publish(Topic.WATER)
 
-    def overview(self) -> WaterOverview:
+    def overview(self, day: date | None = None) -> WaterOverview:
+        """`day` picks whose count and entries to show; the goal, week and streak stay as of today."""
         today = self._clock.today()
+        day = day or today
         profile = self.profile()
         goal = profile.manual_goal or (water_goal_ml(profile.height_cm, profile.weight_kg)
                                        if profile.height_cm and profile.weight_kg else None)
         logs = self._logs.between(today - timedelta(days=STREAK_DAYS), today)
-        mine = [log for log in logs if log.day == today]
+        mine = self._logs.between(day, day)
         drunk = sum(log.ml for log in mine)
         now = self._clock.now()
         expected = (expected_ml(goal, now.hour * 60 + now.minute, profile.start, profile.end)
-                    if goal else 0)
+                    if goal and day == today else 0)
         week = tuple((today - timedelta(days=i), sum(log.ml for log in logs if log.day == today - timedelta(days=i)))
                      for i in range(6, -1, -1))
         per_day: dict = {}
@@ -98,7 +104,8 @@ class WaterService:
         days = [per_day.get(today - timedelta(days=i), 0) for i in range(STREAK_DAYS + 1)]
         return WaterOverview(profile, goal, drunk, expected,
                              tuple(WaterEntry(log.id, log.at, log.ml) for log in mine), week,
-                             water_streak(days, goal) if goal else 0, sum(days[1:8]) // 7)
+                             water_streak(days, goal) if goal else 0, sum(days[1:8]) // 7, day,
+                             sum(ml >= goal for _d, ml in week) if goal else 0)
 
     # ---- reminders ----
 

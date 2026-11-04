@@ -119,6 +119,27 @@ class FeaturesTest {
         assertTrue(repo.waterOn(today.minusDays(1)).isEmpty())
     }
 
+    @Test fun forgottenWaterGoesOnItsDayAndAChosenGoalWins() {
+        val repo = repo()
+        repo.addWater(300, today.minusDays(2))
+        assertEquals(300, repo.waterOn(today.minusDays(2)).sumOf { it.ml })
+        assertTrue(repo.waterOn(today).isEmpty())
+        val w = io.github.quezka.quire.domain.Water
+        assertEquals(2, w.streak(listOf(0, 2000, 2000, 100, 2000), 2000))
+        assertEquals(0, w.streak(listOf(0, 100), 2000))
+        assertEquals(1800, io.github.quezka.quire.domain.WaterProfile(175.0, 70.0, manualGoal = 1800).goal)
+        assertEquals(2200, io.github.quezka.quire.domain.WaterProfile(175.0, 70.0).goal)
+        assertEquals(1800, io.github.quezka.quire.domain.WaterProfile(manualGoal = 1800).goal)
+    }
+
+    @Test fun bedtimeCountdownAndTheWeekBefore() {
+        assertEquals(80, Sleep.minutesUntil(20 * 60 + 40, 22 * 60))
+        assertEquals(120, Sleep.minutesUntil(23 * 60, 60))
+        val logs = (0L..11L).map { SleepLog(today.minusDays(it), if (it < 7) 23 * 60 else 60, 7 * 60) }
+        assertEquals(360, Sleep.weekBefore(logs, today))
+        assertNull(Sleep.weekBefore(logs.take(7), today))
+    }
+
     // ---- sleep ----
 
     @Test fun aNightCrossesMidnightAndStatsMatchTheDesktop() {

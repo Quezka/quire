@@ -939,4 +939,12 @@ MESSAGES = {
     'One way: classes, events, shifts and due dates appear there as Quire changes them. You keep editing them here.': 'В одну сторону: уроки, события, смены и сроки появляются там по мере изменений в Quire. Редактируете вы их здесь.',
     'Windows has no way to follow a file: each time you open it, your calendar app imports the agenda as it is then.': 'Windows не умеет следить за файлом: каждый раз при открытии приложение календаря импортирует расписание в текущем виде.',
     'Calendar': 'Календарь',
+    'How did you sleep?': 'Как вы спали?',
+    'Last night: {time} ({start} to {end}).': 'Прошлой ночью: {time} (с {start} до {end}).',
+    'Rated {value} of 5.': 'Оценка {value} из 5.',
+    'Bedtime at {time}, in {left}.': 'Отбой в {time}, через {left}.',
+    'Back to today': 'Вернуться к сегодня',
+    '{n} of the last 7 days on goal': '{n} из последних 7 дней с выполненной нормой',
+    'Log the night first.': 'Сначала запишите ночь.',
+    "You can't log a day that hasn't come yet.": 'Нельзя записать день, который ещё не наступил.',
 }

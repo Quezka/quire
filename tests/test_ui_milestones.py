@@ -248,3 +248,73 @@ def test_money_page_shows_the_month_and_a_new_entry(window, app, services):
     assert view.list.count() == 0 and view.nothing.isVisibleTo(view)
     view.go(today.year, today.month)
     assert view.list.count() == 1
+
+
+def test_past_days_of_water_can_be_seen_and_fixed(window, app, services):
+    from datetime import timedelta
+
+    from quire.application.inputs import WaterProfileInput
+    from quire.domain import ValidationError
+    today = services.planner.today()
+    yesterday = today - timedelta(days=1)
+    services.water.save_profile(WaterProfileInput(175, 70, 250))
+    view = window.water
+    view.refresh()
+    view.bars.dayPicked.emit(yesterday)
+    assert view.today_btn.isVisibleTo(view)
+    view.glass_btn.click()
+    app.processEvents()
+    assert view.entries.count() == 1
+    assert services.water.overview().drunk == 0 and services.water.overview(yesterday).drunk == 250
+    assert dict(services.water.overview().week)[yesterday] == 250
+    view.undo_btn.click()
+    assert services.water.overview(yesterday).drunk == 0
+    view.today_btn.click()
+    assert view._shown is None and not view.today_btn.isVisibleTo(view)
+    with pytest.raises(ValidationError):
+        services.water.add(100, today + timedelta(days=1))
+
+
+def test_a_night_picked_on_the_chart_opens_in_the_form_and_a_tap_rates_last_night(window, app, services):
+    from datetime import timedelta
+
+    from quire.application.inputs import SleepInput
+    today = services.planner.today()
+    services.sleep.save(SleepInput(today, 23 * 60, 7 * 60))
+    services.sleep.save(SleepInput(today - timedelta(days=2), 22 * 60, 6 * 60, 5))
+    view = window.sleep
+    view.refresh()
+    assert view.rate_row.isVisibleTo(view)
+    view.bars.dayPicked.emit(today - timedelta(days=2))
+    assert view.asleep.time().hour() == 22 and view.quality.checkedId() == 5
+    view.bars.dayPicked.emit(today - timedelta(days=1))
+    assert view.quality.checkedId() == -1  # an empty night shows no old rating
+    view._rate(3)
+    assert services.sleep.night(today).quality == 3 and not view.rate_row.isVisibleTo(view)
+    view.bars.resize(400, 170)
+    assert not view.bars.grab().isNull() and not window.water.bars.grab().isNull()
+
+
+def test_the_buttons_follow_a_selection_either_way_and_headings_light_up_theirs(window, app, services):
+    from PySide6.QtGui import QTextCursor
+    notes = window.notes
+    editor = notes.editor
+    notes._open(services.notes.create("plain **bold** rest"))
+
+    def select(anchor, position):
+        cursor = editor.textCursor()
+        cursor.setPosition(anchor)
+        cursor.setPosition(position, QTextCursor.KeepAnchor)
+        editor.setTextCursor(cursor)
+
+    select(6, 10)
+    assert notes.format_toggles["bold"].isChecked()
+    select(10, 6)  # dragged backwards: the character before the cursor is plain
+    assert notes.format_toggles["bold"].isChecked()
+    notes.format_toggles["bold"].click()  # and pressing it takes the bold away
+    assert not notes.format_toggles["bold"].isChecked() and "**" not in editor.markdown()
+    assert not notes.format_toggles["heading"].isChecked()
+    notes._set_heading(2)
+    assert notes.format_toggles["heading"].isChecked()
+    notes._set_heading(0)
+    assert not notes.format_toggles["heading"].isChecked()

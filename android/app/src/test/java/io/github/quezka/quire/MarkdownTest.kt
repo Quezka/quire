@@ -21,6 +21,28 @@ class MarkdownTest {
         assertEquals("plain", Markdown.toggleCheckbox("plain", 0))
     }
 
+    @Test fun theToolbarKnowsWhatIsOnAtTheCursorAndTurnsItOff() {
+        val line = "a **bold** *it* `co` ***both*** z"
+        assertEquals(emptySet<String>(), Markdown.formatsAt(line, 0))
+        assertEquals(setOf("bold"), Markdown.formatsAt(line, 5))
+        assertEquals(setOf("bold"), Markdown.formatsAt(line, 7))  // right before the closing marks
+        assertEquals(emptySet<String>(), Markdown.formatsAt(line, 2))  // before the opening marks
+        assertEquals(emptySet<String>(), Markdown.formatsAt(line, 10))  // after them: typing there is plain
+        assertEquals(setOf("italic"), Markdown.formatsAt(line, 13))
+        assertEquals(setOf("code"), Markdown.formatsAt(line, 18))
+        assertEquals(setOf("bold", "italic"), Markdown.formatsAt(line, 26))
+        assertEquals(setOf("bold", "italic"), Markdown.formatsAt("**a *b* c**", 5))
+        assertEquals(setOf("bold"), Markdown.formatsAt("**a *b* c**", 3))
+        assertEquals(emptySet<String>(), Markdown.formatsAt("`**a**`", 3).minus("code"))
+
+        assertEquals(Triple("a b", 3, 3), Markdown.toggle("a **b**", 5, 5, "bold", "**", "x").let { Triple(it.first, it.second, it.third) })
+        assertEquals(Triple("*b*", 1, 1), Markdown.toggle("***b***", 3, 3, "bold", "**", "x"))
+        assertEquals(Triple("**b**", 2, 2), Markdown.toggle("***b***", 3, 3, "italic", "*", "x"))
+        assertEquals(Triple("a **x**", 4, 5), Markdown.toggle("a ", 2, 2, "bold", "**", "x"))
+        // pressing again right after the placeholder went in takes it out, not doubles the marks
+        assertEquals(Triple("x", 0, 1), Markdown.toggle("**x**", 2, 3, "bold", "**", "x"))
+    }
+
     @Test fun wrapAndPrefix() {
         assertEquals(Triple("a **b** c", 4, 5), Markdown.wrap("a b c", 2, 3, "**", "bold"))
         assertEquals(Triple("a b c", 2, 3), Markdown.wrap("a **b** c", 2, 7, "**", "bold"))

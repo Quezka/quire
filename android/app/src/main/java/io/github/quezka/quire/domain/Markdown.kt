@@ -50,6 +50,51 @@ object Markdown {
         return lines.joinToString("\n")
     }
 
+    /** A span of inline format: the whole of it, marks included, and how long its marks are. */
+    private data class Span(val kinds: Set<String>, val start: Int, val end: Int, val mark: Int)
+
+    private val SPANS = Regex(
+        """(`[^`\n]+`)""" +
+            """|\*\*\*((?=\S)[^*]+?(?<=\S))\*\*\*""" +
+            """|\*\*((?=\S).+?(?<=\S))\*\*|__((?=\S).+?(?<=\S))__""" +
+            """|~~((?=\S).+?(?<=\S))~~""" +
+            """|(?<![*\w\\])\*((?=[^\s*]).+?(?<=[^\s*]))\*(?!\*)""" +
+            """|(?<![\w\\])_((?=\S).+?(?<=\S))_(?!\w)""")
+
+    private fun spansAround(text: String, start: Int, end: Int, from: Int, to: Int, out: MutableList<Span>) {
+        for (m in SPANS.findAll(text.subSequence(0, to), from)) {
+            val g = m.groups
+            val index = (2..7).firstOrNull { g[it] != null }
+            val mark = when (index) { null -> 1; 2 -> 3; 6, 7 -> 1; else -> 2 }
+            val s = m.range.first; val e = m.range.last + 1
+            if (start < s + mark || end > e - mark) continue  // on the marks or outside: typing there isn't in the span
+            val kinds = when (index) {
+                null -> setOf("code"); 2 -> setOf("bold", "italic"); 3, 4 -> setOf("bold")
+                5 -> setOf("strike"); else -> setOf("italic")
+            }
+            out += Span(kinds, s, e, mark)
+            if (index != null) spansAround(text, start, end, s + mark, e - mark, out)
+        }
+    }
+
+    /** "bold", "italic", "code" and "strike", where they hold from [start] to [end] on this line. */
+    fun formatsAt(text: String, start: Int, end: Int = start): Set<String> {
+        val out = mutableListOf<Span>()
+        spansAround(text, start, end, 0, text.length, out)
+        return out.flatMapTo(mutableSetOf()) { it.kinds }
+    }
+
+    /** The toolbar's press: off if the cursor is inside [kind] already, else [wrap]. Like the desktop, off
+     *  takes the format from the whole span. */
+    fun toggle(text: String, start: Int, end: Int, kind: String, marker: String, placeholder: String): Triple<String, Int, Int> {
+        val spans = mutableListOf<Span>()
+        spansAround(text, start, end, 0, text.length, spans)
+        val span = spans.lastOrNull { kind in it.kinds } ?: return wrap(text, start, end, marker, placeholder)
+        val n = if (span.mark == 3) marker.length else span.mark  // bold italic keeps the other one
+        val out = text.removeRange(span.end - n, span.end).removeRange(span.start, span.start + n)
+        return Triple(out, (start - n).coerceAtLeast(span.start), (end - n).coerceAtLeast(span.start))
+    }
+
     /** Put [marker] around the selection (or around [placeholder]); again removes it. */
     fun wrap(text: String, start: Int, end: Int, marker: String, placeholder: String): Triple<String, Int, Int> {
         val selected = text.substring(start, end)

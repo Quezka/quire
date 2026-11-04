@@ -17,13 +17,15 @@ class WaterManager(
         fun num(key: String) = settings.get("water.$key")?.toDoubleOrNull()
         val d = WaterProfile()
         return WaterProfile(num("height"), num("weight"), num("glass")?.toInt() ?: d.glass,
-            settings.get("water.remind") != "0", num("start")?.toInt() ?: d.start, num("end")?.toInt() ?: d.end)
+            settings.get("water.remind") != "0", num("start")?.toInt() ?: d.start, num("end")?.toInt() ?: d.end,
+            num("manual_goal")?.toInt()?.takeIf { it > 0 })
     }
 
     fun save(p: WaterProfile) {
         settings.set("water.height", p.heightCm?.toString()); settings.set("water.weight", p.weightKg?.toString())
         settings.set("water.glass", p.glass.toString()); settings.set("water.remind", if (p.remind) "1" else "0")
         settings.set("water.start", p.start.toString()); settings.set("water.end", p.end.toString())
+        settings.set("water.manual_goal", (p.manualGoal ?: 0).toString())
         plan()
     }
 

@@ -382,4 +382,19 @@
     <string name="money_amount">Amount</string>
     <string name="money_category">Category</string>
     <string name="money_note">Note</string>
+    <string name="sleep_last_night">Last night: %1$s (%2$s to %3$s)</string>
+    <string name="sleep_how_was_it">How did you sleep?</string>
+    <string name="sleep_rated">Rated %1$d of 5.</string>
+    <string name="sleep_bedtime_in">Bedtime at %1$s, in %2$s.</string>
+    <string name="sleep_average_quality">Average quality %1$s of 5</string>
+    <string name="sleep_more_than_before">%1$s more a night than the week before.</string>
+    <string name="sleep_less_than_before">%1$s less a night than the week before.</string>
+    <string name="water_back_today">Back to today</string>
+    <string name="water_other">Any other amount, ml</string>
+    <string name="water_add">Add</string>
+    <string name="water_undo">Undo</string>
+    <string name="water_streak">%1$d days in a row</string>
+    <string name="water_on_goal">%1$d of the last 7 days on goal</string>
+    <string name="water_average">%1$d ml a day this week</string>
+    <string name="water_manual">Daily goal, ml (empty: from height and weight)</string>
 </resources>

@@ -1,11 +1,11 @@
 """Sleep log: last night, the goal, and the last two weeks at a glance."""
 from __future__ import annotations
 
-from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtCore import QEvent, QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QButtonGroup, QCheckBox, QDateEdit, QDoubleSpinBox, QFormLayout, QHBoxLayout, QLabel, QLineEdit,
-    QPushButton, QTimeEdit, QVBoxLayout, QWidget,
+    QPushButton, QTimeEdit, QToolTip, QVBoxLayout, QWidget,
 )
 
 from ...application.bus import Topic
@@ -15,7 +15,7 @@ from ...application.services import Services
 from .. import theme
 from ..bridge import ChangeRelay
 from ..dialogs import attempt, to_qdate
-from ..formatting import fmt_duration, fmt_min
+from ..formatting import fmt_duration, fmt_min, long_date
 from ..i18n import _
 from ..notify import notify
 from ..widgets import min_to_qtime, qtime_to_min
@@ -23,20 +23,53 @@ from .common import Card, Page, label, primary_button, scrolling
 
 
 class SleepBars(QWidget):
-    """One bar per night, with the goal as a line."""
+    """One slot per day, with the goal as a line: a night not logged leaves a gap, so the days stay
+    where they are. Press a night to open it in the form."""
+
+    dayPicked = Signal(object)  # date
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.overview: SleepOverview | None = None
-        self.setMinimumHeight(150)
+        self.selected = None
+        self.setMinimumHeight(170)
+        self.setCursor(Qt.PointingHandCursor)
 
     def set_overview(self, overview: SleepOverview):
         self.overview = overview
         self.update()
 
+    def set_selected(self, day):
+        self.selected = day
+        self.update()
+
+    def _slot_at(self, x: float):
+        days = self.overview.days if self.overview else ()
+        if not days or self.width() <= 0:
+            return None
+        return days[min(len(days) - 1, max(0, int(x / self.width() * len(days))))]
+
+    def mousePressEvent(self, event):  # noqa: N802 (Qt naming)
+        slot = self._slot_at(event.position().x())
+        if slot is not None:
+            self.dayPicked.emit(slot[0])
+
+    def event(self, event):
+        if event.type() == QEvent.ToolTip:
+            slot = self._slot_at(event.position().x() if hasattr(event, "position") else event.x())
+            if slot is not None:
+                day, night = slot
+                text = long_date(day)
+                if night is not None:
+                    text += "\n" + _("Slept {time}").format(time=fmt_duration(night.minutes))
+                    text += f" ({fmt_min(night.asleep)}\u2013{fmt_min(night.woke)})"
+                QToolTip.showText(event.globalPos(), text, self)
+            return True
+        return super().event(event)
+
     def paintEvent(self, _event):
         o = self.overview
-        if o is None:
+        if o is None or not o.days:
             return
         t = theme.current()
         p = QPainter(self)
@@ -44,18 +77,26 @@ class SleepBars(QWidget):
         top = max([o.goal_hours * 60 + 60] + [n.minutes + 30 for n in o.nights])
         height = self.height() - 22
         width = self.width()
+        slot = width / len(o.days)
         goal_y = height - o.goal_hours * 60 / top * height
-        p.setPen(QColor(t.border))
+        p.setPen(QPen(QColor(t.muted), 1, Qt.DashLine))
         p.drawLine(0, int(goal_y), width, int(goal_y))
-        slot = width / max(1, len(o.nights))
-        for i, night in enumerate(o.nights):
-            bar = night.minutes / top * height
-            enough = night.minutes >= o.goal_hours * 60 * 0.9
-            p.setPen(Qt.NoPen)
-            p.setBrush(QColor(t.accent if enough else t.danger))
-            p.drawRoundedRect(QRectF(i * slot + slot * 0.2, height - bar, slot * 0.6, bar), 5, 5)
-            p.setPen(QColor(t.muted))
-            p.drawText(QRectF(i * slot, height + 2, slot, 18), Qt.AlignCenter, str(night.day.day))
+        for i, (day, night) in enumerate(o.days):
+            if day == self.selected:
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor(t.accent_soft))
+                p.drawRoundedRect(QRectF(i * slot + 1, 0, slot - 2, self.height()), 6, 6)
+            if night is not None:
+                bar = night.minutes / top * height
+                enough = night.minutes >= o.goal_hours * 60 * 0.9
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor(t.accent if enough else t.danger))
+                p.drawRoundedRect(QRectF(i * slot + slot * 0.2, height - bar, slot * 0.6, bar), 5, 5)
+            font = p.font()
+            font.setBold(i == len(o.days) - 1)
+            p.setFont(font)
+            p.setPen(QColor(t.text if i == len(o.days) - 1 else t.muted))
+            p.drawText(QRectF(i * slot, height + 2, slot, 18), Qt.AlignCenter, str(day.day))
         p.end()
 
 
@@ -83,6 +124,20 @@ class SleepView(Page):
         tonight = Card(_("Tonight"))
         tonight.add(self.now_status)
         tonight.body.addLayout(tap)
+        self.last_night = label("", "muted")
+        self.last_night.setWordWrap(True)
+        tonight.add(self.last_night)
+        self.rate_row = QWidget()
+        rate = QHBoxLayout(self.rate_row)
+        rate.setContentsMargins(0, 0, 0, 0)
+        rate.addWidget(label(_("How did you sleep?")))
+        for n in range(1, 6):
+            button = QPushButton(str(n))
+            button.setToolTip(_("1 is awful, 5 is great"))
+            button.clicked.connect(lambda _checked=False, n=n: self._rate(n))
+            rate.addWidget(button)
+        rate.addStretch()
+        tonight.add(self.rate_row)
 
         # ---- the night ----
         self.date = QDateEdit(calendarPopup=True)
@@ -93,7 +148,7 @@ class SleepView(Page):
         self.quality = QButtonGroup(self)
         stars = QHBoxLayout()
         for n in range(1, 6):
-            button = QPushButton(str(n), objectName="segment", checkable=True)
+            button = QPushButton(str(n), checkable=True)
             button.setToolTip(_("1 is awful, 5 is great"))
             self.quality.addButton(button, n)
             stars.addWidget(button)
@@ -135,6 +190,7 @@ class SleepView(Page):
 
         # ---- the last nights ----
         self.bars = SleepBars()
+        self.bars.dayPicked.connect(self._pick_day)
         self.summary = label("", "muted")
         self.summary.setWordWrap(True)
         chart_card = Card(_("Last two weeks"))
@@ -153,16 +209,17 @@ class SleepView(Page):
         self.root.addWidget(scrolling(row), 1)
 
         self._timer = QTimer(self, interval=60_000)  # the wind-down nudge, while Quire is open
-        self._timer.timeout.connect(self._remind)
+        self._timer.timeout.connect(self._tick)
         self._timer.start()
         self.date.setDate(to_qdate(self.planner.today()))
         self.date.dateChanged.connect(self._load_night)
-        self.hours.editingFinished.connect(self._save_goal)
-        self.wake_goal.editingFinished.connect(self._save_goal)
         relay.changed.connect(self._changed)
         self._load_goal()
+        self.hours.valueChanged.connect(self._save_goal)  # at once: arrows and wheel count as well
+        self.wake_goal.timeChanged.connect(self._save_goal)
         self._load_night()
         self.refresh()
+        theme.themed(lambda _t: self.refresh())  # the chart and its colours
 
     # ---- data ----
 
@@ -170,10 +227,40 @@ class SleepView(Page):
         if topic is Topic.SLEEP:
             self.refresh()
 
+    def _tick(self):
+        self._remind()
+        if self.isVisible():
+            self.refresh()  # the countdown to bedtime
+
+    def _rate(self, quality: int):
+        day = self.planner.today()
+        attempt(self, lambda: self.sleep.rate(day, quality))
+        if self.date.date().toPython() == day:
+            self._load_night()
+
+    def _pick_day(self, day):
+        self.date.setDate(to_qdate(day))
+
     def _remind(self):
         bedtime = self.sleep.reminder()
         if bedtime is not None:
             notify(_("Time to wind down"), _("Aim to be asleep by {time}.").format(time=fmt_min(bedtime)))
+
+    def _show_last_night(self, o):
+        night = o.last_night
+        self.rate_row.setVisible(night is not None and night.quality is None)
+        lines = []
+        if night is not None:
+            line = _("Last night: {time} ({start} to {end}).").format(
+                time=fmt_duration(night.minutes), start=fmt_min(night.asleep), end=fmt_min(night.woke))
+            if night.quality:
+                line += " " + _("Rated {value} of 5.").format(value=night.quality)
+            lines.append(line)
+        if o.asleep_since is None and o.bedtime_in <= 6 * 60:
+            lines.append(_("Bedtime at {time}, in {left}.").format(
+                time=fmt_min(o.bedtime_goal), left=fmt_duration(o.bedtime_in)))
+        self.last_night.setText("\n".join(lines))
+        self.last_night.setVisible(bool(lines))
 
     def _going_to_sleep(self):
         self.sleep.go_to_sleep()
@@ -192,6 +279,7 @@ class SleepView(Page):
         self.now_status.setText(_("Asleep since {time}. Tap when you're up.").format(time=fmt_min(o.asleep_since))
                                 if asleep else _("Tap when you go to bed, and again when you wake: no typing."))
         self.bars.set_overview(o)
+        self._show_last_night(o)
         self.bedtime.setText(_("Be asleep by {time} to wake at {wake}.").format(
             time=fmt_min(o.bedtime_goal), wake=fmt_min(o.wake_goal)))
         if not o.nights:
@@ -230,20 +318,22 @@ class SleepView(Page):
         self.hours.setValue(hours)
         self.wake_goal.setTime(min_to_qtime(wake))
 
-    def _save_goal(self):
+    def _save_goal(self, *_ignored):
         self.sleep.save_goal(self.hours.value(), qtime_to_min(self.wake_goal.time()))
 
     def _load_night(self, *_ignored):
-        night = self.sleep.night(self.date.date().toPython())
+        day = self.date.date().toPython()
+        self.bars.set_selected(day)
+        night = self.sleep.night(day)
+        checked = self.quality.checkedButton()
+        if checked:
+            self.quality.setExclusive(False)
+            checked.setChecked(False)
+            self.quality.setExclusive(True)
         if night is None:
             self.result.setText("")
             self.delete_btn.setVisible(False)
             self.note.clear()
-            checked = self.quality.checkedButton()
-            if checked:
-                self.quality.setExclusive(False)
-                checked.setChecked(False)
-                self.quality.setExclusive(True)
             return
         self.asleep.setTime(min_to_qtime(night.asleep))
         self.woke.setTime(min_to_qtime(night.woke))

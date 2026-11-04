@@ -1,8 +1,8 @@
 """Water tracking: the day's ring, quick buttons, and the profile the goal comes from."""
 from __future__ import annotations
 
-from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QPainter
+from PySide6.QtCore import QRectF, Qt, QTimer, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import (
     QCheckBox, QDoubleSpinBox, QFormLayout, QHBoxLayout, QListWidget, QListWidgetItem, QMenu, QPushButton,
     QSpinBox, QTimeEdit, QVBoxLayout, QWidget,
@@ -14,7 +14,7 @@ from ...application.services import Services
 from .. import theme
 from ..bridge import ChangeRelay
 from ..dialogs import attempt
-from ..formatting import fmt_min
+from ..formatting import fmt_min, long_date
 from ..i18n import _
 from ..notify import notify
 from ..widgets import ProgressRing, min_to_qtime, qtime_to_min
@@ -22,17 +22,26 @@ from .common import Card, Page, label, primary_button, scrolling
 
 
 class WeekBars(QWidget):
-    """The last seven days: one bar each, with the goal as a line."""
+    """The last seven days: one bar each with its amount, the goal as a line. Press a day to see it."""
+
+    dayPicked = Signal(object)  # date
 
     def __init__(self, parent=None):
         super().__init__(parent)
         self.week = ()
         self.goal = None
-        self.setMinimumHeight(110)
+        self.selected = None
+        self.setMinimumHeight(140)
+        self.setCursor(Qt.PointingHandCursor)
 
-    def set_data(self, week, goal):
-        self.week, self.goal = week, goal
+    def set_data(self, week, goal, selected=None):
+        self.week, self.goal, self.selected = week, goal, selected
         self.update()
+
+    def mousePressEvent(self, event):  # noqa: N802 (Qt naming)
+        if self.week and self.width() > 0:
+            i = int(event.position().x() / self.width() * len(self.week))
+            self.dayPicked.emit(self.week[min(len(self.week) - 1, max(0, i))][0])
 
     def paintEvent(self, _event):
         if not self.week:
@@ -42,20 +51,32 @@ class WeekBars(QWidget):
         p.setRenderHint(QPainter.Antialiasing)
         top = max([self.goal or 0] + [ml for _day, ml in self.week] + [1]) * 1.1
         height = self.height() - 20
+        chart = height - 18  # room for the amount over the tallest bar
         slot = self.width() / len(self.week)
         if self.goal:
-            y = height - self.goal / top * height
-            p.setPen(QColor(t.border))
+            y = height - self.goal / top * chart
+            p.setPen(QPen(QColor(t.muted), 1, Qt.DashLine))
             p.drawLine(0, int(y), self.width(), int(y))
         for i, (day, ml) in enumerate(self.week):
-            bar = ml / top * height
+            if day == self.selected:
+                p.setPen(Qt.NoPen)
+                p.setBrush(QColor(t.accent_soft))
+                p.drawRoundedRect(QRectF(i * slot + 1, 0, slot - 2, self.height()), 6, 6)
+            bar = ml / top * chart
             reached = bool(self.goal) and ml >= self.goal
             p.setPen(Qt.NoPen)
             p.setBrush(QColor(t.success if reached else t.accent))
             if bar > 0:
                 p.drawRoundedRect(QRectF(i * slot + slot * 0.2, height - bar, slot * 0.6, bar), 5, 5)
-            p.setPen(QColor(t.muted))
+                p.setPen(QColor(t.text))
+                p.drawText(QRectF(i * slot, height - bar - 18, slot, 18), Qt.AlignCenter, f"{ml / 1000:.1f}")
+            font = p.font()
+            font.setBold(i == len(self.week) - 1)
+            p.setFont(font)
+            p.setPen(QColor(t.text if i == len(self.week) - 1 else t.muted))
             p.drawText(QRectF(i * slot, height + 2, slot, 18), Qt.AlignCenter, str(day.day))
+            font.setBold(False)
+            p.setFont(font)
         p.end()
 
 
@@ -67,6 +88,16 @@ class WaterView(Page):
         self.title.setText(_("Water"))
 
         # ---- today ----
+        self._shown = None  # the day on show; None is today
+        self.day_label = label("", "muted")
+        self.day_label.setAlignment(Qt.AlignCenter)
+        self.today_btn = QPushButton(_("Back to today"))
+        self.today_btn.clicked.connect(lambda: self._pick_day(self.planner.today()))
+        day_row = QHBoxLayout()
+        day_row.addStretch()
+        day_row.addWidget(self.day_label)
+        day_row.addWidget(self.today_btn)
+        day_row.addStretch()
         self.ring = ProgressRing()
         self.status = label("", "muted")
         self.status.setAlignment(Qt.AlignCenter)
@@ -81,7 +112,7 @@ class WaterView(Page):
             button.clicked.connect(lambda _checked=False, ml=ml: self._add(ml))
             add_row.addWidget(button)
         self.undo_btn = QPushButton(_("Undo"))
-        self.undo_btn.clicked.connect(self.water.undo_last)
+        self.undo_btn.clicked.connect(lambda: self.water.undo_last(self._shown))
         add_row.addWidget(self.undo_btn)
         add_row.addStretch()
         self.amount = QSpinBox(minimum=10, maximum=2000, singleStep=10, value=330)
@@ -104,6 +135,7 @@ class WaterView(Page):
         self.entries.setContextMenuPolicy(Qt.CustomContextMenu)
         self.entries.customContextMenuRequested.connect(self._entry_menu)
         today = Card()
+        today.body.addLayout(day_row)
         today.add(self.ring, 1)
         today.add(self.status)
         today.body.addLayout(add_row)
@@ -146,6 +178,7 @@ class WaterView(Page):
         profile.add(save)
 
         self.bars = WeekBars()
+        self.bars.dayPicked.connect(self._pick_day)
         week = Card(_("Last seven days"))
         week.add(self.bars)
 
@@ -162,7 +195,7 @@ class WaterView(Page):
         relay.changed.connect(self._changed)
         self._load_profile()
         self._day = self.planner.today()
-        self.refresh()
+        theme.themed(lambda _t: self.refresh())  # also the first time: the ring's colours follow the theme
 
         # Nudges while Quire is open: about once a minute, it checks whether you're behind.
         self._timer = QTimer(self, interval=60_000)
@@ -179,6 +212,7 @@ class WaterView(Page):
         """Quire stays open for days: at midnight today's count starts again by itself."""
         if self.planner.today() != self._day:
             self._day = self.planner.today()
+            self._shown = None
             self.refresh()
         self._remind()
 
@@ -196,8 +230,12 @@ class WaterView(Page):
         if menu.exec(self.entries.viewport().mapToGlobal(pos)) is remove:
             self.water.delete(item.data(Qt.UserRole))
 
+    def _pick_day(self, day):
+        self._shown = None if day == self.planner.today() else day
+        self.refresh()
+
     def _add(self, ml: int):
-        attempt(self, lambda: self.water.add(ml))
+        attempt(self, lambda: self.water.add(ml, self._shown))
 
     def _remind(self):
         line = self.water.reminder()
@@ -224,10 +262,15 @@ class WaterView(Page):
         attempt(self, lambda: self.water.save_profile(data))
 
     def refresh(self):
-        o = self.water.overview()
+        o = self.water.overview(self._shown)
+        past = self._shown is not None
+        self.day_label.setVisible(past)
+        self.today_btn.setVisible(past)
+        if past:
+            self.day_label.setText(long_date(self._shown))
         self.glass_btn.setText(f"+{o.profile.glass_ml} ml")
         self.undo_btn.setEnabled(bool(o.entries))
-        self.bars.set_data(o.week, o.goal)
+        self.bars.set_data(o.week, o.goal, o.day)
         t = theme.current()
         if o.goal is None:
             self.ring.set_state(0, "—", _("Set your height and weight"), t.accent, (0, 0))
@@ -237,8 +280,8 @@ class WaterView(Page):
         else:
             self.ring.set_state(o.drunk / o.goal, f"{o.drunk} ml", _("of {goal} ml").format(goal=o.goal),
                                 t.success if o.drunk >= o.goal else t.accent, (0, 0))
-            self.subtitle.setText(_("{left} ml to go").format(left=max(0, o.goal - o.drunk)) if o.drunk < o.goal
-                                  else _("Goal reached. Nice."))
+            self.subtitle.setText(_("Goal reached. Nice.") if o.drunk >= o.goal else
+                                  _("{left} ml to go").format(left=o.goal - o.drunk))
             behind = o.expected - o.drunk
             self.status.setText(_("About {ml} ml behind where you'd be by now.").format(ml=behind)
                                 if behind >= 250 and o.drunk < o.goal else "")
@@ -247,6 +290,8 @@ class WaterView(Page):
                                     _("Daily goal: {goal} ml, from your body surface area. A rough guide, not "
                                       "medical advice.").format(goal=o.goal))
         parts = [_("{ml} ml a day this week").format(ml=o.average)] if o.average else []
+        if o.goal:
+            parts.append(_("{n} of the last 7 days on goal").format(n=o.on_goal))
         if o.streak >= 2:
             parts.insert(0, _("{days} days in a row").format(days=o.streak))
         self.stats.setText(" · ".join(parts))

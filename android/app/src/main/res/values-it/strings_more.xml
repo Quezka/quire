@@ -382,4 +382,19 @@
     <string name="money_amount">Importo</string>
     <string name="money_category">Categoria</string>
     <string name="money_note">Nota</string>
+    <string name="sleep_last_night">Stanotte: %1$s (dalle %2$s alle %3$s)</string>
+    <string name="sleep_how_was_it">Come hai dormito?</string>
+    <string name="sleep_rated">Voto %1$d su 5.</string>
+    <string name="sleep_bedtime_in">A letto alle %1$s, tra %2$s.</string>
+    <string name="sleep_average_quality">Qualità media %1$s su 5</string>
+    <string name="sleep_more_than_before">%1$s in più a notte rispetto alla settimana prima.</string>
+    <string name="sleep_less_than_before">%1$s in meno a notte rispetto alla settimana prima.</string>
+    <string name="water_back_today">Torna a oggi</string>
+    <string name="water_other">Altra quantità, ml</string>
+    <string name="water_add">Aggiungi</string>
+    <string name="water_undo">Annulla</string>
+    <string name="water_streak">%1$d giorni di fila</string>
+    <string name="water_on_goal">%1$d degli ultimi 7 giorni in obiettivo</string>
+    <string name="water_average">%1$d ml al giorno questa settimana</string>
+    <string name="water_manual">Obiettivo giornaliero, ml (vuoto: da altezza e peso)</string>
 </resources>

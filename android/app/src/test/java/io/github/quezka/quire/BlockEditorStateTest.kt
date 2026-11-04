@@ -54,7 +54,7 @@ class BlockEditorStateTest {
         s.setKind(BlockKind.QUOTE, 1)
         assertEquals("> ab", s.markdown())
         s.blocks[0].field = TextFieldValue("ab", TextRange(2))
-        s.wrap("**", "bold")
+        s.wrap("bold", "**", "bold")
         assertEquals("> ab**bold**", s.markdown())
     }
 

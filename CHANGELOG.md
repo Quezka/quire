@@ -4,6 +4,16 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.39.0] - 2026-11-04
+
+### Added
+- **New look**: Material 3 and the Manrope typeface in the whole suite, on the computer and the phone. A flick on a trackpad keeps gliding on the computer; a mouse wheel works as before.
+- **Sleep**: the chart keeps a place for every day, so a night you didn't log shows as a gap, and pressing a day opens it in the form. After you wake up, "Tonight" shows last night and rates it with one tap, and counts down to bedtime. The goal saves as soon as you change it. The phone also shows average quality and the comparison with the week before.
+- **Water**: press a day on the chart to see it, add what you forgot or remove an entry. The chart shows the amounts and how many of the last 7 days were on goal. The phone gains any amount, undo, a chosen daily goal, the streak and the weekly average.
+
+### Fixed
+- **The formatting buttons stay lit for the format that is on.** On the phone they never lit up, and pressing Bold twice doubled the marks: pressing it again now takes the format off. The heading button lights up too, and on the computer the buttons follow a selection dragged backwards.
+
 ## [0.38.1] - 2026-11-04
 
 ### Fixed

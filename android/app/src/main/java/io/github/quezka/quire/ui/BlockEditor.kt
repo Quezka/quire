@@ -229,12 +229,24 @@ class BlockEditorState(body: String, private val onChange: () -> Unit = {}) {
         apply(BlockEdit(NoteBlocks.indent(blocks.map { it.current }, i, deeper), i, cursor))
     }
 
-    fun wrap(marker: String, placeholder: String) {
+    /** What the toolbar shows as on, where the cursor is: the line's kind and the inline formats. */
+    val activeFormats: Set<String> get() {
+        val block = blocks.getOrNull(focusedIndex()) ?: return emptySet()
+        val kind = when (block.block.kind) {
+            BlockKind.HEADING -> "heading"; BlockKind.BULLET -> "list"; BlockKind.CHECK -> "checklist"
+            BlockKind.QUOTE -> "quote"; BlockKind.CODE -> "code"; else -> null
+        }
+        val f = block.field
+        val inline = if (block.block.kind == BlockKind.CODE) emptySet() else Markdown.formatsAt(f.text, f.selection.min, f.selection.max)
+        return if (kind != null) inline + kind else inline
+    }
+
+    fun wrap(kind: String, marker: String, placeholder: String) {
         val i = focusedIndex()
         val block = blocks[i]
-        if (block.block.kind == BlockKind.IMAGE || block.block.kind == BlockKind.RULE) return
+        if (block.block.kind == BlockKind.IMAGE || block.block.kind == BlockKind.RULE || block.block.kind == BlockKind.CODE) return
         val f = block.field
-        val (text, s, e) = Markdown.wrap(f.text, f.selection.min, f.selection.max, marker, placeholder)
+        val (text, s, e) = Markdown.toggle(f.text, f.selection.min, f.selection.max, kind, marker, placeholder)
         block.field = TextFieldValue(text, TextRange(s, e))
         pendingFocus = block.id to s
         changed()

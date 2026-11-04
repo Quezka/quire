@@ -398,4 +398,19 @@
     <string name="money_amount">Сумма</string>
     <string name="money_category">Категория</string>
     <string name="money_note">Заметка</string>
+    <string name="sleep_last_night">Прошлой ночью: %1$s (с %2$s до %3$s)</string>
+    <string name="sleep_how_was_it">Как вы спали?</string>
+    <string name="sleep_rated">Оценка %1$d из 5.</string>
+    <string name="sleep_bedtime_in">Отбой в %1$s, через %2$s.</string>
+    <string name="sleep_average_quality">Среднее качество %1$s из 5</string>
+    <string name="sleep_more_than_before">На %1$s за ночь больше, чем неделей раньше.</string>
+    <string name="sleep_less_than_before">На %1$s за ночь меньше, чем неделей раньше.</string>
+    <string name="water_back_today">Вернуться к сегодня</string>
+    <string name="water_other">Другое количество, мл</string>
+    <string name="water_add">Добавить</string>
+    <string name="water_undo">Отменить</string>
+    <string name="water_streak">%1$d дн. подряд</string>
+    <string name="water_on_goal">%1$d из последних 7 дней с выполненной нормой</string>
+    <string name="water_average">%1$d мл в день за неделю</string>
+    <string name="water_manual">Дневная норма, мл (пусто: по росту и весу)</string>
 </resources>

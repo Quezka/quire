@@ -100,6 +100,8 @@ class WaterOverview:
     week: tuple[tuple[date, int], ...]  # the last 7 days, oldest first
     streak: int = 0  # days in a row the goal was reached (today counts once reached)
     average: int = 0  # ml a day over the last 7 days, today left out (it isn't over yet)
+    day: date | None = None  # the day `drunk` and `entries` are about
+    on_goal: int = 0  # days of `week` that reached the goal
 
 
 @dataclass(frozen=True)
@@ -185,6 +187,9 @@ class SleepOverview:
     focus_after_enough: int | None = None  # average focus minutes on days after a night that reached the goal
     focus_after_short: int | None = None  # ... after one that didn't
     asleep_since: int | None = None  # minute of day you said you were going to sleep, while it's unfinished
+    days: tuple[tuple[date, SleepRecord | None], ...] = ()  # every day of the period, oldest first
+    last_night: SleepRecord | None = None  # the night you woke from today
+    bedtime_in: int = 0  # minutes from now until the bedtime goal
 
 
 @dataclass(frozen=True)

@@ -1,12 +1,10 @@
 package io.github.quezka.quire.ui
 
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
@@ -24,9 +22,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.geometry.CornerRadius
-import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import io.github.quezka.quire.Container
@@ -48,13 +43,14 @@ fun SleepScreen(container: Container, version: Int, back: () -> Unit) {
     var goalWake by remember { mutableStateOf(settings.get("sleep.wake")?.toIntOrNull() ?: DEFAULT_WAKE) }
     var day by remember { mutableStateOf(today) }
     val logs = remember(version) { repo.sleepLogs().filter { it.day > today.minusDays(NIGHTS) && it.day <= today } }
+    val lastNight = logs.firstOrNull { it.day == today }
     val stats = remember(logs, goalHours) { Sleep.stats(logs, goalHours) }
 
     Column(Modifier.fillMaxSize().imePadding()) {
         PageBar(stringResource(R.string.nav_sleep), back)
         Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(12.dp)) {
-            TonightPanel(container, version) { day = today }
+            TonightPanel(container, version, lastNight, Sleep.bedtimeFor(goalWake, goalHours)) { day = today }
             NightPanel(repo, day, today, version) { day = it }
             Panel(stringResource(R.string.sleep_goal)) {
                 var remind by remember { mutableStateOf(container.sleepNudge.remindEnabled()) }
@@ -78,7 +74,7 @@ fun SleepScreen(container: Container, version: Int, back: () -> Unit) {
             Panel(stringResource(R.string.sleep_two_weeks)) {
                 if (logs.isEmpty()) Hint(stringResource(R.string.sleep_nothing))
                 else {
-                    SleepBars(logs, goalHours)
+                    SleepBars(logs, goalHours, today, day) { day = it }
                     Text(stringResource(R.string.sleep_average, durationText(stats.averageMinutes)),
                         style = MaterialTheme.typography.titleSmall)
                     Hint(stringResource(R.string.sleep_enough, stats.enough, stats.nights))
@@ -90,6 +86,13 @@ fun SleepScreen(container: Container, version: Int, back: () -> Unit) {
                     if (stats.streak >= 2) Hint(stringResource(R.string.sleep_streak, stats.streak))
                     if (stats.shortfallMinutes > 0) Hint(stringResource(R.string.sleep_short, durationText(stats.shortfallMinutes)))
                     stats.averageBedtime?.let { Hint(stringResource(R.string.sleep_usually, minutes(it))) }
+                    stats.averageQuality?.let { Hint(stringResource(R.string.sleep_average_quality, "%.1f".format(it))) }
+                    Sleep.weekBefore(logs, today)?.let { before ->
+                        val change = stats.averageMinutes - before
+                        if (kotlin.math.abs(change) >= 10) Hint(stringResource(
+                            if (change > 0) R.string.sleep_more_than_before else R.string.sleep_less_than_before,
+                            durationText(kotlin.math.abs(change))))
+                    }
                 }
             }
         }
@@ -135,7 +138,7 @@ private fun NightPanel(repo: io.github.quezka.quire.data.Repository, day: LocalD
 
 /** One tap when you go to bed and one when you wake: the night is logged without typing. */
 @Composable
-private fun TonightPanel(container: Container, version: Int, logged: () -> Unit) {
+private fun TonightPanel(container: Container, version: Int, lastNight: SleepLog?, bedtime: Int, logged: () -> Unit) {
     val manager = container.sleepNudge
     var since by remember(version) { mutableStateOf(manager.asleepSince()) }
     var failed by remember { mutableStateOf(false) }
@@ -153,23 +156,32 @@ private fun TonightPanel(container: Container, version: Int, logged: () -> Unit)
                 TextButton(onClick = { manager.cancel(); since = null; failed = false }) { Text(stringResource(R.string.cancel)) }
             }
         }
+        if (lastNight != null) {
+            Text(stringResource(R.string.sleep_last_night, durationText(lastNight.minutes), minutes(lastNight.asleep), minutes(lastNight.woke)),
+                style = MaterialTheme.typography.titleSmall)
+            if (lastNight.quality == null) {
+                Hint(stringResource(R.string.sleep_how_was_it))
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    for (n in 1..5) FilterChip(selected = false, onClick = { container.repository.saveSleep(lastNight.copy(quality = n)) },
+                        label = { Text(n.toString()) })
+                }
+            } else Hint(stringResource(R.string.sleep_rated, lastNight.quality))
+        }
+        val now = container.repository.now()
+        val left = Sleep.minutesUntil(now.hour * 60 + now.minute, bedtime)
+        if (since == null && left <= 6 * 60) Hint(stringResource(R.string.sleep_bedtime_in, minutes(bedtime), durationText(left)))
     }
 }
 
 @Composable
-private fun SleepBars(logs: List<SleepLog>, goalHours: Double) {
+private fun SleepBars(logs: List<SleepLog>, goalHours: Double, today: LocalDate, selected: LocalDate, pick: (LocalDate) -> Unit) {
     val good = MaterialTheme.colorScheme.primary
     val bad = MaterialTheme.colorScheme.error
-    val line = MaterialTheme.colorScheme.outlineVariant
-    val top = maxOf(goalHours * 60 + 60, (logs.maxOf { it.minutes } + 30).toDouble())
-    Canvas(Modifier.fillMaxWidth().height(140.dp)) {
-        val goalY = (size.height - goalHours * 60 / top * size.height).toFloat()
-        drawLine(line, Offset(0f, goalY), Offset(size.width, goalY), strokeWidth = 2f)
-        val slot = size.width / logs.size
-        logs.forEachIndexed { i, night ->
-            val h = (night.minutes / top * size.height).toFloat()
-            drawRoundRect(if (night.minutes >= goalHours * 60 * 0.9) good else bad,
-                Offset(i * slot + slot * 0.2f, size.height - h), Size(slot * 0.6f, h), CornerRadius(8f))
-        }
+    val goal = (goalHours * 60).toInt()
+    val bars = (NIGHTS - 1 downTo 0L).map { today.minusDays(it) }.map { d ->
+        val night = logs.firstOrNull { it.day == d }
+        DayBar(d, night?.minutes ?: 0, if (night != null && night.minutes >= goal * 0.9) good else bad,
+            night?.let { "%.0f".format(it.minutes / 60.0) }.orEmpty())
     }
+    DayBars(bars, goal, selected, pick)
 }

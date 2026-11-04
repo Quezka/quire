@@ -53,6 +53,16 @@ object Sleep {
         return run
     }
 
+    /** Minutes from [now] to the next time the clock shows [target]. */
+    fun minutesUntil(now: Int, target: Int) = Math.floorMod(target - now, MINUTES_PER_DAY)
+
+    /** The average of the seven nights before the last seven; null until each side has three. */
+    fun weekBefore(logs: List<SleepLog>, today: LocalDate): Int? {
+        val recent = logs.filter { it.day > today.minusDays(7) }
+        val before = logs.filter { it.day <= today.minusDays(7) }
+        return if (recent.size >= 3 && before.size >= 3) before.sumOf { it.minutes } / before.size else null
+    }
+
     /** Within [lead] minutes before bedtime (measured around midnight). */
     fun shouldWindDown(minute: Int, bedtime: Int, lead: Int = 30): Boolean {
         val ahead = Math.floorMod(bedtime - minute, MINUTES_PER_DAY)

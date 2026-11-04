@@ -630,6 +630,7 @@ private fun TopicField(topic: String, suggestions: List<String>, modifier: Modif
 @Composable
 private fun FormatBar(editor: BlockEditorState) {
     val context = LocalContext.current
+    val on = editor.activeFormats
     Column {
         HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
         Row(Modifier.fillMaxWidth().background(MaterialTheme.colorScheme.surfaceContainer)
@@ -637,21 +638,32 @@ private fun FormatBar(editor: BlockEditorState) {
             verticalAlignment = Alignment.CenterVertically) {
             FormatButton(Icons.AutoMirrored.Filled.KeyboardArrowLeft, R.string.cursor_back) { editor.moveCursor(false) }
             FormatButton(Icons.AutoMirrored.Filled.KeyboardArrowRight, R.string.cursor_forward) { editor.moveCursor(true) }
-            FormatButton(Icons.Filled.Title, R.string.heading) { editor.setKind(BlockKind.HEADING, 2) }
-            FormatButton(Icons.Filled.FormatBold, R.string.bold) { editor.wrap("**", context.getString(R.string.bold_placeholder)) }
-            FormatButton(Icons.Filled.FormatItalic, R.string.italic) { editor.wrap("*", context.getString(R.string.italic_placeholder)) }
-            FormatButton(Icons.AutoMirrored.Filled.FormatListBulleted, R.string.bulleted_list) { editor.setKind(BlockKind.BULLET) }
-            FormatButton(Icons.Filled.ChecklistRtl, R.string.checklist) { editor.setKind(BlockKind.CHECK) }
+            FormatToggle(Icons.Filled.Title, R.string.heading, "heading" in on) { editor.setKind(BlockKind.HEADING, 2) }
+            FormatToggle(Icons.Filled.FormatBold, R.string.bold, "bold" in on) { editor.wrap("bold", "**", context.getString(R.string.bold_placeholder)) }
+            FormatToggle(Icons.Filled.FormatItalic, R.string.italic, "italic" in on) { editor.wrap("italic", "*", context.getString(R.string.italic_placeholder)) }
+            FormatToggle(Icons.AutoMirrored.Filled.FormatListBulleted, R.string.bulleted_list, "list" in on) { editor.setKind(BlockKind.BULLET) }
+            FormatToggle(Icons.Filled.ChecklistRtl, R.string.checklist, "checklist" in on) { editor.setKind(BlockKind.CHECK) }
             FormatButton(Icons.AutoMirrored.Filled.FormatIndentIncrease, R.string.indent) { editor.indent(true) }
             FormatButton(Icons.AutoMirrored.Filled.FormatIndentDecrease, R.string.outdent) { editor.indent(false) }
-            FormatButton(Icons.Filled.FormatQuote, R.string.quote) { editor.setKind(BlockKind.QUOTE, 1) }
-            FormatButton(Icons.Filled.Code, R.string.code) { editor.wrap("`", context.getString(R.string.code_placeholder)) }
+            FormatToggle(Icons.Filled.FormatQuote, R.string.quote, "quote" in on) { editor.setKind(BlockKind.QUOTE, 1) }
+            FormatToggle(Icons.Filled.Code, R.string.code, "code" in on) { editor.wrap("code", "`", context.getString(R.string.code_placeholder)) }
             Spacer(Modifier.width(12.dp))
             val words = editor.words
             if (words > 0) Text(pluralStringResource(R.plurals.words, words, words),
                 style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.padding(end = 12.dp))
         }
+    }
+}
+
+/** Stays lit while its format is on where the cursor is; pressing it again turns the format off. */
+@Composable
+private fun FormatToggle(icon: ImageVector, label: Int, on: Boolean, onClick: () -> Unit) {
+    val c = MaterialTheme.colorScheme
+    androidx.compose.material3.IconToggleButton(on, { onClick() },
+        colors = androidx.compose.material3.IconButtonDefaults.iconToggleButtonColors(
+            checkedContainerColor = c.primaryContainer, checkedContentColor = c.onPrimaryContainer)) {
+        Icon(icon, stringResource(label))
     }
 }
 

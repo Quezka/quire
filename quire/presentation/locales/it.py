@@ -937,4 +937,12 @@ MESSAGES = {
     'One way: classes, events, shifts and due dates appear there as Quire changes them. You keep editing them here.': 'In una sola direzione: lezioni, eventi, turni e scadenze compaiono lì man mano che Quire li cambia. Li modifichi sempre qui.',
     'Windows has no way to follow a file: each time you open it, your calendar app imports the agenda as it is then.': "Windows non può seguire un file: ogni volta che lo apri, l'app calendario importa l'agenda com'è in quel momento.",
     'Calendar': 'Calendario',
+    'How did you sleep?': 'Come hai dormito?',
+    'Last night: {time} ({start} to {end}).': 'Stanotte: {time} (dalle {start} alle {end}).',
+    'Rated {value} of 5.': 'Voto {value} su 5.',
+    'Bedtime at {time}, in {left}.': 'A letto alle {time}, tra {left}.',
+    'Back to today': 'Torna a oggi',
+    '{n} of the last 7 days on goal': '{n} degli ultimi 7 giorni in obiettivo',
+    'Log the night first.': 'Registra prima la notte.',
+    "You can't log a day that hasn't come yet.": 'Non puoi registrare un giorno che non è ancora arrivato.',
 }

@@ -92,3 +92,20 @@ def test_overview_compares_weeks_and_focus_after_full_and_short_nights():
     o = sleep.overview()
     assert (o.focus_after_enough, o.focus_after_short) == (50, 20)
     db.close()
+
+
+def test_the_overview_has_a_slot_for_every_day_and_last_night_can_be_rated_alone():
+    services, clock, quiet, db = make()
+    sleep = services.sleep
+    sleep.save(SleepInput(TODAY, 23 * 60, 7 * 60))
+    sleep.save(SleepInput(TODAY - timedelta(days=3), 23 * 60, 6 * 60))
+    o = sleep.overview()
+    assert len(o.days) == 14 and o.days[-1][0] == TODAY and o.days[0][0] == TODAY - timedelta(days=13)
+    assert o.days[-2][1] is None and o.days[-4][1].woke == 6 * 60
+    assert o.last_night.minutes == 8 * 60 and o.last_night.quality is None
+    sleep.rate(TODAY, 4)
+    night = sleep.night(TODAY)
+    assert (night.quality, night.asleep, night.woke) == (4, 23 * 60, 7 * 60)
+    with pytest.raises(ValidationError):
+        sleep.rate(TODAY - timedelta(days=1), 4)  # nothing logged
+    db.close()

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime, timedelta
 
 from ...domain import SleepLog, ValidationError, bedtime_for, regularity, should_wind_down, sleep_stats
-from ...domain.sleep import DEFAULT_GOAL_HOURS, DEFAULT_WAKE, ENOUGH_RATIO
+from ...domain.sleep import DEFAULT_GOAL_HOURS, DEFAULT_WAKE, ENOUGH_RATIO, minutes_until
 from ..bus import ChangeBus, Topic
 from ..inputs import SleepInput
 from ..ports import Clock, FocusLogRepository, KeyValueStore, SleepRepository
@@ -107,6 +107,16 @@ class SleepService:
         self._logs.put(log)
         self._bus.publish(Topic.SLEEP)
 
+    def rate(self, day: date, quality: int) -> None:
+        """Rate a night already logged, without touching its times."""
+        log = self._logs.get(day)
+        if log is None:
+            raise ValidationError("Log the night first.")
+        log.quality = quality
+        log.validate()
+        self._logs.put(log)
+        self._bus.publish(Topic.SLEEP)
+
     def delete(self, day: date) -> None:
         self._logs.delete(day)
         self._bus.publish(Topic.SLEEP)
@@ -140,10 +150,15 @@ class SleepService:
         last_week = sleep_stats(before, hours).average_minutes if len(before) >= 3 and len(recent) >= 3 else None
         after_enough, after_short = self._focus_after(today, hours)
         since = self.asleep_since()
+        by_day = {log.day: sleep_record(log) for log in logs}
+        days = tuple((today - timedelta(days=i), by_day.get(today - timedelta(days=i)))
+                     for i in range(nights - 1, -1, -1))
+        now = self._clock.now()
         return SleepOverview(hours, wake, bedtime_for(wake, hours),
                              tuple(sleep_record(log) for log in logs), stats.average_minutes,
                              stats.average_bedtime, stats.average_wake, stats.average_quality,
                              stats.enough, stats.shortfall_minutes, stats.bedtime_spread,
                              regularity(stats.bedtime_spread) if stats.nights >= 3 else "",
                              stats.streak, last_week, after_enough, after_short,
-                             since.hour * 60 + since.minute if since else None)
+                             since.hour * 60 + since.minute if since else None, days, by_day.get(today),
+                             minutes_until(now.hour * 60 + now.minute, bedtime_for(wake, hours)))

@@ -551,32 +551,46 @@ class NoteEditor(QTextEdit):
         cursor.mergeCharFormat(fmt)
         self.mergeCurrentCharFormat(fmt)
 
+    def _active_format(self) -> QTextCharFormat:
+        """The format the buttons go by: the cursor's or, with a selection, that of its last
+        character, whichever way the selection was dragged."""
+        cursor = self.textCursor()
+        if not cursor.hasSelection():
+            return self.currentCharFormat()
+        probe = QTextCursor(self.document())
+        probe.setPosition(cursor.selectionEnd())
+        if probe.atBlockStart():  # a selection that ends on the line break
+            probe.setPosition(cursor.selectionEnd() - 1)
+        return probe.charFormat()
+
     def format_state(self) -> dict[str, bool]:
         """What the formatting buttons should show as switched on, where the cursor is now."""
         block = self.textCursor().block()
+        fmt = self._active_format()
         in_list = block.textList() is not None
         checklist = in_list and block.blockFormat().marker() != QTextBlockFormat.MarkerType.NoMarker
-        return {"bold": self.fontWeight() >= QFont.DemiBold, "italic": self.fontItalic(),
-                "code": is_code(self.currentCharFormat()) or block_kind(block) == "code",
+        return {"bold": fmt.fontWeight() >= QFont.DemiBold, "italic": fmt.fontItalic(),
+                "code": is_code(fmt) or block_kind(block) == "code",
+                "heading": block_kind(block) == "heading",
                 "list": in_list and not checklist, "checklist": checklist, "quote": block_kind(block) == "quote"}
 
     def toggle_bold(self):
         fmt = QTextCharFormat()
-        fmt.setFontWeight(QFont.Normal if self.fontWeight() >= QFont.DemiBold else QFont.Bold)
+        fmt.setFontWeight(QFont.Normal if self._active_format().fontWeight() >= QFont.DemiBold else QFont.Bold)
         self._merge(fmt)
 
     def toggle_italic(self):
         fmt = QTextCharFormat()
-        fmt.setFontItalic(not self.fontItalic())
+        fmt.setFontItalic(not self._active_format().fontItalic())
         self._merge(fmt)
 
     def toggle_strike(self):
         fmt = QTextCharFormat()
-        fmt.setFontStrikeOut(not self.currentCharFormat().fontStrikeOut())
+        fmt.setFontStrikeOut(not self._active_format().fontStrikeOut())
         self._merge(fmt)
 
     def toggle_code(self):
-        on = not is_code(self.currentCharFormat())
+        on = not is_code(self._active_format())
         cursor = self.textCursor()
         if not cursor.hasSelection():
             cursor.select(QTextCursor.WordUnderCursor)

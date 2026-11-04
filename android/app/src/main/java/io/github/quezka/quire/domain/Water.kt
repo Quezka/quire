@@ -23,6 +23,15 @@ object Water {
         return (Math.round(area * 1200 / 50) * 50).toInt().coerceIn(WATER_MIN_GOAL, WATER_MAX_GOAL)
     }
 
+    /** Days in a row on goal; [days] holds each day's ml, today first: today doesn't break the run while it can still be reached. */
+    fun streak(days: List<Int>, goal: Int): Int {
+        var run = 0
+        for ((i, ml) in days.withIndex()) {
+            if (ml >= goal) run++ else if (i > 0) break
+        }
+        return run
+    }
+
     /** How much should have been drunk by [minute], spread evenly across the waking day. */
     fun expected(goal: Int, minute: Int, start: Int = WATER_START, end: Int = WATER_END): Int = when {
         minute <= start -> 0
@@ -41,6 +50,7 @@ object Water {
 data class WaterProfile(
     val heightCm: Double? = null, val weightKg: Double? = null, val glass: Int = WATER_GLASS,
     val remind: Boolean = true, val start: Int = WATER_START, val end: Int = WATER_END,
+    val manualGoal: Int? = null, // chosen by hand; otherwise it comes from height and weight
 ) {
-    val goal: Int? get() = if (heightCm != null && weightKg != null) Water.goal(heightCm, weightKg) else null
+    val goal: Int? get() = manualGoal ?: if (heightCm != null && weightKg != null) Water.goal(heightCm, weightKg) else null
 }

@@ -212,13 +212,14 @@ class NotesView(Page):
         """Buttons for the Markdown the editor understands, with their shortcuts."""
         e = self.editor
         self.format_toggles = {}
-        heading = icon_button("heading", _("Heading"))
+        heading = icon_button("heading", _("Heading"), checkable=True)
         heading.setPopupMode(QToolButton.InstantPopup)
         menu = QMenu(heading)
         for level, text in ((1, _("Title")), (2, _("Heading")), (3, _("Subheading")),
                             (0, _("Plain text"))):
-            menu.addAction(text, lambda level=level: e.set_heading(level))
+            menu.addAction(text, lambda level=level: self._set_heading(level))
         heading.setMenu(menu)
+        self.format_toggles["heading"] = heading
         buttons = [heading]
         for name, tip, action in (
                 ("bold", _("Bold"), e.toggle_bold),
@@ -250,6 +251,11 @@ class NotesView(Page):
         row.addStretch()
         row.addWidget(self.words)
         return row
+
+    def _set_heading(self, level: int):
+        self.editor.set_heading(level)
+        self.editor.setFocus()
+        self._sync_format_buttons()
 
     def _count_words(self):
         words = len(self.editor.toPlainText().replace("\ufffc", " ").split())

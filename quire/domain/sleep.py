@@ -49,6 +49,11 @@ def bedtime_for(wake: int, hours: float) -> int:
     return (wake - round(hours * 60)) % MINUTES_PER_DAY
 
 
+def minutes_until(now: int, target: int) -> int:
+    """Minutes from `now` to the next time the clock shows `target`."""
+    return (target - now) % MINUTES_PER_DAY
+
+
 def _evening_minutes(minute: int) -> int:
     """Bedtimes either side of midnight average sensibly when measured from noon."""
     return (minute - 12 * 60) % MINUTES_PER_DAY

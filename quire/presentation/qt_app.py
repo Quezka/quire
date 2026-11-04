@@ -9,14 +9,12 @@ from quezka_ui.app import create_application as _create
 
 from .. import APP_ID, APP_NAME
 from ..application.services import Services
-from . import material
 from .i18n import _
 
 ICON = Path(__file__).resolve().parent.parent / "assets" / "icon.svg"
 
 
 def create_application(argv: list[str]) -> QApplication:
-    material.install()
     return _create(argv, name=APP_NAME, app_id=APP_ID, icon=ICON, locale_package="quire.presentation.locales")
 
 
