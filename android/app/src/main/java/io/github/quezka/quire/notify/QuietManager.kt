@@ -45,16 +45,26 @@ class QuietManager(
         val owned = settings.get("quiet.applied") != null
         val granted = hasAccess()
         if (status.active && granted && !owned) {
-            settings.set("quiet.applied", manager.currentInterruptionFilter.toString())
+            settings.set("quiet.applied", restoreTo(manager.currentInterruptionFilter).toString())
             manager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALARMS)
         } else if ((!status.active || !granted) && owned) {
-            val before = settings.get("quiet.applied")?.toIntOrNull() ?: NotificationManager.INTERRUPTION_FILTER_ALL
-            // Only undo our own change; if the mode was changed by hand since, leave it.
-            if (granted && manager.currentInterruptionFilter == NotificationManager.INTERRUPTION_FILTER_ALARMS) {
-                manager.setInterruptionFilter(before)
-            }
-            settings.set("quiet.applied", null)
+            if (granted) {
+                val before = settings.get("quiet.applied")?.toIntOrNull() ?: NotificationManager.INTERRUPTION_FILTER_ALL
+                // The event is over, so Do Not Disturb goes back whatever the phone reports it as now: it
+                // can be other than "alarms" (another rule merged in, a maker's own modes), and staying
+                // silenced by mistake is worse than undoing a change made by hand during the event.
+                if (manager.currentInterruptionFilter != before) manager.setInterruptionFilter(restoreTo(before))
+                settings.set("quiet.applied", null)
+            }  // no access any more: remembered, and undone as soon as it comes back
         }
         notifier.wakeAt(Notifier.ACTION_QUIET, status.until ?: status.nextStart)
+        // A second look a little later, in case the phone's battery saving swallows the alarm at the end.
+        notifier.wakeAt(Notifier.ACTION_QUIET_AGAIN, status.until?.plusMinutes(2))
+    }
+
+    /** What to go back to: never "alarms" or an unknown state, which would only be a silence left behind. */
+    private fun restoreTo(filter: Int) = when (filter) {
+        NotificationManager.INTERRUPTION_FILTER_PRIORITY, NotificationManager.INTERRUPTION_FILTER_NONE -> filter
+        else -> NotificationManager.INTERRUPTION_FILTER_ALL
     }
 }

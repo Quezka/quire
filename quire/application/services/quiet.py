@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sys
 from dataclasses import dataclass
 from datetime import datetime, time, timedelta
 
@@ -120,15 +121,26 @@ class QuietService:
         want = self.status().active and self._switch.available()
         owned = self._settings.get(self.PREFIX + "applied") == "1"
         if want and not owned:
-            self._switch.set_quiet(True)
+            # Noted first: if switching fails halfway it is still ours to undo, and it is never switched on
+            # twice (the second time would read our own "off" as the way things were, and restore that).
             self._settings.set(self.PREFIX + "applied", "1")
+            self._switch.set_quiet(True)
+            print("quiet: on", file=sys.stderr, flush=True)
         elif not want and owned:
-            self._switch.set_quiet(False)
-            self._settings.set(self.PREFIX + "applied", None)
+            self._undo()
         return want
+
+    def _undo(self):
+        """Forgotten only once the switch says it worked: otherwise the next tick tries again."""
+        try:
+            self._switch.set_quiet(False)
+        except Exception as e:  # noqa: BLE001 (a command that failed or hung: try again in a moment)
+            print("quiet: couldn't switch off:", e, file=sys.stderr, flush=True)
+            return
+        self._settings.set(self.PREFIX + "applied", None)
+        print("quiet: off", file=sys.stderr, flush=True)
 
     def release(self):
         """Give the notifications back (Quire is closing, or it crashed while quiet)."""
         if self._settings.get(self.PREFIX + "applied") == "1":
-            self._switch.set_quiet(False)
-            self._settings.set(self.PREFIX + "applied", None)
+            self._undo()

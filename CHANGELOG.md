@@ -4,6 +4,13 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.38.1] - 2026-11-04
+
+### Fixed
+- **Do Not Disturb now comes off when the event ends**, on the computer and the phone.
+  - Computer: if switching on ran twice or was interrupted, Quire took its own silence for the way things were and restored that. It now keeps the original state, checks that switching off worked, and tries again until it does.
+  - Phone: it gave up if the phone reported anything other than "alarms only" by then. It now goes back regardless, never takes a leftover silence for the original state, looks again two minutes after the end, every time you open the app, and every couple of hours.
+
 ## [0.38.0] - 2026-11-04
 
 ### Added

@@ -38,10 +38,15 @@ class GnomeQuiet:
 
     def set_quiet(self, on: bool) -> None:
         if on:
-            self._before = self._gsettings("get", SCHEMA, "show-banners") or "true"
+            if self._before is None:  # asked twice: the first answer is the way things were
+                self._before = self._gsettings("get", SCHEMA, "show-banners") or "true"
             self._gsettings("set", SCHEMA, "show-banners", "false")
         else:
-            self._gsettings("set", SCHEMA, "show-banners", self._before or "true")
+            wanted = self._before or "true"
+            self._gsettings("set", SCHEMA, "show-banners", wanted)
+            now = self._gsettings("get", SCHEMA, "show-banners")
+            if now and now != wanted:
+                raise OSError(f"show-banners is still {now}")
             self._before = None
 
 

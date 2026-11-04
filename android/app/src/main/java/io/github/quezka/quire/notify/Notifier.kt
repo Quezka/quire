@@ -39,6 +39,7 @@ class Notifier(private val context: Context) {
         const val ACTION_REMIND = "io.github.quezka.quire.REMIND"
         const val ACTION_FOCUS = "io.github.quezka.quire.FOCUS"
         const val ACTION_QUIET = "io.github.quezka.quire.QUIET"
+        const val ACTION_QUIET_AGAIN = "io.github.quezka.quire.QUIET_AGAIN"
         const val ACTION_WATER = "io.github.quezka.quire.WATER"
         const val ACTION_MEDICINE = "io.github.quezka.quire.MEDICINE"
         const val ACTION_SLEEP = "io.github.quezka.quire.SLEEP"
@@ -184,7 +185,7 @@ class AlarmReceiver : BroadcastReceiver() {
         val container = context.container
         when (intent.action) {
             Notifier.ACTION_FOCUS -> container.focus.tick()
-            Notifier.ACTION_QUIET -> Unit
+            Notifier.ACTION_QUIET, Notifier.ACTION_QUIET_AGAIN -> Unit
             Notifier.ACTION_WATER -> container.water.check()
             Notifier.ACTION_MEDICINE -> container.medicines.check()
             Notifier.ACTION_SLEEP -> container.sleepNudge.check()

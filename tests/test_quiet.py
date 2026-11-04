@@ -101,3 +101,69 @@ def test_leaving_it_on_a_desktop_that_cannot_silence_does_nothing_and_release_re
     services.quiet.release()
     assert quiet.calls == [True, False]
     db.close()
+
+
+def test_a_failed_switch_off_is_tried_again_and_a_failed_save_never_switches_on_twice():
+    services, clock, quiet, db = make(9)
+    services.planner.save_event(None, EventInput(TODAY, 9 * 60, 11 * 60, "Exam"))
+    services.quiet.save_settings(QuietSettings(enabled=True))
+    assert quiet.on
+    clock.at = at(11)
+    real = quiet.set_quiet
+
+    def fails(on):
+        raise OSError("gsettings hung")
+    quiet.set_quiet = fails
+    assert not services.quiet.tick()  # no crash, and it isn't forgotten
+    quiet.set_quiet = real
+    assert quiet.on
+    services.quiet.tick()
+    assert not quiet.on
+    db.close()
+
+
+def test_a_problem_while_switching_on_is_still_ours_to_undo():
+    services, clock, quiet, db = make(9)
+    services.planner.save_event(None, EventInput(TODAY, 9 * 60, 11 * 60, "Exam"))
+    real = quiet.set_quiet
+
+    def half(on):
+        real(on)
+        raise OSError("then it failed")
+    quiet.set_quiet = half
+    with pytest.raises(OSError):
+        services.quiet.save_settings(QuietSettings(enabled=True))
+    quiet.set_quiet = real
+    services.quiet.tick()
+    assert quiet.calls == [True]  # never switched on twice
+    clock.at = at(11)
+    services.quiet.tick()
+    assert not quiet.on
+    db.close()
+
+
+def test_gnome_goes_back_to_how_it_was_even_if_asked_twice_and_checks_that_it_took():
+    from types import SimpleNamespace
+    from quire.infrastructure.quiet import GnomeQuiet
+    state = {"banners": "true", "broken": False}
+
+    def run(command, **_kwargs):
+        if command[1] == "get":
+            return SimpleNamespace(stdout=state["banners"] + "\n")
+        if not state["broken"]:
+            state["banners"] = command[-1]
+        return SimpleNamespace(stdout="")
+    gnome = GnomeQuiet(run)
+    gnome.set_quiet(True)
+    gnome.set_quiet(True)  # the second must not take our own "false" for the way things were
+    assert state["banners"] == "false"
+    state["broken"] = True
+    with pytest.raises(OSError):
+        gnome.set_quiet(False)
+    state["broken"] = False
+    gnome.set_quiet(False)
+    assert state["banners"] == "true"
+    state["banners"] = "false"  # you had it on yourself: it stays as you left it
+    gnome.set_quiet(True)
+    gnome.set_quiet(False)
+    assert state["banners"] == "false"

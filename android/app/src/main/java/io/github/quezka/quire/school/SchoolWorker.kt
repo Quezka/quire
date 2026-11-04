@@ -18,6 +18,7 @@ import java.util.concurrent.TimeUnit
 class SchoolWorker(context: Context, params: WorkerParameters) : CoroutineWorker(context, params) {
     override suspend fun doWork(): Result {
         val container = applicationContext.container
+        container.quiet.update()  // every couple of hours: a safety net if an alarm was swallowed
         if (!container.school.status().connected) return Result.success()
         return try {
             container.syncSchool()

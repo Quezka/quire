@@ -157,6 +157,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onResume() {
         super.onResume()
+        container.quiet.update()  // an alarm the phone swallowed is put right as soon as you look
         container.sync.syncNow() // pick up what changed on the computer
         container.focus.tick(announce = false)
         container.reminders.plan()
