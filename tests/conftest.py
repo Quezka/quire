@@ -1,8 +1,11 @@
 import os
+import tempfile
 from datetime import date, datetime
 
 import pytest
 
+# Tests must never touch the real settings of the installed app (QSettings().clear() would wipe them).
+os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="quire-tests-")
 os.environ.setdefault("QT_SCALE_FACTOR", "1")  # tests measure pixels: no automatic scaling
 
 from quire.bootstrap import build_services
