@@ -354,4 +354,5 @@
     <string name="sleep_remind">Напоминать перед сном</string>
     <string name="sleep_wind_down_title">Пора готовиться ко сну</string>
     <string name="sleep_wind_down_text">Постарайтесь уснуть к %1$s.</string>
+    <string name="all_day">Весь день</string>
 </resources>

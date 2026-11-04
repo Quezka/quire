@@ -42,6 +42,20 @@ class SingleInstance(QObject):
             return True
         return False
 
+    def wait_until_gone(self, seconds: float = 8.0) -> bool:
+        """After a restart: the copy that started this one is still closing, so give it time to go
+        (without asking it to show itself). False if it is still there, then it isn't quitting."""
+        import time
+        end = time.monotonic() + seconds
+        while time.monotonic() < end:
+            socket = QLocalSocket()
+            socket.connectToServer(self.name)
+            if not socket.waitForConnected(200):
+                return True
+            socket.disconnectFromServer()
+            time.sleep(0.1)
+        return False
+
     def listen(self) -> None:
         QLocalServer.removeServer(self.name)  # left behind by a crash
         self.server = QLocalServer(self)

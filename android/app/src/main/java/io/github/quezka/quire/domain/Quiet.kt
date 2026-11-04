@@ -55,7 +55,7 @@ object Quiet {
         val found = mutableListOf<Pair<LocalDateTime, LocalDateTime>>()
         for (day in listOf(now.toLocalDate(), now.toLocalDate().plusDays(1))) {
             for (item in itemsOn(day)) {
-                if (item.isMilestone || !settings.wants(item.kind)) continue
+                if (item.isMilestone || item.isAllDay || !settings.wants(item.kind)) continue
                 val midnight = day.atStartOfDay()
                 found += midnight.plusMinutes(item.start.toLong()) to midnight.plusMinutes(item.end.toLong())
             }

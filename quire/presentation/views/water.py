@@ -4,8 +4,8 @@ from __future__ import annotations
 from PySide6.QtCore import QRectF, Qt, QTimer
 from PySide6.QtGui import QColor, QPainter
 from PySide6.QtWidgets import (
-    QCheckBox, QDoubleSpinBox, QFormLayout, QHBoxLayout, QListWidget, QPushButton, QSpinBox,
-    QTimeEdit, QVBoxLayout, QWidget,
+    QCheckBox, QDoubleSpinBox, QFormLayout, QHBoxLayout, QListWidget, QListWidgetItem, QMenu, QPushButton,
+    QSpinBox, QTimeEdit, QVBoxLayout, QWidget,
 )
 
 from ...application.bus import Topic
@@ -63,6 +63,7 @@ class WaterView(Page):
     def __init__(self, services: Services, relay: ChangeRelay, parent=None):
         super().__init__(parent)
         self.water = services.water
+        self.planner = services.planner
         self.title.setText(_("Water"))
 
         # ---- today ----
@@ -83,12 +84,31 @@ class WaterView(Page):
         self.undo_btn.clicked.connect(self.water.undo_last)
         add_row.addWidget(self.undo_btn)
         add_row.addStretch()
+        self.amount = QSpinBox(minimum=10, maximum=2000, singleStep=10, value=330)
+        self.amount.setSuffix(" ml")
+        self.amount.setToolTip(_("Any other amount"))
+        self.amount.setAccessibleName(_("Any other amount"))
+        add_amount = QPushButton(_("Add"))
+        add_amount.clicked.connect(lambda: self._add(self.amount.value()))
+        other_row = QHBoxLayout()
+        other_row.addStretch()
+        other_row.addWidget(self.amount)
+        other_row.addWidget(add_amount)
+        other_row.addStretch()
+        self.stats = label("", "muted")
+        self.stats.setAlignment(Qt.AlignCenter)
+        self.stats.setWordWrap(True)
         self.entries = QListWidget()
-        self.entries.setMaximumHeight(110)
+        self.entries.setMaximumHeight(130)
+        self.entries.setToolTip(_("Right-click an entry to remove it"))
+        self.entries.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.entries.customContextMenuRequested.connect(self._entry_menu)
         today = Card()
         today.add(self.ring, 1)
         today.add(self.status)
         today.body.addLayout(add_row)
+        today.body.addLayout(other_row)
+        today.add(self.stats)
         today.add(self.entries)
 
         # ---- profile ----
@@ -98,6 +118,9 @@ class WaterView(Page):
         self.weight_box.setSuffix(" kg")
         self.glass_box = QSpinBox(minimum=50, maximum=1000, singleStep=50)
         self.glass_box.setSuffix(" ml")
+        self.goal_box = QSpinBox(minimum=0, maximum=6000, singleStep=100)
+        self.goal_box.setSuffix(" ml")
+        self.goal_box.setSpecialValueText(_("From height and weight"))
         self.remind = QCheckBox(_("Remind me when I fall behind"))
         self.start = QTimeEdit(displayFormat="HH:mm")
         self.end = QTimeEdit(displayFormat="HH:mm")
@@ -114,6 +137,7 @@ class WaterView(Page):
         form.addRow(_("Height"), self.height_box)
         form.addRow(_("Weight"), self.weight_box)
         form.addRow(_("One glass"), self.glass_box)
+        form.addRow(_("Daily goal"), self.goal_box)
         form.addRow("", self.remind)
         form.addRow(_("Between"), hours)
         profile = Card(_("Your goal"))
@@ -137,11 +161,12 @@ class WaterView(Page):
 
         relay.changed.connect(self._changed)
         self._load_profile()
+        self._day = self.planner.today()
         self.refresh()
 
         # Nudges while Quire is open: about once a minute, it checks whether you're behind.
         self._timer = QTimer(self, interval=60_000)
-        self._timer.timeout.connect(self._remind)
+        self._timer.timeout.connect(self._tick)
         self._timer.start()
 
     # ---- data ----
@@ -149,6 +174,27 @@ class WaterView(Page):
     def _changed(self, topic):
         if topic is Topic.WATER:
             self.refresh()
+
+    def _tick(self):
+        """Quire stays open for days: at midnight today's count starts again by itself."""
+        if self.planner.today() != self._day:
+            self._day = self.planner.today()
+            self.refresh()
+        self._remind()
+
+    def showEvent(self, event):  # noqa: N802 (Qt naming)
+        super().showEvent(event)
+        if self.planner.today() != self._day:
+            self._tick()
+
+    def _entry_menu(self, pos):
+        item = self.entries.itemAt(pos)
+        if item is None:
+            return
+        menu = QMenu(self)
+        remove = menu.addAction(_("Remove this entry"))
+        if menu.exec(self.entries.viewport().mapToGlobal(pos)) is remove:
+            self.water.delete(item.data(Qt.UserRole))
 
     def _add(self, ml: int):
         attempt(self, lambda: self.water.add(ml))
@@ -165,6 +211,7 @@ class WaterView(Page):
         self.height_box.setValue(p.height_cm or 170)
         self.weight_box.setValue(p.weight_kg or 65)
         self.glass_box.setValue(p.glass_ml)
+        self.goal_box.setValue(p.manual_goal or 0)
         self.remind.setChecked(p.remind)
         self.start.setTime(min_to_qtime(p.start))
         self.end.setTime(min_to_qtime(p.end))
@@ -172,7 +219,8 @@ class WaterView(Page):
     def _save_profile(self):
         data = WaterProfileInput(self.height_box.value(), self.weight_box.value(),
                                  self.glass_box.value(), self.remind.isChecked(),
-                                 qtime_to_min(self.start.time()), qtime_to_min(self.end.time()))
+                                 qtime_to_min(self.start.time()), qtime_to_min(self.end.time()),
+                                 self.goal_box.value() or None)
         attempt(self, lambda: self.water.save_profile(data))
 
     def refresh(self):
@@ -194,8 +242,16 @@ class WaterView(Page):
             behind = o.expected - o.drunk
             self.status.setText(_("About {ml} ml behind where you'd be by now.").format(ml=behind)
                                 if behind >= 250 and o.drunk < o.goal else "")
-            self.goal_label.setText(_("Daily goal: {goal} ml, from your body surface area. A rough guide, not "
+            self.goal_label.setText(_("Daily goal: {goal} ml, chosen by you.").format(goal=o.goal)
+                                    if o.profile.manual_goal else
+                                    _("Daily goal: {goal} ml, from your body surface area. A rough guide, not "
                                       "medical advice.").format(goal=o.goal))
+        parts = [_("{ml} ml a day this week").format(ml=o.average)] if o.average else []
+        if o.streak >= 2:
+            parts.insert(0, _("{days} days in a row").format(days=o.streak))
+        self.stats.setText(" · ".join(parts))
         self.entries.clear()
         for e in reversed(o.entries):
-            self.entries.addItem(f"{fmt_min(e.at)}   +{e.ml} ml")
+            item = QListWidgetItem(f"{fmt_min(e.at)}   +{e.ml} ml")
+            item.setData(Qt.UserRole, e.id)
+            self.entries.addItem(item)

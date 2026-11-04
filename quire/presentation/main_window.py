@@ -138,6 +138,7 @@ class MainWindow(QMainWindow):
         self.today.openClassNote.connect(self.open_class_note)
         self.week.openClassNote.connect(self.open_class_note)
         self.school.openClassNote.connect(self.open_class_note)
+        self.school.newTopicNote.connect(self.new_topic_note)
         self._shortcuts()
 
         settings = QSettings()
@@ -241,6 +242,10 @@ class MainWindow(QMainWindow):
 
     def open_courses(self):
         CoursesDialog(self.services, self).exec()
+
+    def new_topic_note(self, course_id: int, topic: str):
+        self.show_page(3)
+        self.notes.new_topic_note(course_id, topic)
 
     def open_class_note(self, course_id, day):
         self.show_page(3)

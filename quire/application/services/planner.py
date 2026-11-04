@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, timedelta
 
 from ...domain import (
-    Course, Event, NotFound, Routine, TimeRange, milestone_time, work_shifts,
+    Course, Event, NotFound, Routine, TimeRange, all_day_time, milestone_time, work_shifts,
 )
 from ..bus import ChangeBus, Topic
 from ..dto import AgendaItem, DayAgenda, ItemKind, TaskItem, WeekAgenda
@@ -141,7 +141,8 @@ class PlannerService:
         return event_record(self._event(event_id))
 
     def save_event(self, event_id: int | None, data: EventInput) -> int:
-        time = milestone_time(data.start) if data.milestone else TimeRange(data.start, data.end)
+        time = (all_day_time() if data.all_day else milestone_time(data.start) if data.milestone
+                else TimeRange(data.start, data.end))
         if event_id is None:
             event = Event(data.day, time, data.title.strip(), data.details, data.color)
         else:

@@ -99,7 +99,7 @@ class QuietService:
         today = now.date()
         found = []
         for item in self._planner.items_between(today, today + timedelta(days=CHECK_DAYS)):
-            if item.is_milestone or not self._wanted(item.kind, settings):
+            if item.is_milestone or item.is_all_day or not self._wanted(item.kind, settings):
                 continue
             midnight = datetime.combine(item.day, time())
             found.append((midnight + timedelta(minutes=item.time.start),

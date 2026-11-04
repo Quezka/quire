@@ -6,7 +6,8 @@ import re
 from pathlib import Path
 
 from PySide6.QtCore import QBuffer, QByteArray, QIODevice, QMarginsF, QMimeData, QSizeF, QUrl, Qt
-from PySide6.QtGui import QImage, QPageLayout, QPageSize, QPdfWriter, QTextDocument
+from PySide6.QtGui import (QImage, QPageLayout, QPageSize, QPdfWriter, QTextBlockFormat, QTextCursor, QTextDocument,
+                           QTextDocumentFragment)
 
 from ..application.services import Services
 
@@ -102,6 +103,11 @@ def load_picture(services: Services, url: QUrl, width: int) -> QImage | None:
 
 def note_pdf(services: Services, title: str, body: str, path: str):
     """Print a note, pictures included, to an A4 PDF."""
+    notes_pdf(services, title, [body], path)
+
+
+def notes_pdf(services: Services, title: str, bodies: list[str], path: str):
+    """Print several notes, pictures included, to one A4 PDF: each starts on a new page."""
     writer = QPdfWriter(path)
     writer.setTitle(title)
     writer.setPageLayout(QPageLayout(QPageSize(QPageSize.A4), QPageLayout.Portrait,
@@ -113,10 +119,20 @@ def note_pdf(services: Services, title: str, body: str, path: str):
     page = writer.pageLayout().paintRect(QPageLayout.Point)
     document.setPageSize(QSizeF(page.width() * 96 / 72, page.height() * 96 / 72))
     width = int(page.width() * 96 / 72 - 2 * document.documentMargin() - 2)
-    document.setMarkdown(body)  # first: it clears the document's resources
-    for m in IMAGE_LINE.finditer(body):
-        url = QUrl(f"{SCHEME}:{m.group(2)}")
-        image = load_picture(services, url, width)
-        if image is not None:
-            document.addResource(QTextDocument.ImageResource, url, image)
+    document.setMarkdown(bodies[0] if bodies else "")  # first: it clears the document's resources
+    cursor = QTextCursor(document)
+    for body in bodies[1:]:
+        one = QTextDocument()
+        one.setMarkdown(body)
+        cursor.movePosition(QTextCursor.End)
+        new_page = QTextBlockFormat()
+        new_page.setPageBreakPolicy(QTextBlockFormat.PageBreak_AlwaysBefore)
+        cursor.insertBlock(new_page)
+        cursor.insertFragment(QTextDocumentFragment(one))
+    for body in bodies:
+        for m in IMAGE_LINE.finditer(body):
+            url = QUrl(f"{SCHEME}:{m.group(2)}")
+            image = load_picture(services, url, width)
+            if image is not None:
+                document.addResource(QTextDocument.ImageResource, url, image)
     document.print_(writer)

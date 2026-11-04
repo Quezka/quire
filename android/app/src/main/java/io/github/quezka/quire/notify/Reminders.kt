@@ -57,7 +57,7 @@ object ReminderPlan {
         var day = now.toLocalDate()
         while (day <= horizon.toLocalDate()) {
             for (item in itemsOn(day)) {
-                if (item.continues || !settings.wants(item.kind)) continue
+                if (item.continues || item.isAllDay || !settings.wants(item.kind)) continue
                 val starts = day.atStartOfDay().plusMinutes(item.start.toLong())
                 if (starts <= now || starts > horizon) continue
                 result += Reminder(maxOf(starts.minusMinutes(before.toLong()), now), starts, item)

@@ -81,8 +81,8 @@ class ReminderService:
         earliest = now - GRACE
         found = []
         for item in self._planner.items_between(earliest.date(), horizon.date()):
-            if not self._wanted(item.kind, settings):
-                continue
+            if item.is_all_day or not self._wanted(item.kind, settings):
+                continue  # an all-day event has no moment to be reminded of
             day, minute = item.origin or (item.day, item.time.start)
             if (day, minute) != (item.day, item.time.start):
                 continue  # the after-midnight part of something that started yesterday

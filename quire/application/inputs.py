@@ -37,6 +37,7 @@ class EventInput:
     details: str = ""
     color: str = "#8a8f98"
     milestone: bool = False  # a point in time with no duration; `end` is ignored
+    all_day: bool = False  # the whole day; `start` and `end` are ignored
 
 
 @dataclass(frozen=True)
@@ -56,6 +57,7 @@ class WaterProfileInput:
     remind: bool = True
     start: int = 8 * 60
     end: int = 22 * 60
+    manual_goal: int | None = None  # None: from height and weight
 
 
 @dataclass(frozen=True)

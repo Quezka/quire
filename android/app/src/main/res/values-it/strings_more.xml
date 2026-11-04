@@ -338,4 +338,5 @@
     <string name="sleep_remind">Ricordamelo prima di dormire</string>
     <string name="sleep_wind_down_title">È ora di rilassarsi</string>
     <string name="sleep_wind_down_text">Punta a dormire entro le %1$s.</string>
+    <string name="all_day">Tutto il giorno</string>
 </resources>

@@ -22,6 +22,7 @@ data class AgendaItem(
     val originStart: Int = start,
 ) {
     val isMilestone get() = (kind == ItemKind.EVENT || kind == ItemKind.ROUTINE) && end - start == MILESTONE_MINUTES
+    val isAllDay get() = kind == ItemKind.EVENT && start == 0 && end == MINUTES_PER_DAY
 }
 
 data class DayAgenda(

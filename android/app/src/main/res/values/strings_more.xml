@@ -338,4 +338,5 @@
     <string name="sleep_remind">Remind me before bedtime</string>
     <string name="sleep_wind_down_title">Time to wind down</string>
     <string name="sleep_wind_down_text">Aim to be asleep by %1$s.</string>
+    <string name="all_day">All day</string>
 </resources>

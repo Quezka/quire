@@ -77,6 +77,7 @@ class _FetchJob(QRunnable):
 class SchoolView(Page):
     newsChanged = Signal(int)  # number of unseen changes from the last sync
     openClassNote = Signal(int, object)  # course_id, date
+    newTopicNote = Signal(int, str)  # course_id, topic
 
     def __init__(self, services: Services, relay: ChangeRelay, parent=None):
         super().__init__(parent)
@@ -250,8 +251,11 @@ class SchoolView(Page):
         self.lessons = QListWidget()
         self.lessons.setItemDelegate(TwoLineDelegate(self.lessons))
         self.lessons.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        self.lessons.setResizeMode(QListView.Adjust)  # rows follow the width: long topics wrap
         self.lessons.itemDoubleClicked.connect(self._open_lesson_note)
-        self.lessons.setToolTip(_("Double-click a lesson to open its class notes"))
+        self.lessons.setToolTip(_("Double-click a lesson to open its class notes; right-click for a note on its topic"))
+        self.lessons.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.lessons.customContextMenuRequested.connect(self._lesson_menu)
         lessons.add(self.lessons, 1)
 
         self.news_card = Card(_("What's new"))
@@ -503,12 +507,28 @@ class SchoolView(Page):
             course = courses.get(lesson.course_id)
             item.setData(TwoLineDelegate.COLOR, course.color if course else None)
             item.setData(Qt.UserRole, (lesson.course_id, lesson.day))
-            item.setToolTip(lesson.topic)
+            item.setData(Qt.UserRole + 30, lesson.topic)
+            item.setData(TwoLineDelegate.WRAP, True)
             self.lessons.addItem(item)
         if not self.lessons.count():
             empty = QListWidgetItem(_("No lessons in the last two weeks"))
             empty.setFlags(Qt.NoItemFlags)
             self.lessons.addItem(empty)
+
+    def _lesson_menu(self, pos):
+        item = self.lessons.itemAt(pos)
+        data = item.data(Qt.UserRole) if item is not None else None
+        if not data or data[0] is None:
+            return
+        menu = QMenu(self)
+        open_notes = menu.addAction(_("Open the class notes"))
+        topic = item.data(Qt.UserRole + 30)
+        new = menu.addAction(_("New note on this topic")) if topic else None
+        chosen = menu.exec(self.lessons.viewport().mapToGlobal(pos))
+        if chosen is open_notes:
+            self._open_lesson_note(item)
+        elif chosen is not None and chosen is new:
+            self.newTopicNote.emit(data[0], topic)
 
     def _fill_news(self):
         t = theme.current()

@@ -58,6 +58,10 @@ class EventRecord:
     def is_milestone(self) -> bool:
         return self.time.duration == MILESTONE_MINUTES
 
+    @property
+    def is_all_day(self) -> bool:
+        return self.time.duration == 24 * 60
+
 
 @dataclass(frozen=True)
 class RoutineRecord:
@@ -76,6 +80,7 @@ class WaterProfile:
     remind: bool
     start: int  # minute of day the reminders begin
     end: int
+    manual_goal: int | None = None  # chosen by hand; otherwise it comes from height and weight
 
 
 @dataclass(frozen=True)
@@ -93,6 +98,8 @@ class WaterOverview:
     expected: int  # what the pace says you should have had by now
     entries: tuple[WaterEntry, ...]  # today, oldest first
     week: tuple[tuple[date, int], ...]  # the last 7 days, oldest first
+    streak: int = 0  # days in a row the goal was reached (today counts once reached)
+    average: int = 0  # ml a day over the last 7 days, today left out (it isn't over yet)
 
 
 @dataclass(frozen=True)

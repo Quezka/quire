@@ -169,7 +169,7 @@ private fun WeekItem(item: AgendaItem, onClick: () -> Unit) {
         verticalAlignment = Alignment.CenterVertically) {
         Box(Modifier.size(8.dp).background(parseColor(item.color), CircleShape))
         Spacer(Modifier.width(10.dp))
-        Text(span(item.start, item.end), style = MaterialTheme.typography.bodySmall,
+        Text(if (item.isAllDay) stringResource(R.string.all_day) else span(item.start, item.end), style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.width(92.dp))
         Text(item.title, maxLines = 1, overflow = TextOverflow.Ellipsis, style = MaterialTheme.typography.bodyMedium,
             modifier = Modifier.weight(1f))

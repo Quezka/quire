@@ -551,6 +551,15 @@ class NoteEditor(QTextEdit):
         cursor.mergeCharFormat(fmt)
         self.mergeCurrentCharFormat(fmt)
 
+    def format_state(self) -> dict[str, bool]:
+        """What the formatting buttons should show as switched on, where the cursor is now."""
+        block = self.textCursor().block()
+        in_list = block.textList() is not None
+        checklist = in_list and block.blockFormat().marker() != QTextBlockFormat.MarkerType.NoMarker
+        return {"bold": self.fontWeight() >= QFont.DemiBold, "italic": self.fontItalic(),
+                "code": is_code(self.currentCharFormat()) or block_kind(block) == "code",
+                "list": in_list and not checklist, "checklist": checklist, "quote": block_kind(block) == "quote"}
+
     def toggle_bold(self):
         fmt = QTextCharFormat()
         fmt.setFontWeight(QFont.Normal if self.fontWeight() >= QFont.DemiBold else QFont.Bold)

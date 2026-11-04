@@ -39,6 +39,10 @@ class AgendaItem:
     def is_milestone(self) -> bool:
         return self.kind in (ItemKind.EVENT, ItemKind.ROUTINE) and self.time.duration == MILESTONE_MINUTES
 
+    @property
+    def is_all_day(self) -> bool:
+        return self.kind is ItemKind.EVENT and self.time.duration == 24 * 60
+
 
 @dataclass(frozen=True)
 class TaskItem:

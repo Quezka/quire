@@ -1,7 +1,8 @@
 """Building blocks shared by the pages: header, cards, buttons, agenda blocks."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QToolButton, QVBoxLayout, QWidget,
 )
@@ -67,6 +68,43 @@ def zoom_controls(page: QWidget, zoom) -> QWidget:
                   context=Qt.WidgetWithChildrenShortcut)
     box.fit_button = fit
     return box
+
+
+class AllDayStrip(QWidget):
+    """All-day events, above the timeline: a coloured chip each, which opens the event when clicked."""
+
+    activated = Signal(object)  # AgendaItem
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.row = QHBoxLayout(self)
+        self.row.setContentsMargins(0, 0, 0, 6)
+        self.row.setSpacing(6)
+        self.hide()
+
+    def set_items(self, items: list[AgendaItem], with_day=None):
+        while self.row.count():
+            old = self.row.takeAt(0).widget()
+            if old is not None:
+                old.setParent(None)
+                old.deleteLater()
+        for item in items:
+            text = f"{with_day(item.day)}: {item.title}" if with_day else item.title
+            chip = QPushButton(text, objectName="allDay")
+            chip.setCursor(Qt.PointingHandCursor)
+            chip.setToolTip(_("All day"))
+            chip.setStyleSheet(f"QPushButton#allDay {{ background: {item.color}; color: {readable_on(item.color)}; "
+                               "border: none; border-radius: 8px; padding: 3px 10px; font-weight: 600; }")
+            chip.clicked.connect(lambda _c=False, i=item: self.activated.emit(i))
+            self.row.addWidget(chip)
+        self.row.addStretch()
+        self.setVisible(bool(items))
+
+
+def readable_on(color: str) -> str:
+    """Black or white, whichever reads better on this background (perceived brightness)."""
+    c = QColor(color)
+    return "#000000" if 0.299 * c.red() + 0.587 * c.green() + 0.114 * c.blue() > 150 else "#ffffff"
 
 
 def agenda_block(item: AgendaItem, column: int) -> Block:

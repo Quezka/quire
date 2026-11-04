@@ -15,7 +15,7 @@ from ..dialogs import (
     weekly_shift_menu,
 )
 from ..widgets import GridHeader, Slider, TimeGrid, TimelineZoom
-from .common import Card, Page, agenda_block, button, icon_button, menu_button, zoom_controls
+from .common import AllDayStrip, Card, Page, agenda_block, button, icon_button, menu_button, zoom_controls
 from ..i18n import _, month_name, month_short, weekday_short
 
 
@@ -65,6 +65,9 @@ class WeekView(Page):
         pane_layout = QVBoxLayout(pane)
         pane_layout.setContentsMargins(0, 0, 0, 0)
         pane_layout.setSpacing(0)
+        self.all_day = AllDayStrip()
+        self.all_day.activated.connect(lambda item: self._block_activated(item, None))
+        pane_layout.addWidget(self.all_day)
         pane_layout.addWidget(self.day_header)
         pane_layout.addWidget(self.scroll, 1)
         self.slider = Slider(pane)
@@ -115,7 +118,8 @@ class WeekView(Page):
                                f"{month_short(sunday)} {sunday.year}")
 
         now_col = -1 if week.today_index is None else week.today_index
-        blocks = [agenda_block(i, week.days.index(i.day)) for i in week.items]
+        self.all_day.set_items([i for i in week.items if i.is_all_day], with_day=weekday_short)
+        blocks = [agenda_block(i, week.days.index(i.day)) for i in week.items if not i.is_all_day]
         self.grid.set_data(len(week.days), blocks, now_col)
         self.zoom.apply()
         self.day_header.set_days([(weekday_short(d), d.day) for d in week.days], now_col)

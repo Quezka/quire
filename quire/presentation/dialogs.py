@@ -346,6 +346,7 @@ class EventDialog(QDialog):
         self.start = _time_edit(start)
         self.end = _time_edit(min(start + 60, 24 * 60 - 1))
         self.milestone = QCheckBox(_("Milestone: a moment with no duration"))
+        self.all_day = QCheckBox(_("All day"))
         self.color = ColorButton("#8a8f98")
         self.details = QPlainTextEdit(placeholderText=_("Details (optional)"))
         self.details.setFixedHeight(90)
@@ -357,12 +358,15 @@ class EventDialog(QDialog):
         times.addWidget(self.end)
         times.addStretch()
         self.milestone.toggled.connect(self._milestone_toggled)
+        self.all_day.toggled.connect(self._all_day_toggled)
 
         form = QFormLayout()
         form.addRow(_("Title"), self.title)
         form.addRow(_("Date"), self.date)
+        form.addRow("", self.all_day)
         form.addRow(_("Time"), times)
         form.addRow("", self.milestone)
+        self._form = form
         form.addRow(_("Colour"), self.color)
         form.addRow(_("Details"), self.details)
 
@@ -377,11 +381,19 @@ class EventDialog(QDialog):
             self.start.setTime(min_to_qtime(e.time.start))
             self.end.setTime(min_to_qtime(e.time.end))
             self.milestone.setChecked(e.is_milestone)
+            self.all_day.setChecked(e.is_all_day)
             self.color.setColor(e.color)
             self.details.setPlainText(e.details)
         else:
             self.date.setDate(to_qdate(day or self.planner.today()))
             self.milestone.setChecked(milestone)
+
+    def _all_day_toggled(self, on: bool):
+        """An all-day event has no times, and isn't a milestone."""
+        self._form.setRowVisible(3, not on)  # the times
+        self._form.setRowVisible(4, not on)  # the milestone switch
+        if on:
+            self.milestone.setChecked(False)
 
     def _milestone_toggled(self, on: bool):
         self.end.setVisible(not on)
@@ -398,7 +410,7 @@ class EventDialog(QDialog):
             data = EventInput(self.date.date().toPython(), qtime_to_min(self.start.time()),
                               qtime_to_min(self.end.time()), self.title.text().strip(),
                               self.details.toPlainText(), self.color.color(),
-                              self.milestone.isChecked())
+                              self.milestone.isChecked(), self.all_day.isChecked())
             self.planner.save_event(self.event_id, data)
 
         if attempt(self, save):

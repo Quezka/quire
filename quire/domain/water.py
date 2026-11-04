@@ -14,6 +14,7 @@ from .errors import ValidationError
 
 ML_PER_SQUARE_METRE = 1200
 MIN_GOAL, MAX_GOAL = 1200, 4500
+MIN_MANUAL_GOAL, MAX_MANUAL_GOAL = 500, 6000
 MAX_SIP = 2000  # one entry; more is a typo
 DEFAULT_GLASS = 250
 DEFAULT_START = 8 * 60  # reminders run between these times of day
@@ -28,6 +29,24 @@ def water_goal_ml(height_cm: float, weight_kg: float) -> int:
     area = math.sqrt(height_cm * weight_kg / 3600)
     goal = round(area * ML_PER_SQUARE_METRE / 50) * 50
     return max(MIN_GOAL, min(MAX_GOAL, goal))
+
+
+def check_manual_goal(goal: int) -> int:
+    if not MIN_MANUAL_GOAL <= goal <= MAX_MANUAL_GOAL:
+        raise ValidationError("Enter a daily goal between 500 and 6000 ml.")
+    return goal
+
+
+def water_streak(days: list[int], goal: int) -> int:
+    """How many days in a row reached the goal. `days` holds each day's ml, newest first, today first:
+    today doesn't break the run while it can still be reached."""
+    run = 0
+    for i, ml in enumerate(days):
+        if ml >= goal:
+            run += 1
+        elif i > 0:
+            break
+    return run
 
 
 @dataclass

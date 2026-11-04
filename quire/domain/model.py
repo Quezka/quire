@@ -100,6 +100,15 @@ class Event:
     def is_milestone(self) -> bool:
         return self.time.duration == MILESTONE_MINUTES
 
+    @property
+    def is_all_day(self) -> bool:
+        return self.time.duration == MINUTES_PER_DAY
+
+
+def all_day_time() -> TimeRange:
+    """The stored span of an all-day event: the whole day, midnight to midnight."""
+    return TimeRange(0, MINUTES_PER_DAY)
+
 
 def milestone_time(minute: int) -> TimeRange:
     """The stored span of a milestone at `minute`: no duration, so the shortest one."""

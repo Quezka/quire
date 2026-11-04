@@ -232,11 +232,12 @@ fun EventEditor(repo: Repository, uid: String?, day: LocalDate, close: () -> Uni
     var details by remember { mutableStateOf(existing?.details.orEmpty()) }
     var color by remember { mutableStateOf(existing?.color ?: "#8a8f98") }
     var moment by remember { mutableStateOf(existing?.isMilestone ?: milestone) }
+    var allDay by remember { mutableStateOf(existing != null && existing.start == 0 && existing.end == MINUTES_PER_DAY) }
     EditorSheet(stringResource(if (existing == null) (if (moment) R.string.new_milestone else R.string.new_event) else R.string.edit_event), close,
-        canSave = title.isNotBlank() && (moment || end > start),
+        canSave = title.isNotBlank() && (allDay || moment || end > start),
         onSave = {
-            val from = if (moment) minOf(start, MINUTES_PER_DAY - MILESTONE_MINUTES) else start
-            val until = if (moment) from + MILESTONE_MINUTES else end
+            val from = if (allDay) 0 else if (moment) minOf(start, MINUTES_PER_DAY - MILESTONE_MINUTES) else start
+            val until = if (allDay) MINUTES_PER_DAY else if (moment) from + MILESTONE_MINUTES else end
             repo.saveEvent(Event(existing?.uid ?: Codec.newUid(), date, from, until, title, details, color)); close()
         },
         onDelete = existing?.let { { repo.deleteEvent(it.uid); close() } }) {
@@ -245,10 +246,14 @@ fun EventEditor(repo: Repository, uid: String?, day: LocalDate, close: () -> Uni
             textStyle = MaterialTheme.typography.titleMedium)
         DateButton(date, repo.today(), { date = it })
         Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.all_day), Modifier.weight(1f))
+            Switch(allDay, { allDay = it; if (it) moment = false })
+        }
+        if (!allDay) Row(verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.milestone_switch), Modifier.weight(1f))
             Switch(moment, { moment = it })
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (!allDay) Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
             if (moment) {
                 TimeButton(stringResource(R.string.at_time), start, { start = it; if (end <= it) end = minOf(it + 60, MINUTES_PER_DAY) })
             } else {
@@ -256,7 +261,7 @@ fun EventEditor(repo: Repository, uid: String?, day: LocalDate, close: () -> Uni
                 TimeButton(stringResource(R.string.to), end, { end = if (it == 0) MINUTES_PER_DAY else it })
             }
         }
-        if (!moment && end <= start) Text(stringResource(R.string.ends_before_start), color = MaterialTheme.colorScheme.error)
+        if (!allDay && !moment && end <= start) Text(stringResource(R.string.ends_before_start), color = MaterialTheme.colorScheme.error)
         ColorPicker(color) { color = it }
         OutlinedTextField(details, { details = it }, Modifier.fillMaxWidth().heightIn(min = 90.dp),
             label = { Text(stringResource(R.string.details)) })

@@ -1,6 +1,7 @@
 """Starts the Qt event loop around an already-wired set of services."""
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 from PySide6.QtWidgets import QApplication
@@ -17,6 +18,9 @@ def create_application(argv: list[str]) -> QApplication:
     return _create(argv, name=APP_NAME, app_id=APP_ID, icon=ICON, locale_package="quire.presentation.locales")
 
 
+RESTARTING = "QUIRE_RESTARTING"  # set for the new copy by Settings → Restart now
+
+
 def run(services: Services, argv: list[str], background: bool = False,
         app: QApplication | None = None, splash=None) -> int:
     from .background import SingleInstance, Tray, instance_name
@@ -25,6 +29,8 @@ def run(services: Services, argv: list[str], background: bool = False,
 
     app = app or create_application(argv)
     single = SingleInstance(instance_name(str(services.storage.location)), app)
+    if os.environ.pop(RESTARTING, None):
+        single.wait_until_gone()
     if single.already_running():
         if splash is not None:
             splash.close_now()

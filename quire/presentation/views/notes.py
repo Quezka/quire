@@ -8,7 +8,7 @@ from pathlib import Path
 from PySide6.QtCore import QFileSystemWatcher, QMimeData, QSettings, Qt, QTimer
 from PySide6.QtGui import QGuiApplication, QImage, QKeySequence, QShortcut, QTextCursor
 from PySide6.QtWidgets import (
-    QComboBox, QCompleter, QFileDialog, QHBoxLayout, QInputDialog, QLineEdit, QListWidget,
+    QAbstractItemView, QComboBox, QCompleter, QFileDialog, QHBoxLayout, QInputDialog, QLineEdit, QListWidget,
     QListWidgetItem, QMenu, QMessageBox, QToolButton,
 )
 
@@ -23,7 +23,7 @@ from ..bridge import ChangeRelay
 from ..dialogs import NotebookDialog, confirm, select_data
 from ..formatting import plural, relative_timestamp
 from ..note_editor import SHORTCUTS, NoteEditor
-from ..note_images import OPENABLE, load_picture, note_pdf, picture_from_file, picture_from_mime
+from ..note_images import OPENABLE, load_picture, note_pdf, notes_pdf, picture_from_file, picture_from_mime
 from ..widgets import TwoLineDelegate, color_icon, scaled_font
 from .common import Card, Page, icon_button, label, primary_button
 from ..i18n import N_, _
@@ -108,12 +108,14 @@ class NotesView(Page):
         self.group_btn.setChecked(QSettings().value("notes/grouped", False, type=bool))
         self.group_btn.toggled.connect(self._grouping_toggled)
         self._collapsed: set[tuple] = set()
+        self._closed_at_start = False
         self._group_keys: set[tuple] = set()  # every group heading in the list, shown or not
         self.collapse_btn = icon_button("collapse", _("Collapse all groups"))
         self.collapse_btn.clicked.connect(self._toggle_all_groups)
         self.list = QListWidget()
         self.list.setItemDelegate(TwoLineDelegate(self.list))
         self.list.setMouseTracking(True)
+        self.list.setSelectionMode(QAbstractItemView.ExtendedSelection)  # Ctrl/Shift+click: several, for one PDF
         self.list.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.list.currentItemChanged.connect(self._selected)
         self.list.itemClicked.connect(self._header_clicked)
@@ -209,6 +211,7 @@ class NotesView(Page):
     def _format_bar(self) -> QHBoxLayout:
         """Buttons for the Markdown the editor understands, with their shortcuts."""
         e = self.editor
+        self.format_toggles = {}
         heading = icon_button("heading", _("Heading"))
         heading.setPopupMode(QToolButton.InstantPopup)
         menu = QMenu(heading)
@@ -229,11 +232,16 @@ class NotesView(Page):
             shortcut = SHORTCUTS.get(name)
             if shortcut is not None:
                 tip += f" ({shortcut.toString(QKeySequence.NativeText)})"
-            button = icon_button(name, tip)
+            button = icon_button(name, tip, checkable=name != "image")
             button.clicked.connect(action)
             button.clicked.connect(e.setFocus)
+            button.clicked.connect(self._sync_format_buttons)
             buttons.append(button)
+            if name != "image":
+                self.format_toggles[name] = button
         self.format_buttons = buttons
+        e.cursorPositionChanged.connect(self._sync_format_buttons)
+        e.currentCharFormatChanged.connect(lambda _fmt: self._sync_format_buttons())
         self.words = label("", "hint")
         row = QHBoxLayout()
         row.setSpacing(2)
@@ -295,9 +303,16 @@ class NotesView(Page):
             cursor.setPosition(min(position, self.editor.document().characterCount() - 1))
             self.editor.setTextCursor(cursor)
 
+    def _sync_format_buttons(self):
+        """Each button shows whether its format is on where the cursor is, so pressing it again turns it off."""
+        state = self.editor.format_state()
+        for name, button in self.format_toggles.items():
+            button.setChecked(state[name])
+
     def reload_list(self, select_id=None):
         select_id = select_id or (self.note.id if self.note else None)
         text = self.search.text()
+        searching = bool(text.strip())  # what was found is shown even inside a closed group
         course_id, notebook_id = self._scope()
         filtered = course_id is not None or notebook_id is not None
         self.edit_notebook_btn.setVisible(notebook_id is not None)
@@ -311,16 +326,19 @@ class NotesView(Page):
             per_home: dict = {}
             for g in self.notes.grouped(text, course_id, notebook_id):
                 per_home.setdefault(self._home_of(g), []).append(g)
+            if not self._closed_at_start and per_home:  # classes and notebooks start closed
+                self._closed_at_start = True
+                self._collapsed |= {("home", home) for home in per_home if home != ("course", None)}
             for home, home_groups in per_home.items():
                 first = home_groups[0]
                 home_hidden = False
                 if not filtered:  # a single filtered class or notebook needs no heading
                     self._group_keys.add(("home", home))
-                    home_hidden = ("home", home) in self._collapsed
+                    home_hidden = ("home", home) in self._collapsed and not searching
                     owner = first.course or first.notebook
                     self._add_header(1, owner.name if owner else _("Not filed"), ("home", home),
                                      sum(len(g.notes) for g in home_groups),
-                                     owner.color if owner else None, home_hidden)
+                                     owner.color if owner else None, home_hidden, can_add=True)
                 indent = 0 if filtered else 12
                 only_loose = len(home_groups) == 1 and not home_groups[0].topic
                 for g in home_groups:
@@ -328,10 +346,10 @@ class NotesView(Page):
                     if not only_loose:
                         topic_key = ("topic", home, g.topic)
                         self._group_keys.add(topic_key)
-                        collapsed = topic_key in self._collapsed
+                        collapsed = topic_key in self._collapsed and not searching
                         if not home_hidden:
                             self._add_header(2, g.topic or _("No topic"), topic_key, len(g.notes),
-                                             None, collapsed, indent)
+                                             None, collapsed, indent, can_add=True)
                         topic_hidden = home_hidden or collapsed
                         indent_notes = indent + 16
                     else:
@@ -369,7 +387,7 @@ class NotesView(Page):
             self.list.setCurrentItem(item)
 
     def _add_header(self, level: int, text: str, key: tuple, count: int, color, collapsed: bool,
-                    indent: int = 0):
+                    indent: int = 0, can_add: bool = False):
         item = QListWidgetItem(text)
         item.setFlags(Qt.ItemIsEnabled)
         item.setData(TwoLineDelegate.HEADER, level)
@@ -377,6 +395,7 @@ class NotesView(Page):
         item.setData(TwoLineDelegate.COLOR, color)
         item.setData(TwoLineDelegate.COLLAPSED, collapsed)
         item.setData(TwoLineDelegate.INDENT, indent)
+        item.setData(TwoLineDelegate.ADD, can_add)
         item.setData(Qt.UserRole + 20, key)
         self.list.addItem(item)
 
@@ -403,8 +422,15 @@ class NotesView(Page):
         key = item.data(Qt.UserRole + 20)
         if key is None:
             return
+        if self.list.itemDelegate().take_add_click():  # the + on the heading: a new note right there
+            return self._new_note_under(key)
         self._collapsed ^= {key}
         self.reload_list()
+
+    def _new_note_under(self, key: tuple):
+        home, topic = (key[1], "") if key[0] == "home" else (key[1], key[2])
+        course_id, notebook_id = self._ids_of(home)
+        self._open(self.notes.create("", course_id, topic, notebook_id))
 
     def _list_menu(self, pos):
         item = self.list.itemAt(pos)
@@ -434,8 +460,15 @@ class NotesView(Page):
             elif chosen is not None and chosen is edit:
                 self.edit_notebook(notebook_id)
         elif item.data(Qt.UserRole) is not None:
-            delete = menu.addAction(_("Delete note"))
-            if menu.exec(self.list.viewport().mapToGlobal(pos)) is delete:
+            chosen_ids = self._selected_note_ids() if item.isSelected() else []
+            together = None
+            if len(chosen_ids) > 1:
+                together = menu.addAction(_("Export {notes} as one PDF…").format(notes=plural(len(chosen_ids), "note")))
+            delete = menu.addAction(_("Delete note")) if together is None else None
+            chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+            if chosen is not None and chosen is together:
+                self.export_many(chosen_ids)
+            elif chosen is not None and chosen is delete:
                 self.list.setCurrentItem(item)
                 self.delete_current()
 
@@ -601,6 +634,8 @@ class NotesView(Page):
             self.filter.setCurrentIndex(0)
         for widget in (self.search, self.filter):
             widget.blockSignals(False)
+        home = ("notebook", note.notebook_id) if note.notebook_id is not None else ("course", note.course_id)
+        self._collapsed -= {("home", home), ("topic", home, note.topic)}  # the note just opened is on show
         self._show(note)
         self.reload_list(note.id)
         self.editor.setFocus()
@@ -611,6 +646,9 @@ class NotesView(Page):
     def new_note(self):
         course_id, notebook_id = self._scope()
         self._open(self.notes.create("", course_id, "", notebook_id))
+
+    def new_topic_note(self, course_id: int, topic: str):
+        self._open(self.notes.create("", course_id, topic, None))
 
     def open_class_note(self, course_id: int, day: date):
         self._open(self.notes.class_note(course_id, day))
@@ -734,6 +772,23 @@ class NotesView(Page):
                 self.status.setText(_(str(e)))
             if Path(path).exists() and path not in self._watcher.files():
                 self._watcher.addPath(path)
+
+    def _selected_note_ids(self) -> list[int]:
+        rows = sorted(self.list.selectedItems(), key=self.list.row)  # in the order of the list
+        return [i.data(Qt.UserRole) for i in rows if i.data(Qt.UserRole) is not None]
+
+    def export_many(self, note_ids: list[int]):
+        self.flush()
+        folder = QSettings().value("notes/pdf_folder", str(Path.home()))
+        path, _filter = QFileDialog.getSaveFileName(
+            self, _("Export as PDF"), str(Path(folder) / f"{_('Notes')}.pdf"), "PDF (*.pdf)")
+        if not path:
+            return
+        if not path.lower().endswith(".pdf"):
+            path += ".pdf"
+        QSettings().setValue("notes/pdf_folder", str(Path(path).parent))
+        notes_pdf(self.services, _("Notes"), [self.notes.note(i).body for i in note_ids], path)
+        self.status.setText(_("Saved {notes} to one PDF.").format(notes=plural(len(note_ids), "note")))
 
     def export_pdf(self):
         if self.note is None:

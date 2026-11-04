@@ -23,12 +23,16 @@ from .i18n import _
 
 def restart_app():
     """Start a fresh Quire and quit this one (the window saves on close)."""
+    import os
     import sys
 
     from PySide6.QtCore import QProcess
     from PySide6.QtWidgets import QApplication
 
+    from .qt_app import RESTARTING
+
     args = sys.argv[1:] if getattr(sys, "frozen", False) else sys.argv
+    os.environ[RESTARTING] = "1"  # the new copy waits for this one to go, rather than asking it to show itself
     if QProcess.startDetached(sys.executable, args):
         for window in QApplication.topLevelWidgets():
             window.close()

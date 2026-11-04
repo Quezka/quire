@@ -25,6 +25,7 @@ from ..formatting import KIND_LABELS, long_date, plural, relative_date, was_due
 from ..task_view import TaskView
 from ..widgets import Slider, TimeGrid, TimelineZoom, TwoLineDelegate
 from .common import (
+    AllDayStrip,
     Card, Page, agenda_block, badge, button, icon_button, menu_button, zoom_controls,
 )
 from ..i18n import _
@@ -73,7 +74,10 @@ class TodayView(Page):
         self.zoom = TimelineZoom(self.grid, self.scroll, "today", self)
         self.slider = Slider(self.scroll.viewport())
         self.header.insertWidget(self.header.count() - 3, zoom_controls(self, self.zoom))
+        self.all_day = AllDayStrip()
+        self.all_day.activated.connect(lambda item: self._block_activated(item, None))
         timeline = Card(padding=6)
+        timeline.add(self.all_day)
         timeline.add(self.scroll, 1)
 
         # ---- due ----
@@ -213,7 +217,8 @@ class TodayView(Page):
             title += f" {agenda.day.year}"
         self.title.setText(title)
 
-        self.grid.set_data(1, [agenda_block(i, 0) for i in agenda.items],
+        self.all_day.set_items([i for i in agenda.items if i.is_all_day])
+        self.grid.set_data(1, [agenda_block(i, 0) for i in agenda.items if not i.is_all_day],
                            now_col=0 if agenda.is_today else -1)
         self.zoom.apply()
         self._fill_tasks(agenda, today)

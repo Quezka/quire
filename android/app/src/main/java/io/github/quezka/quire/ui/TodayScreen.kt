@@ -251,7 +251,7 @@ fun AgendaRow(item: AgendaItem, onClick: (() -> Unit)? = null) {
                 Text(item.title, fontWeight = FontWeight.SemiBold, maxLines = 1,
                     overflow = TextOverflow.Ellipsis)
                 val meta = buildList {
-                    add(if (item.isMilestone) minutes(item.start) else span(item.start, item.end)); add(kind); addAll(extra)
+                    add(if (item.isAllDay) stringResource(R.string.all_day) else if (item.isMilestone) minutes(item.start) else span(item.start, item.end)); add(kind); addAll(extra)
                     if (item.continues) add(stringResource(R.string.continues_from_yesterday))
                 }
                 Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall,

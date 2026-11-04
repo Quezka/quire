@@ -127,6 +127,12 @@ def test_notes_group_by_topic(window, services, app):
     notes.group_btn.setChecked(True)
     app.processEvents()
 
+    def texts():
+        return [notes.list.item(i).text() for i in range(notes.list.count())]
+
+    assert "Biology" in texts() and "Cell biology" not in texts()  # classes and notebooks start closed
+    notes._header_clicked(next(notes.list.item(i) for i in range(notes.list.count())
+                               if notes.list.item(i).text() == "Biology"))
     rows = [notes.list.item(i) for i in range(notes.list.count())]
     headers = [(r.data(TwoLineDelegate.HEADER), r.text()) for r in rows
                if r.data(TwoLineDelegate.HEADER)]

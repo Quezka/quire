@@ -6,13 +6,14 @@ from dataclasses import dataclass
 from datetime import datetime
 
 from PySide6.QtCore import (
-    QEasingCurve, QEvent, QObject, QPoint, QPointF, QRectF, QSettings, QSize, Qt, QTime, QTimer,
+    QEasingCurve, QEvent, QObject, QPoint, QPointF, QRect, QRectF, QSettings, QSize, Qt, QTime, QTimer,
     QVariantAnimation, Signal,
 )
 from PySide6.QtGui import QColor, QFont, QFontMetrics, QIcon, QPainter, QPainterPath, QPen, QPixmap
 from PySide6.QtWidgets import (
     QColorDialog, QLabel, QLineEdit, QPushButton, QSpinBox, QStyle, QStyledItemDelegate, QToolTip, QWidget,
 )
+from shiboken6 import isValid
 
 from ..application.types import COURSE_COLORS
 from . import icons, theme
@@ -590,6 +591,8 @@ class TimelineZoom(QObject):
 
     def apply(self):
         """Re-apply after the grid's data (and so its hour range) changed."""
+        if not isValid(self.scroll):  # a late timer, with the window already gone
+            return
         height = self._fit_height() if self.fit else self.level
         if height is not None:
             self.grid.set_hour_height(height)
@@ -685,6 +688,9 @@ class TwoLineDelegate(QStyledItemDelegate):
     INDENT = Qt.UserRole + 6
     COLLAPSED = Qt.UserRole + 7
     ALERT = Qt.UserRole + 8  # e.g. overdue: title in the danger colour
+    ADD = Qt.UserRole + 9  # a heading with a + to add something under it (appears under the mouse)
+    WRAP = Qt.UserRole + 10  # the title may take several lines, so nothing of it is lost
+    ADD_SIZE = 22
 
     CHECK = 18  # diameter of the round checkbox on checkable rows
 
@@ -694,7 +700,30 @@ class TwoLineDelegate(QStyledItemDelegate):
             return QSize(0, 34)
         if level == 2:
             return QSize(0, 28)
+        if index.data(self.WRAP):
+            return QSize(0, 54 + (self._title_height(option, index) - self._line_height(option)))
         return QSize(0, 54)
+
+    def _title_font(self, option):
+        return scaled_font(option.widget or self.parent(), 1.0, bold=True)
+
+    def _line_height(self, option) -> int:
+        return QFontMetrics(self._title_font(option)).height()
+
+    def _title_height(self, option, index) -> int:
+        """Height of a wrapped title in this row's width (colour dot and margins left out)."""
+        width = max(60, (option.widget.viewport().width() if option.widget else option.rect.width()) - 48)
+        return QFontMetrics(self._title_font(option)).boundingRect(
+            QRect(0, 0, width, 10_000), Qt.TextWordWrap, index.data(Qt.DisplayRole) or "").height()
+
+    def _add_rect(self, option) -> QRectF:
+        r = QRectF(option.rect)
+        return QRectF(r.right() - self.ADD_SIZE - 4, r.center().y() - self.ADD_SIZE / 2, self.ADD_SIZE, self.ADD_SIZE)
+
+    def take_add_click(self) -> bool:
+        """Whether the click being handled landed on a heading's +; asking forgets it."""
+        clicked, self._add_clicked = getattr(self, "_add_clicked", False), False
+        return clicked
 
     @staticmethod
     def _checked(index) -> bool:
@@ -708,6 +737,8 @@ class TwoLineDelegate(QStyledItemDelegate):
         return QRectF(r.left() + 10, r.top() + 17 - self.CHECK / 2 + 2, self.CHECK, self.CHECK)
 
     def editorEvent(self, event, model, option, index):
+        if index.data(self.ADD) and event.type() == QEvent.MouseButtonRelease:
+            self._add_clicked = self._add_rect(option).contains(event.position())
         # Clicking the round checkbox toggles the row's check state.
         if (index.data(Qt.CheckStateRole) is not None and not index.data(self.HEADER)
                 and event.type() == QEvent.MouseButtonRelease
@@ -742,6 +773,10 @@ class TwoLineDelegate(QStyledItemDelegate):
         p.setFont(font)
         count = str(index.data(self.COUNT) or "")
         count_w = QFontMetrics(font).horizontalAdvance(count) + 12
+        if index.data(self.ADD) and option.state & QStyle.State_MouseOver:  # the + takes the count's place
+            box = self._add_rect(option)
+            p.drawPixmap(int(box.left() + 4), int(box.top() + 4), icons.pixmap("plus", t.accent, int(self.ADD_SIZE - 8)))
+            count, count_w = "", self.ADD_SIZE + 8
         p.setPen(QColor(t.text if level == 1 else t.muted))
         title = QFontMetrics(font).elidedText(index.data(Qt.DisplayRole) or "", Qt.ElideRight,
                                              int(r.right() - x - count_w))
@@ -800,20 +835,26 @@ class TwoLineDelegate(QStyledItemDelegate):
             p.drawPixmap(int(right - 14), int(r.top() + 10), pin)
             right -= 20
 
-        title_font = scaled_font(option.widget or self.parent(), 1.0, bold=True)
+        title_font = self._title_font(option)
         title_font.setStrikeOut(checked)
         meta_font = scaled_font(option.widget or self.parent(), 0.85)
         p.setFont(title_font)
         alert = index.data(self.ALERT)
         p.setPen(QColor(t.faint if checked else t.danger if alert else t.text))
-        title = QFontMetrics(title_font).elidedText(index.data(Qt.DisplayRole) or "",
-                                                   Qt.ElideRight, int(right - x))
-        p.drawText(QRectF(x, r.top() + 6, right - x, 22), Qt.AlignLeft | Qt.AlignVCenter, title)
+        extra = 0
+        if index.data(self.WRAP):
+            extra = self._title_height(option, index) - self._line_height(option)
+            p.drawText(QRectF(x, r.top() + 8, right - x, 22 + extra), Qt.AlignLeft | Qt.AlignTop | Qt.TextWordWrap,
+                       index.data(Qt.DisplayRole) or "")
+        else:
+            title = QFontMetrics(title_font).elidedText(index.data(Qt.DisplayRole) or "",
+                                                        Qt.ElideRight, int(right - x))
+            p.drawText(QRectF(x, r.top() + 6, right - x, 22), Qt.AlignLeft | Qt.AlignVCenter, title)
         p.setFont(meta_font)
         p.setPen(QColor(t.muted))
         meta = QFontMetrics(meta_font).elidedText(index.data(self.META) or "", Qt.ElideRight,
                                                   int(r.right() - 10 - x))
-        p.drawText(QRectF(x, r.top() + 27, r.right() - 10 - x, 18),
+        p.drawText(QRectF(x, r.top() + 27 + extra, r.right() - 10 - x, 18),
                    Qt.AlignLeft | Qt.AlignVCenter, meta)
         p.restore()
 
