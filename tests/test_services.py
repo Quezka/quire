@@ -435,3 +435,129 @@ def test_topics_belong_to_their_notebook(services):
     other = services.notes.create("# e", topic="Otters", notebook_id=ideas)
     assert services.notes.rename_topic(None, "Otters", "Sea otters", zoo) == 2
     assert services.notes.note(other.id).topic == "Otters"
+
+
+def _medicine_services():
+    from quire.application.bus import ChangeBus
+    from quire.application.services import MedicineService
+    from quire.infrastructure.repositories import SqliteMedicineRepository
+    from quire.infrastructure.sqlite import SqliteDatabase
+    from datetime import datetime
+
+    class Clock:
+        moment = datetime(2026, 11, 4, 9, 0)  # a Wednesday
+
+        def now(self):
+            return self.moment
+
+        def today(self):
+            return self.moment.date()
+
+    clock = Clock()
+    return MedicineService(SqliteMedicineRepository(SqliteDatabase(":memory:")), clock, ChangeBus()), clock
+
+
+def test_medicine_plan_ticks_late_and_reminders():
+    from quire.application.inputs import MedicineInput
+    svc, clock = _medicine_services()
+    vit = svc.save(None, MedicineInput("Vitamin D", "1 tablet", (8 * 60, 20 * 60)))
+    svc.save(None, MedicineInput("Thursday only", "", (9 * 60,), (3,)))
+    doses = svc.day()
+    assert [(d.name, d.planned) for d in doses] == [("Vitamin D", 480), ("Vitamin D", 1200)]
+    assert [d.medicine_id for d in svc.due()] == [vit]
+    assert svc.due() == []  # each dose nudges once
+    assert not svc.day()[0].late  # 09:00 is exactly an hour after
+    clock.moment = clock.moment.replace(hour=9, minute=30)
+    assert svc.day()[0].late
+    svc.mark(vit, clock.today(), 480)
+    first = svc.day()[0]
+    assert first.done and first.taken and first.at == 9 * 60 + 30 and not first.late
+    svc.mark(vit, clock.today(), 480, taken=False)  # changed, not doubled
+    assert len(svc.day()) == 2 and svc.day()[0].done and not svc.day()[0].taken
+    svc.unmark(vit, clock.today(), 480)
+    assert not svc.day()[0].done
+
+
+def test_a_stopped_medicine_keeps_what_you_ticked_and_the_week_counts_only_what_was_due():
+    from dataclasses import replace
+    from datetime import timedelta
+    from quire.application.inputs import MedicineInput
+    svc, clock = _medicine_services()
+    m = svc.save(None, MedicineInput("A", "", (8 * 60, 20 * 60)))
+    svc.mark(m, clock.today(), 480)
+    assert (svc.week().planned, svc.week().taken) == (7 * 2 - 1, 1)  # tonight's isn't due yet
+    svc.save(m, MedicineInput("A", "", (8 * 60, 20 * 60), active=False))
+    assert [d.done for d in svc.day()] == [True]  # the ticked one stays on the day
+    assert svc.day(clock.today() + timedelta(days=1)) == []
+
+
+def test_medicine_rules_refuse_nonsense():
+    import pytest
+    from quire.application.inputs import MedicineInput
+    from quire.domain import ValidationError
+    svc, _clock = _medicine_services()
+    for bad in (MedicineInput(" "), MedicineInput("A", "", (480, 480)), MedicineInput("A", "", (2000,))):
+        with pytest.raises(ValidationError):
+            svc.save(None, bad)
+
+
+def test_money_parses_every_way_of_writing_it():
+    import pytest
+    from quire.domain import ValidationError
+    from quire.domain.finance import parse_cents
+    for text, cents in (("12,50", 1250), ("12.5", 1250), ("1.234,56", 123456), ("1,234.56", 123456), ("1234", 123400),
+                        ("€ 3", 300), ("0,05", 5), (",5", 50), ("1.234", 123400)):
+        assert parse_cents(text) == cents, text
+    for bad in ("", "abc", "1,2,x"):
+        with pytest.raises(ValidationError):
+            parse_cents(bad)
+
+
+def _finance():
+    from datetime import date, datetime
+    from quire.application.bus import ChangeBus
+    from quire.application.services import FinanceService
+    from quire.infrastructure.repositories import SqliteTransactionRepository
+    from quire.infrastructure.sqlite import SqliteDatabase
+
+    class Settings(dict):
+        def get(self, key, default=None):
+            return dict.get(self, key, default)
+
+        def set(self, key, value):
+            self[key] = value
+
+    class Clock:
+        def now(self):
+            return datetime(2026, 11, 4, 9, 0)
+
+        def today(self):
+            return date(2026, 11, 4)
+
+    return FinanceService(SqliteTransactionRepository(SqliteDatabase(":memory:")), Settings(), Clock(), ChangeBus())
+
+
+def test_a_month_adds_up_exactly_by_category_and_against_the_budget():
+    from datetime import date
+    import pytest
+    from quire.application.inputs import TransactionInput as T
+    from quire.domain import ValidationError
+    svc = _finance()
+    svc.add(T(date(2026, 11, 1), "1000", income=True, category="Pay"))
+    svc.add(T(date(2026, 11, 2), "0,10", category="Food"))
+    svc.add(T(date(2026, 11, 2), "0,20", category="Food"))
+    svc.add(T(date(2026, 11, 3), "50", category="Rent"))
+    svc.add(T(date(2026, 10, 31), "999", category="Food"))  # another month
+    o = svc.month(2026, 11)
+    assert (o.income, o.spent, o.balance) == (100000, 5030, 94970)  # 0,10 + 0,20 is exactly 0,30
+    assert o.categories == (("Rent", 5000), ("Food", 30))
+    assert [t.day.day for t in o.transactions] == [3, 2, 2, 1]
+    assert svc.categories()[0] == "Food"
+    svc.set_budget("40,00")
+    assert svc.month(2026, 11).budget == 4000
+    svc.set_budget("")
+    assert svc.month(2026, 11).budget is None
+    with pytest.raises(ValidationError):
+        svc.add(T(date(2026, 11, 3), "0"))
+    assert svc.csv(2026, 11)[1] == ["2026-11-01", "1000.00", "Pay", ""]
+    assert svc.csv(2026, 11)[2][1] == "-0.10"

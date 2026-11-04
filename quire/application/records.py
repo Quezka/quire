@@ -103,6 +103,58 @@ class WaterOverview:
 
 
 @dataclass(frozen=True)
+class MedicineRecord:
+    id: int
+    name: str
+    dose: str
+    times: tuple[int, ...]
+    weekdays: tuple[int, ...]
+    active: bool
+    notes: str
+
+
+@dataclass(frozen=True)
+class DoseRecord:
+    medicine_id: int
+    name: str
+    dose: str
+    day: date
+    planned: int  # minute of the day; -1 for an extra one
+    done: bool  # ticked, either way
+    taken: bool  # False with `done`: skipped on purpose
+    at: int | None
+    late: bool
+
+
+@dataclass(frozen=True)
+class MedicineWeek:
+    planned: int
+    taken: int
+
+
+@dataclass(frozen=True)
+class TransactionRecord:
+    id: int
+    day: date
+    cents: int
+    income: bool
+    category: str
+    note: str
+
+
+@dataclass(frozen=True)
+class MonthOverview:
+    year: int
+    month: int
+    income: int
+    spent: int
+    balance: int
+    categories: tuple[tuple[str, int], ...]  # what went out, biggest first
+    transactions: tuple[TransactionRecord, ...]  # newest first
+    budget: int | None
+
+
+@dataclass(frozen=True)
 class SleepRecord:
     day: date  # the day you woke up
     asleep: int

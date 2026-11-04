@@ -10,7 +10,7 @@ from .application.ports import (
     UpdateInstaller,
 )
 from .application.services import (
-    FocusService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
+    FinanceService, FocusService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
     SchoolSyncService, Services, StartupService, SyncService, TaskService, TimetableService,
     UpdateService, WorkService,
 )
@@ -22,7 +22,7 @@ from .infrastructure.ligature import LigatureApp
 from .infrastructure.login_item import platform_login_item
 from .infrastructure.quiet import platform_quiet
 from .infrastructure.repositories import (
-    SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteWaterRepository, SqliteFocusLogRepository, SqliteJobRepository,
+    SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteWaterRepository, SqliteMedicineRepository, SqliteTransactionRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
     SqliteImageRepository, SqliteKeyValueStore, SqliteNotebookRepository, SqliteNoteRepository, SqliteSchoolRecordRepository,
     SqliteShiftRepository, SqliteTaskRepository,
@@ -74,6 +74,8 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         sleep=SleepService(SqliteSleepRepository(db), settings, clock, bus,
                            SqliteFocusLogRepository(db)),
         water=WaterService(SqliteWaterRepository(db), settings, clock, bus),
+        medicine=MedicineService(SqliteMedicineRepository(db), clock, bus),
+        finance=FinanceService(SqliteTransactionRepository(db), settings, clock, bus),
         quiet=QuietService(planner, settings, clock, quiet or platform_quiet()),
         reminders=ReminderService(planner, settings, clock),
         sync=SyncService(SqliteSyncStore(db), cloud or RoutingCloud(),

@@ -7,6 +7,8 @@ from ..ports import Storage
 from .focus import FocusService, FocusStats
 from .quiet import QuietService, QuietSettings
 from .sleep import SleepService
+from .finance import FinanceService
+from .medicine import MedicineService
 from .water import WaterService
 from .notes import NoteService
 from .planner import PlannerService
@@ -35,6 +37,8 @@ class Services:
     focus: FocusService
     sleep: SleepService
     water: WaterService
+    medicine: MedicineService
+    finance: FinanceService
     quiet: QuietService  # Do Not Disturb while things are on
     reminders: ReminderService
     sync: SyncService  # between your devices, through a cloud account

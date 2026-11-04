@@ -51,6 +51,9 @@ SYNCED = (
     Synced("sleep", "sleep_logs", "'day:' || NEW.day"),  # one night per day, like the journal
     Synced("shift", "shifts", RANDOM_UID),
     Synced("focus", "focus_sessions", RANDOM_UID),
+    Synced("medicine", "medicines", RANDOM_UID),
+    Synced("dose", "medicine_doses", RANDOM_UID),  # after its medicine
+    Synced("money", "transactions", RANDOM_UID),
 )
 BY_KIND = {s.kind: s for s in SYNCED}
 ORDER = {s.kind: i for i, s in enumerate(SYNCED)}
@@ -203,6 +206,16 @@ class SqliteSyncStore:
             return {"day": r["day"], "body": r["body"]}
         if kind == "water":
             return {"day": r["day"], "at": r["at_min"], "ml": r["ml"]}
+        if kind == "medicine":
+            return {"name": r["name"], "dose": r["dose"], "notes": r["notes"], "active": bool(r["active"]),
+                    "times": [int(t) for t in r["times"].split(",") if t.strip().isdigit()],
+                    "weekdays": [int(d) for d in r["weekdays"].split(",") if d.strip().isdigit()]}
+        if kind == "dose":
+            return {"medicine": self._uid("medicines", r["medicine_id"]), "day": r["day"], "planned": r["planned"],
+                    "taken": bool(r["taken"]), "at": r["at_min"]}
+        if kind == "money":
+            return {"day": r["day"], "cents": r["cents"], "income": bool(r["income"]),
+                    "category": r["category"], "note": r["note"]}
         if kind == "sleep":
             return {"day": r["day"], "asleep": r["asleep"], "woke": r["woke"],
                     "quality": r["quality"], "note": r["note"]}
@@ -303,6 +316,19 @@ class SqliteSyncStore:
             values = {"day": d["day"], "body": d.get("body", "")}
         elif s.kind == "water":
             values = {"day": d["day"], "at_min": d["at"], "ml": d["ml"]}
+        elif s.kind == "medicine":
+            values = {"name": d["name"], "dose": d.get("dose", ""), "notes": d.get("notes", ""),
+                      "active": int(d.get("active", True)), "times": ",".join(str(t) for t in d.get("times", [])),
+                      "weekdays": ",".join(str(w) for w in d.get("weekdays", []))}
+        elif s.kind == "dose":
+            medicine = self._id("medicines", d.get("medicine"))
+            if medicine is None:
+                return False  # its medicine comes later
+            values = {"medicine_id": medicine, "day": d["day"], "planned": d["planned"],
+                      "taken": int(d.get("taken", True)), "at_min": d.get("at", 0)}
+        elif s.kind == "money":
+            values = {"day": d["day"], "cents": d["cents"], "income": int(d.get("income", False)),
+                      "category": d.get("category", ""), "note": d.get("note", "")}
         elif s.kind == "sleep":
             values = {"day": d["day"], "asleep": d["asleep"], "woke": d["woke"],
                       "quality": d.get("quality"), "note": d.get("note", "")}

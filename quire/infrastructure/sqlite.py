@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 17
+SCHEMA_VERSION = 18
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -87,6 +87,33 @@ CREATE TABLE IF NOT EXISTS water_logs (
     ml     INTEGER NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_water_day ON water_logs(day);
+CREATE TABLE IF NOT EXISTS medicines (
+    id       INTEGER PRIMARY KEY,
+    name     TEXT NOT NULL,
+    dose     TEXT NOT NULL DEFAULT '',
+    times    TEXT NOT NULL DEFAULT '',
+    weekdays TEXT NOT NULL DEFAULT '',
+    active   INTEGER NOT NULL DEFAULT 1,
+    notes    TEXT NOT NULL DEFAULT ''
+);
+CREATE TABLE IF NOT EXISTS medicine_doses (
+    id          INTEGER PRIMARY KEY,
+    medicine_id INTEGER NOT NULL REFERENCES medicines(id) ON DELETE CASCADE,
+    day         TEXT NOT NULL,
+    planned     INTEGER NOT NULL,
+    taken       INTEGER NOT NULL DEFAULT 1,
+    at_min      INTEGER NOT NULL DEFAULT 0
+);
+CREATE INDEX IF NOT EXISTS idx_dose_day ON medicine_doses(day);
+CREATE TABLE IF NOT EXISTS transactions (
+    id       INTEGER PRIMARY KEY,
+    day      TEXT NOT NULL,
+    cents    INTEGER NOT NULL,
+    income   INTEGER NOT NULL DEFAULT 0,
+    category TEXT NOT NULL DEFAULT '',
+    note     TEXT NOT NULL DEFAULT ''
+);
+CREATE INDEX IF NOT EXISTS idx_transaction_day ON transactions(day);
 CREATE TABLE IF NOT EXISTS grades (
     external_id TEXT PRIMARY KEY,
     subject     TEXT NOT NULL,

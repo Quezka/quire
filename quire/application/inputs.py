@@ -61,6 +61,25 @@ class WaterProfileInput:
 
 
 @dataclass(frozen=True)
+class MedicineInput:
+    name: str
+    dose: str = ""
+    times: tuple[int, ...] = ()
+    weekdays: tuple[int, ...] = ()  # none chosen: every day
+    active: bool = True
+    notes: str = ""
+
+
+@dataclass(frozen=True)
+class TransactionInput:
+    day: date
+    amount: str  # as typed: "12,50"
+    income: bool = False
+    category: str = ""
+    note: str = ""
+
+
+@dataclass(frozen=True)
 class RoutineInput:
     title: str
     minute: int

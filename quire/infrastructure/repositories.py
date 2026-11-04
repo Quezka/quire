@@ -5,6 +5,8 @@ from datetime import date, datetime, timedelta
 
 import json
 
+from ..domain.finance import Transaction
+from ..domain.medicine import DoseLog, Medicine
 from ..domain import (
     Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
     Lesson, Note, Notebook, NoteImage, Notice, NoticeAttachment, Routine, SchoolDocument, Shift, ShiftPattern, SleepLog, WaterLog,
@@ -366,6 +368,84 @@ class SqliteWaterRepository(_Repo):
 
     def delete(self, log_id):
         self._write("DELETE FROM water_logs WHERE id = ?", log_id)
+
+
+def _numbers(text: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in text.split(",") if x.strip().isdigit())
+
+
+def _joined(numbers) -> str:
+    return ",".join(str(n) for n in numbers)
+
+
+class SqliteMedicineRepository(_Repo):
+    @staticmethod
+    def _medicine(r) -> Medicine:
+        return Medicine(r["name"], r["dose"], _numbers(r["times"]), _numbers(r["weekdays"]), bool(r["active"]),
+                        r["notes"], r["id"])
+
+    @staticmethod
+    def _log(r) -> DoseLog:
+        return DoseLog(r["medicine_id"], date.fromisoformat(r["day"]), r["planned"], bool(r["taken"]), r["at_min"], r["id"])
+
+    def all(self):
+        return [self._medicine(r) for r in self._all("SELECT * FROM medicines ORDER BY name COLLATE NOCASE, id")]
+
+    def get(self, medicine_id):
+        row = self._one("SELECT * FROM medicines WHERE id = ?", medicine_id)
+        return self._medicine(row) if row else None
+
+    def add(self, m: Medicine) -> int:
+        return self._write("INSERT INTO medicines (name, dose, times, weekdays, active, notes) VALUES (?, ?, ?, ?, ?, ?)",
+                           m.name, m.dose, _joined(m.times), _joined(m.weekdays), int(m.active), m.notes)
+
+    def update(self, m: Medicine) -> None:
+        self._write("UPDATE medicines SET name = ?, dose = ?, times = ?, weekdays = ?, active = ?, notes = ? WHERE id = ?",
+                    m.name, m.dose, _joined(m.times), _joined(m.weekdays), int(m.active), m.notes, m.id)
+
+    def delete(self, medicine_id) -> None:
+        self._write("DELETE FROM medicines WHERE id = ?", medicine_id)
+
+    def logs_between(self, first, last):
+        return [self._log(r) for r in self._all("SELECT * FROM medicine_doses WHERE day BETWEEN ? AND ? ORDER BY day, id",
+                                                first.isoformat(), last.isoformat())]
+
+    def add_log(self, log: DoseLog) -> int:
+        return self._write("INSERT INTO medicine_doses (medicine_id, day, planned, taken, at_min) VALUES (?, ?, ?, ?, ?)",
+                           log.medicine_id, log.day.isoformat(), log.planned, int(log.taken), log.at)
+
+    def delete_log(self, log_id) -> None:
+        self._write("DELETE FROM medicine_doses WHERE id = ?", log_id)
+
+
+class SqliteTransactionRepository(_Repo):
+    @staticmethod
+    def _transaction(r) -> Transaction:
+        return Transaction(date.fromisoformat(r["day"]), r["cents"], bool(r["income"]), r["category"], r["note"], r["id"])
+
+    def between(self, first, last):
+        return [self._transaction(r) for r in self._all(
+            "SELECT * FROM transactions WHERE day BETWEEN ? AND ? ORDER BY day, id", first.isoformat(), last.isoformat())]
+
+    def get(self, transaction_id):
+        row = self._one("SELECT * FROM transactions WHERE id = ?", transaction_id)
+        return self._transaction(row) if row else None
+
+    def add(self, t: Transaction) -> int:
+        return self._write("INSERT INTO transactions (day, cents, income, category, note) VALUES (?, ?, ?, ?, ?)",
+                           t.day.isoformat(), t.cents, int(t.income), t.category, t.note)
+
+    def update(self, t: Transaction) -> None:
+        self._write("UPDATE transactions SET day = ?, cents = ?, income = ?, category = ?, note = ? WHERE id = ?",
+                    t.day.isoformat(), t.cents, int(t.income), t.category, t.note, t.id)
+
+    def delete(self, transaction_id) -> None:
+        self._write("DELETE FROM transactions WHERE id = ?", transaction_id)
+
+    def categories(self):
+        return [r["category"] for r in self._all(
+            "SELECT category, COUNT(*) AS n FROM transactions WHERE category != '' GROUP BY category"
+            " ORDER BY n DESC, category COLLATE NOCASE")]
 
 
 class SqliteSchoolRecordRepository(_Repo):

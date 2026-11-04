@@ -620,3 +620,27 @@ def test_the_router_sends_each_call_to_its_backend():
     assert [c[0] for c in firebase.calls] == ["sign_in"]
     assert [c[0] for c in server.calls] == ["sign_up", "refresh"]
     assert server.calls[0][1] == (new, "a@b.c", "pw", "code")
+
+
+def test_medicines_doses_and_money_reach_the_other_device(pair):
+    from datetime import date
+    from quire.application.inputs import MedicineInput, TransactionInput
+    a, b = pair
+    medicine = a.medicine.save(None, MedicineInput("Vitamin D", "1 tablet", (480, 1200), (0, 3), True, "with food"))
+    a.medicine.mark(medicine, a.planner.today(), 480)
+    a.finance.add(TransactionInput(date(2026, 11, 4), "12,50", False, "Food", "lunch"))
+    a.sync.sync()
+    b.sync.sync()
+    there = b.medicine.medicines()[0]
+    assert (there.name, there.dose, there.times, there.weekdays, there.notes) == (
+        "Vitamin D", "1 tablet", (480, 1200), (0, 3), "with food")
+    logs = b.medicine._repo.logs_between(a.planner.today(), a.planner.today())
+    assert [(l.medicine_id, l.planned, l.taken) for l in logs] == [(there.id, 480, True)]
+    t = b.finance.month(2026, 11).transactions[0]
+    assert (t.cents, t.income, t.category, t.note) == (1250, False, "Food", "lunch")
+    tick()
+    b.medicine.delete(there.id)
+    b.sync.sync()
+    a.sync.sync()
+    assert a.medicine.medicines() == []
+    assert a.medicine._repo.logs_between(a.planner.today(), a.planner.today()) == []

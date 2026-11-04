@@ -27,6 +27,8 @@ from .sync_ui import SyncRunner
 from .updates_ui import UpdateChecker
 from .views.focus import FocusView
 from .views.sleep import SleepView
+from .views.finance import FinanceView
+from .views.medicine import MedicineView
 from .views.water import WaterView
 from .views.work import WorkView
 from .i18n import N_, _
@@ -74,7 +76,7 @@ class Sidebar(QFrame):
 
     def add_page(self, icon_name: str, text: str, shortcut: str) -> QToolButton:
         button = self.nav_button(icon_name, text)
-        button.setToolTip(f"{text}  ({shortcut})")
+        button.setToolTip(f"{text}  ({shortcut})" if shortcut else text)
         self.group.addButton(button, len(self.group.buttons()))
         self.nav.addWidget(button)
         return button
@@ -83,7 +85,8 @@ class Sidebar(QFrame):
 class MainWindow(QMainWindow):
     PAGES = [("today", N_("Today")), ("week", N_("Week")), ("coursework", N_("Coursework")),
              ("notes", N_("Notes")), ("school", N_("School")), ("briefcase", N_("Work")),
-             ("timer", N_("Focus")), ("moon", N_("Sleep")), ("drop", N_("Water"))]
+             ("timer", N_("Focus")), ("moon", N_("Sleep")), ("drop", N_("Water")),
+             ("pill", N_("Medicines")), ("wallet", N_("Money"))]
 
     def __init__(self, services: Services, tray=None):
         super().__init__()
@@ -106,15 +109,17 @@ class MainWindow(QMainWindow):
         self.focus = FocusView(services, relay)
         self.sleep = SleepView(services, relay)
         self.water = WaterView(services, relay)
+        self.medicine = MedicineView(services, relay)
+        self.finance = FinanceView(services, relay)
 
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         for i, (page, (icon_name, label)) in enumerate(zip(
                 [self.today, self.week, self.coursework, self.notes, self.school, self.work,
-                 self.focus, self.sleep, self.water],
+                 self.focus, self.sleep, self.water, self.medicine, self.finance],
                 self.PAGES)):
             self.stack.addWidget(page)
-            self.sidebar.add_page(icon_name, _(label), f"Ctrl+{i + 1}")
+            self.sidebar.add_page(icon_name, _(label), f"Ctrl+{i + 1}" if i < 9 else "")
         self.sidebar.group.idClicked.connect(self.show_page)
         self.school.newsChanged.connect(self._school_news)
         self.focus.statusChanged.connect(self._focus_status)
@@ -177,7 +182,7 @@ class MainWindow(QMainWindow):
         self.addAction(action)
 
     def _shortcuts(self):
-        for i in range(len(self.PAGES)):
+        for i in range(min(9, len(self.PAGES))):
             self._shortcut(f"Ctrl+{i + 1}", lambda _checked=False, i=i: self.show_page(i))
         self._shortcut("Ctrl+N", self.new_note)
         self._shortcut("Ctrl+Q", self.quit_app)
