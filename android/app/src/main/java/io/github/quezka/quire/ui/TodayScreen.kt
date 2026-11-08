@@ -84,6 +84,16 @@ import io.github.quezka.quire.domain.ItemKind
 import io.github.quezka.quire.domain.Task
 import io.github.quezka.quire.domain.TaskKind
 import kotlinx.coroutines.delay
+import androidx.compose.runtime.produceState
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.layout.size
+import io.github.quezka.quire.Container
+import io.github.quezka.quire.domain.Agenda
 import kotlinx.coroutines.launch
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
@@ -95,10 +105,21 @@ private const val TODAY_PAGE = DAYS / 2
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun TodayScreen(repo: Repository, version: Int, openTask: (String) -> Unit, newTask: (LocalDate) -> Unit) {
-    val today = repo.today()
-    val pager = rememberPagerState(initialPage = TODAY_PAGE) { DAYS }
+fun TodayScreen(container: Container, version: Int, openTask: (String) -> Unit, newTask: (LocalDate) -> Unit) {
+    val repo = container.repository
     val scope = rememberCoroutineScope()
+    val today = repo.today()
+    val snackbar = remember { SnackbarHostState() }
+    val undoLabel = stringResource(R.string.quick_undo)
+    fun showLogged(logged: Logged) {
+        scope.launch {
+            snackbar.currentSnackbarData?.dismiss()
+            val result = snackbar.showSnackbar(logged.message, actionLabel = if (logged.undo != null) undoLabel else null,
+                duration = SnackbarDuration.Short)
+            if (result == SnackbarResult.ActionPerformed) logged.undo?.invoke()
+        }
+    }
+    val pager = rememberPagerState(initialPage = TODAY_PAGE) { DAYS }
     val context = LocalContext.current
     fun dayOf(page: Int): LocalDate = today.plusDays((page - TODAY_PAGE).toLong())
     fun pageOf(day: LocalDate) = TODAY_PAGE + ChronoUnit.DAYS.between(today, day).toInt()
@@ -140,7 +161,8 @@ fun TodayScreen(repo: Repository, version: Int, openTask: (String) -> Unit, newT
                     }
                 },
             )
-            HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1,
+            // Swiping sideways moves between Today, Week, Tasks and Notes; the day changes with the arrows above.
+            HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, userScrollEnabled = false,
                 key = { it }) { page ->
                 // Neighbouring days fade and shrink a little as they slide in.
                 val offset = ((pager.currentPage - page) + pager.currentPageOffsetFraction).absoluteValue.coerceIn(0f, 1f)
@@ -149,10 +171,11 @@ fun TodayScreen(repo: Repository, version: Int, openTask: (String) -> Unit, newT
                     val scale = 1f - offset * 0.04f
                     scaleX = scale; scaleY = scale
                 }) {
-                    DayPage(repo, version, dayOf(page), today, openTask, onItem = { editing = it })
+                    DayPage(container, version, dayOf(page), today, openTask, onItem = { editing = it }, logged = ::showLogged)
                 }
             }
         }
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))
         FloatingActionButton(onClick = { menu = true },
             modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)) {
             val turn by animateFloatAsState(if (menu) 45f else 0f, Motion.bouncy(), label = "fab")
@@ -182,9 +205,20 @@ fun TodayScreen(repo: Repository, version: Int, openTask: (String) -> Unit, newT
 
 /** One day: schedule, tasks, quick add and the day note. */
 @Composable
-private fun DayPage(repo: Repository, version: Int, day: LocalDate, today: LocalDate,
-                    openTask: (String) -> Unit, onItem: (AgendaItem) -> Unit) {
+private fun DayPage(container: Container, version: Int, day: LocalDate, today: LocalDate,
+                    openTask: (String) -> Unit, onItem: (AgendaItem) -> Unit, logged: (Logged) -> Unit) {
+    val repo = container.repository
     val agenda = remember(version, day) { repo.day(day) }
+    // The minute of the day, ticking, for the "now" line (today only).
+    val minute by produceState(repo.now().let { it.hour * 60 + it.minute }, day) {
+        while (true) {
+            val n = repo.now()
+            value = n.hour * 60 + n.minute
+            delay((60 - n.second) * 1000L)
+        }
+    }
+    val isToday = day == today
+    val nowAt = if (isToday) Agenda.nowIndex(agenda.items, minute) else -1
     val courses = remember(version) { repo.courseIndex() }
     LazyColumn(
         // Edge-to-edge: the window no longer resizes for the keyboard, so lift the list
@@ -193,11 +227,21 @@ private fun DayPage(repo: Repository, version: Int, day: LocalDate, today: Local
         contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 96.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
+        if (isToday) {
+            item(key = "quick-title") { SectionTitle(stringResource(R.string.quick_log)) }
+            item(key = "quick") { QuickLog(container, version, logged) }
+        }
         item(key = "schedule") { SectionTitle(stringResource(R.string.schedule)) }
         if (agenda.items.isEmpty()) item(key = "no-items") { Hint(stringResource(R.string.nothing_scheduled)) }
-        items(agenda.items, key = { "${it.kind}-${it.refUid}-${it.start}-${it.continues}" }) {
-            Box(Modifier.animateItem()) { AgendaRow(it, onClick = { onItem(it) }) }
+        agenda.items.forEachIndexed { index, it ->
+            if (index == nowAt) item(key = "now") { NowLine(minute) }
+            item(key = "${it.kind}-${it.refUid}-${it.start}-${it.continues}") {
+                Box(Modifier.animateItem().graphicsLayer { alpha = if (isToday && Agenda.isOver(it, minute)) 0.55f else 1f }) {
+                    AgendaRow(it, onClick = { onItem(it) }, progress = if (isToday) Agenda.progress(it, minute) else null)
+                }
+            }
         }
+        if (nowAt == agenda.items.size && agenda.items.isNotEmpty()) item(key = "now") { NowLine(minute) }
 
         item(key = "todo") { SectionTitle(stringResource(R.string.to_do)) }
         if (agenda.tasks.isEmpty()) item(key = "no-tasks") { Hint(stringResource(R.string.nothing_due)) }
@@ -226,8 +270,21 @@ fun Hint(text: String) {
         color = MaterialTheme.colorScheme.onSurfaceVariant)
 }
 
+/** Today's "now": a line with the time, between what has started and what hasn't, like the desktop's. */
 @Composable
-fun AgendaRow(item: AgendaItem, onClick: (() -> Unit)? = null) {
+private fun NowLine(minute: Int) {
+    val c = MaterialTheme.colorScheme
+    Row(Modifier.fillMaxWidth().padding(vertical = 2.dp), verticalAlignment = Alignment.CenterVertically) {
+        Text(minutes(minute), color = c.onPrimary, fontWeight = FontWeight.Bold,
+            style = MaterialTheme.typography.labelLarge,
+            modifier = Modifier.background(c.primary, RoundedCornerShape(10.dp)).padding(horizontal = 8.dp, vertical = 3.dp))
+        Box(Modifier.size(8.dp).background(c.primary, CircleShape))
+        Box(Modifier.weight(1f).height(2.dp).background(c.primary))
+    }
+}
+
+@Composable
+fun AgendaRow(item: AgendaItem, onClick: (() -> Unit)? = null, progress: Float? = null) {
     val kind = stringResource(when (item.kind) {
         ItemKind.CLASS -> R.string.kind_class
         ItemKind.EVENT -> R.string.kind_event
@@ -238,7 +295,7 @@ fun AgendaRow(item: AgendaItem, onClick: (() -> Unit)? = null) {
         .filter { it.isNotBlank() }
     val source = remember { MutableInteractionSource() }
     Card(
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+        colors = CardDefaults.cardColors(containerColor = Glass.surface()), border = Glass.edge(),
         shape = RoundedCornerShape(14.dp),
         modifier = Modifier.pressScale(source).then(
             if (onClick != null) Modifier.clickable(source, null, onClick = onClick) else Modifier),
@@ -257,6 +314,9 @@ fun AgendaRow(item: AgendaItem, onClick: (() -> Unit)? = null) {
                 Text(meta.joinToString(" · "), style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant, maxLines = 2,
                     overflow = TextOverflow.Ellipsis)
+                if (progress != null) LinearProgressIndicator(progress = { progress },
+                    modifier = Modifier.fillMaxWidth().padding(top = 6.dp).height(4.dp),
+                    color = parseColor(item.color), trackColor = MaterialTheme.colorScheme.surfaceVariant)
             }
         }
     }

@@ -892,7 +892,7 @@ def test_sync_setup_dialog_and_background_sync(window, services, cloud, app):
     from quire.presentation.sync_ui import SyncSetupDialog
 
     settings = SettingsDialog(services, lambda: None, window, window.sync)
-    assert settings.sync_setup.text() == "Set up sync…" and not settings.sync_now.isVisible()
+    assert settings.sync_setup.text() == "Set up sync…" and not (not settings.sync_now.isHidden())
 
     dialog = SyncSetupDialog(services, settings)
     assert dialog.create.isChecked() and not dialog.take_cloud.isVisibleTo(dialog)
@@ -948,7 +948,7 @@ def test_sync_setup_dialog_and_background_sync(window, services, cloud, app):
     assert status.pending == 0 and status.last_sync is not None and cloud.docs  # demo data sent
     settings._show_sync()
     assert "me@example.com" in settings.sync_status.text()
-    assert settings.sync_now.isVisibleTo(settings) and settings.sync_off.isVisibleTo(settings)
+    assert (not settings.sync_now.isHidden()) and (not settings.sync_off.isHidden())
 
     cloud.offline = True
     window.sync.sync_now()
@@ -1218,3 +1218,36 @@ def test_changing_week_slides_and_cleans_up(window, services, app):
     week.slider.finish()
     assert week.anchor == TODAY
     assert not any(label.isVisible() for label in labels)
+
+
+def test_quick_log_on_the_main_page(window, services, app, monkeypatch):
+    from quire.application.inputs import MedicineInput
+    from quire.presentation.views import quick_log
+
+    log = window.today.quick_log
+    before = services.water.overview().drunk
+    log.water.click()
+    assert services.water.overview().drunk == before + services.water.profile().glass_ml
+    log.undo.click()
+    assert services.water.overview().drunk == before
+
+    assert services.sleep.asleep_since() is None
+    log.sleep.click()
+    assert services.sleep.asleep_since() is not None and log.sleep.text() == "Sleep\nwoke up"
+    log.undo.click()
+    assert services.sleep.asleep_since() is None
+
+    services.medicine.save(None, MedicineInput("Vitamin D", "1 tablet", (23 * 60 + 59,)))
+    log.refresh()
+    assert log.medicine.isEnabled() and "Vitamin D" in log.medicine.text()
+    log.medicine.click()
+    assert services.medicine.pending() == [] and not log.medicine.isEnabled()
+
+    class Typed(quick_log.ExpenseDialog):
+        def exec(self):
+            self.amount.setText("4,50")
+            self.what.setText("coffee")
+            return True
+    monkeypatch.setattr(quick_log, "ExpenseDialog", Typed)
+    log.expense.click()
+    assert "coffee" in log.status.text()

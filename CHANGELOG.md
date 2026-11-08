@@ -4,6 +4,21 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.42.0] - 2026-11-08
+
+### Added
+- **Quick log on the main page, on both apps:** one tap for a glass of water, going to sleep / waking up, the next medicine taken, or an expense, with Undo. Right-click (computer) or long-press (phone) offers other amounts and the other medicines due.
+- **Phone: swipe sideways to move between Today, Week, Tasks, Notes and More.** The day and the week now change with the arrows at the top.
+- **Phone: a "now" line on Today**, with the time, between what has started and what hasn't, like the computer's. What's over is dimmed, and what's on now shows how far through it is.
+- **Glass look:** frosted, see-through surfaces over a soft wash of colour, on top of Material 3, with brighter colours. Settings → Look turns it off; High contrast stays solid.
+
+### Changed
+- **Settings is redone in the new look:** sections on the left (Look, Money, Reminders, Sync, Startup, Your data), cards of rows with switches, nothing cut off on a small screen. Every other window (events, tasks, courses…) has its title on top and a filled Save button.
+
+### Fixed
+- **Phone notes: the cursor goes where you tap again,** and dragging its handle or sliding on the keyboard's space bar moves it. The editor placed it at the start of the run of text instead, and some keyboards closed the app.
+- Phone notes: no empty band between the formatting bar and the keyboard.
+
 ## [0.41.0] - 2026-11-04
 
 ### Changed

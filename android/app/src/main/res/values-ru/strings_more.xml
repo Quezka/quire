@@ -413,4 +413,24 @@
     <string name="water_on_goal">%1$d из последних 7 дней с выполненной нормой</string>
     <string name="water_average">%1$d мл в день за неделю</string>
     <string name="water_manual">Дневная норма, мл (пусто: по росту и весу)</string>
+    <string name="quick_log">Быстрая запись</string>
+    <string name="quick_water">Вода</string>
+    <string name="quick_sleep">Сон</string>
+    <string name="quick_going_to_bed">Иду спать</string>
+    <string name="quick_woke_up">Проснулся</string>
+    <string name="quick_medicines">Лекарства</string>
+    <string name="quick_took">Принял %1$s</string>
+    <string name="quick_none_due">Сейчас нет</string>
+    <string name="quick_money">Деньги</string>
+    <string name="quick_add_expense">Добавить расход</string>
+    <string name="quick_add_expense_title">Добавить расход</string>
+    <string name="quick_amount">Сумма</string>
+    <string name="quick_what_for">На что (необязательно)</string>
+    <string name="quick_not_amount">Это не сумма.</string>
+    <string name="quick_logged_water">Записано %1$d мл воды.</string>
+    <string name="quick_good_night">Спокойной ночи. Утром нажмите «Проснулся».</string>
+    <string name="quick_good_morning">Доброе утро. Ночь записана.</string>
+    <string name="quick_took_done">%1$s отмечено как принятое.</string>
+    <string name="quick_spent">Потрачено %1$s.</string>
+    <string name="quick_undo">Отменить</string>
 </resources>

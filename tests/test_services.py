@@ -478,6 +478,16 @@ def test_medicine_plan_ticks_late_and_reminders():
     assert not svc.day()[0].done
 
 
+def test_pending_doses_put_the_next_one_first_and_drop_ticked_ones():
+    from quire.application.inputs import MedicineInput
+    svc, clock = _medicine_services()
+    vit = svc.save(None, MedicineInput("Vitamin D", "1 tablet", (20 * 60, 8 * 60)))
+    iron = svc.save(None, MedicineInput("Iron", "", (12 * 60,)))
+    assert [(d.medicine_id, d.planned) for d in svc.pending()] == [(vit, 480), (iron, 720), (vit, 1200)]
+    svc.mark(vit, clock.today(), 480)
+    assert [(d.medicine_id, d.planned) for d in svc.pending()] == [(iron, 720), (vit, 1200)]
+
+
 def test_a_stopped_medicine_keeps_what_you_ticked_and_the_week_counts_only_what_was_due():
     from dataclasses import replace
     from datetime import timedelta

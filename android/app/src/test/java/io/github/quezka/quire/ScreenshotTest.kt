@@ -75,8 +75,8 @@ class ScreenshotTest {
 
     @Composable
     private fun Shell(tab: Int, content: @Composable () -> Unit) = QuireTheme {
-        Scaffold(bottomBar = {
-            NavigationBar {
+        Scaffold(containerColor = androidx.compose.ui.graphics.Color.Transparent, bottomBar = {
+            NavigationBar(containerColor = androidx.compose.material3.MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)) {
                 listOf(R.string.nav_today to Icons.Filled.Today, R.string.nav_week to Icons.Filled.CalendarViewWeek,
                     R.string.nav_tasks to Icons.Filled.CheckCircle, R.string.nav_notes to Icons.AutoMirrored.Filled.Notes,
                     R.string.nav_more to Icons.Filled.GridView)
@@ -120,8 +120,8 @@ class ScreenshotTest {
     }
 
     @Test fun today() {
-        val repo = repo()
-        compose.setContent { Shell(0) { TodayScreen(repo, 0, {}, {}) } }
+        val c = container()
+        compose.setContent { Shell(0) { TodayScreen(c, 0, {}, {}) } }
         shoot("today")
     }
 

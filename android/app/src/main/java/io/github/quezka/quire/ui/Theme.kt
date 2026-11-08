@@ -7,6 +7,10 @@ import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.luminance
+import androidx.compose.ui.unit.dp
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.ui.text.font.Font
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -29,34 +33,77 @@ private val SuiteType = Typography().run {
 
 /** The suite's palette, the same as the desktop's (quezka_ui/theme.py), Cadence's and Vesper's. */
 internal val Light = lightColorScheme(
-    primary = Color(0xFF4B4BC8), onPrimary = Color.White,
-    primaryContainer = Color(0xFFDDDCFB), onPrimaryContainer = Color(0xFF23236E),
-    secondaryContainer = Color(0xFFDDDCFB), onSecondaryContainer = Color(0xFF23236E),
-    background = Color(0xFFF6F5FC), onBackground = Color(0xFF0E1116),
-    surface = Color(0xFFF6F5FC), onSurface = Color(0xFF0E1116),
-    surfaceVariant = Color(0xFFE9E8F6), onSurfaceVariant = Color(0xFF3F4654),
-    surfaceContainer = Color(0xFFEEEDF8), surfaceContainerLow = Color(0xFFFFFFFF),
-    surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFE9E8F6),
-    outline = Color(0xFFB9BEC9), outlineVariant = Color(0xFFDFE2EA),
-    error = Color(0xFFC4262C), tertiary = Color(0xFF1F7A4D),
+    primary = Color(0xFF4F46E5), onPrimary = Color.White,
+    primaryContainer = Color(0xFFDCDBFF), onPrimaryContainer = Color(0xFF1E1A78),
+    secondaryContainer = Color(0xFFDCDBFF), onSecondaryContainer = Color(0xFF1E1A78),
+    background = Color(0xFFF3F2FF), onBackground = Color(0xFF0B0D14),
+    surface = Color(0xFFF3F2FF), onSurface = Color(0xFF0B0D14),
+    surfaceVariant = Color(0xFFE9E8FF), onSurfaceVariant = Color(0xFF343B4D),
+    surfaceContainer = Color(0xFFECEAFF), surfaceContainerLow = Color(0xFFFFFFFF),
+    surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFE9E8FF),
+    outline = Color(0xFFB3B6CC), outlineVariant = Color(0xFFDEDCF7),
+    error = Color(0xFFD0262D), tertiary = Color(0xFF127A46),
 )
 
 internal val Dark = darkColorScheme(
-    primary = Color(0xFF9A9BFF), onPrimary = Color(0xFF0E0F11),
-    primaryContainer = Color(0xFF35366B), onPrimaryContainer = Color(0xFFE2E2FF),
-    secondaryContainer = Color(0xFF35366B), onSecondaryContainer = Color(0xFFE2E2FF),
-    background = Color(0xFF111119), onBackground = Color(0xFFF4F5F7),
-    surface = Color(0xFF111119), onSurface = Color(0xFFF4F5F7),
-    surfaceVariant = Color(0xFF28283A), onSurfaceVariant = Color(0xFFC3C8D2),
-    surfaceContainer = Color(0xFF16161F), surfaceContainerLow = Color(0xFF1B1B25),
-    surfaceContainerHigh = Color(0xFF1B1B25), surfaceContainerHighest = Color(0xFF28283A),
-    outline = Color(0xFF4A4E57), outlineVariant = Color(0xFF2C2F35),
-    error = Color(0xFFFF7B80), tertiary = Color(0xFF4FE39B),
+    primary = Color(0xFFA9A6FF), onPrimary = Color(0xFF0B0B14),
+    primaryContainer = Color(0xFF3B3984), onPrimaryContainer = Color(0xFFE4E3FF),
+    secondaryContainer = Color(0xFF3B3984), onSecondaryContainer = Color(0xFFE4E3FF),
+    background = Color(0xFF0E0E19), onBackground = Color(0xFFF6F7FB),
+    surface = Color(0xFF0E0E19), onSurface = Color(0xFFF6F7FB),
+    surfaceVariant = Color(0xFF27273F), onSurfaceVariant = Color(0xFFCBCFDD),
+    surfaceContainer = Color(0xFF13131F), surfaceContainerLow = Color(0xFF1A1A2B),
+    surfaceContainerHigh = Color(0xFF1A1A2B), surfaceContainerHighest = Color(0xFF27273F),
+    outline = Color(0xFF4B4E66), outlineVariant = Color(0xFF2D2D47),
+    error = Color(0xFFFF7B80), tertiary = Color(0xFF4ADE80),
 )
+
+/** The pink glow at the far corner of the glass wash, the same as the desktop kit's `GLOW`. */
+internal val Glow = Color(0xFFEC4899)
+
+/**
+ * Liquid glass on top of Material 3, like the desktop suite: the screen shows a soft colour wash and surfaces are
+ * translucent with a bright top edge. Text keeps its solid colours, so its contrast never drops.
+ */
+object Glass {
+    /** How opaque a frosted surface is. */
+    const val tint = 0.72f
+
+    @Composable
+    fun edge(): androidx.compose.foundation.BorderStroke {
+        val dark = MaterialTheme.colorScheme.background.luminance() < 0.5f
+        return androidx.compose.foundation.BorderStroke(1.dp, androidx.compose.ui.graphics.Brush.verticalGradient(
+            listOf(Color.White.copy(alpha = if (dark) 0.16f else 0.95f), Color.White.copy(alpha = if (dark) 0.04f else 0.35f))))
+    }
+
+    /** The colour wash behind everything: the accent from the top left, a warm glow at the bottom right. */
+    @Composable
+    fun wash(): androidx.compose.ui.graphics.Brush {
+        val c = MaterialTheme.colorScheme
+        val dark = c.background.luminance() < 0.5f
+        return androidx.compose.ui.graphics.Brush.linearGradient(listOf(
+            androidx.compose.ui.graphics.lerp(c.background, c.primary, if (dark) 0.20f else 0.16f),
+            c.background,
+            androidx.compose.ui.graphics.lerp(c.background, Glow, if (dark) 0.13f else 0.10f)))
+    }
+
+    /** A frosted surface colour for cards and bars. */
+    @Composable
+    fun surface(): Color = MaterialTheme.colorScheme.surfaceContainerLow.copy(alpha = tint)
+}
 
 @Composable
 fun QuireTheme(content: @Composable () -> Unit) {
-    MaterialTheme(colorScheme = if (isSystemInDarkTheme()) Dark else Light, typography = SuiteType, content = content)
+    val solid = if (isSystemInDarkTheme()) Dark else Light
+    // Glass: the screen's own background and the bars on it are see-through, over one colour wash drawn here.
+    // Sheets, dialogs and menus keep their solid containers, so what's on them stays easy to read.
+    val glass = solid.copy(background = Color.Transparent, surface = Color.Transparent)
+    MaterialTheme(colorScheme = solid, typography = SuiteType) {
+        androidx.compose.foundation.layout.Box(androidx.compose.ui.Modifier.fillMaxSize()
+            .background(solid.background).background(Glass.wash())) {
+            MaterialTheme(colorScheme = glass, typography = SuiteType, content = content)
+        }
+    }
 }
 
 fun parseColor(hex: String): Color =

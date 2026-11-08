@@ -86,12 +86,14 @@ class Repository(
     fun waterLogs(): List<WaterLog> = records.live("water").mapNotNull(Codec::water).sortedWith(compareBy({ it.day }, { it.at }))
     fun waterOn(day: LocalDate): List<WaterLog> = waterLogs().filter { it.day == day }
     /** Now or, for a day you forgot, on that day at the same time of day. */
-    fun addWater(ml: Int, day: LocalDate? = null) {
+    /** Returns the new entry's uid, so it can be undone. */
+    fun addWater(ml: Int, day: LocalDate? = null): String {
         require(ml in 1..io.github.quezka.quire.domain.WATER_MAX_SIP) { "Not a sensible amount" }
         val n = now()
         val log = WaterLog(Codec.newUid(), day ?: n.toLocalDate(), n.hour * 60 + n.minute, ml)
         records.save("water", log.uid, Codec.waterData(log, null))
         changed()
+        return log.uid
     }
     fun deleteWater(uid: String) {
         records.delete("water", uid)

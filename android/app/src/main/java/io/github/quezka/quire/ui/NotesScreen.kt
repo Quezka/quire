@@ -413,7 +413,7 @@ private fun NoteCard(note: Note, course: io.github.quezka.quire.domain.Course?, 
     Card(Modifier.fillMaxWidth().pressScale(source)
         .combinedClickable(source, null, onClick = onOpen, onLongClick = onPin),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        colors = CardDefaults.cardColors(containerColor = Glass.surface()), border = Glass.edge()) {
         Row(Modifier.fillMaxWidth().height(IntrinsicSize.Min)) {
             Box(Modifier.width(5.dp).fillMaxHeight()
                 .background((course?.color ?: notebook?.color)?.let { parseColor(it) } ?: Color.Transparent))

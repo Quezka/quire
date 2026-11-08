@@ -37,6 +37,9 @@ object Doses {
         return plan.sortedWith(compareBy({ if (it.planned >= 0) it.planned else it.log?.at ?: 0 }, { it.medicine.name.lowercase() }))
     }
 
+    /** Doses of the plan still to take, the next one first: what "Took …" on the main page ticks. */
+    fun pending(plan: List<PlannedDose>): List<PlannedDose> = plan.filter { !it.done && it.planned >= 0 }.sortedBy { it.planned }
+
     fun isLate(dose: PlannedDose, minute: Int) = !dose.done && dose.planned >= 0 && minute > dose.planned + LATE_AFTER
 
     fun dueNow(dose: PlannedDose, minute: Int) =

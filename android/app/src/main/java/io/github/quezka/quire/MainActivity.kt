@@ -11,6 +11,11 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.layout.consumeWindowInsets
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.ui.graphics.Color
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -99,32 +104,37 @@ class MainActivity : ComponentActivity() {
                 AnimatedContent(openNote, transitionSpec = { push(forward = targetState != null) },
                     label = "note") { note ->
                     if (note != null) {
-                        Scaffold { padding ->
-                            Box(Modifier.padding(padding)) {
+                        Scaffold(containerColor = Color.Transparent) { padding ->
+                            // The editor lifts itself above the keyboard; the bar's own inset is already in `padding`.
+                            Box(Modifier.padding(padding).consumeWindowInsets(padding)) {
                                 NoteEditor(container.repository, version, note) { openNote = null }
                             }
                         }
                     } else {
-                        Scaffold(bottomBar = {
-                            NavigationBar {
-                                val tabs = listOf(
+                        val tabs = rememberPagerState(initialPage = tab) { 5 }
+                        // The bar and the pages follow each other: a swipe changes the tab, a tap slides the pages.
+                        LaunchedEffect(tab) { if (tabs.currentPage != tab) tabs.animateScrollToPage(tab) }
+                        LaunchedEffect(tabs.settledPage) { tab = tabs.settledPage }
+                        Scaffold(containerColor = Color.Transparent, bottomBar = {
+                            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)) {
+                                val items = listOf(
                                     Triple(R.string.nav_today, Icons.Filled.Today, 0),
                                     Triple(R.string.nav_week, Icons.Filled.CalendarViewWeek, 1),
                                     Triple(R.string.nav_tasks, Icons.Filled.CheckCircle, 2),
                                     Triple(R.string.nav_notes, Icons.AutoMirrored.Filled.Notes, 3),
                                     Triple(R.string.nav_more, Icons.Filled.GridView, 4),
                                 )
-                                for ((label, icon, index) in tabs) {
-                                    NavigationBarItem(selected = tab == index,
+                                for ((label, icon, index) in items) {
+                                    NavigationBarItem(selected = tabs.targetPage == index,
                                         onClick = { if (tab == index) page = null; tab = index },
                                         icon = { Icon(icon, null) }, label = { Text(stringResource(label)) })
                                 }
                             }
                         }) { padding ->
                             Box(Modifier.padding(padding).fillMaxSize()) {
-                                AnimatedContent(tab, transitionSpec = { Motion.tabs() }, label = "tab") { shown ->
+                                HorizontalPager(tabs, Modifier.fillMaxSize(), beyondViewportPageCount = 1, key = { it }) { shown ->
                                     when (shown) {
-                                        0 -> TodayScreen(container.repository, version,
+                                        0 -> TodayScreen(container, version,
                                             openTask = { editingTask = it },
                                             newTask = { newTaskDue = it; newTask = true })
                                         1 -> WeekScreen(container.repository, version) { editingTask = it }

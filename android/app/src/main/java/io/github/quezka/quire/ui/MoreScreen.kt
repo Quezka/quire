@@ -82,7 +82,7 @@ private fun MoreRow(icon: ImageVector, title: String, subtitle: String, onClick:
     val source = remember { MutableInteractionSource() }
     Card(Modifier.fillMaxWidth().pressScale(source).clickable(source, null, onClick = onClick),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        colors = CardDefaults.cardColors(containerColor = Glass.surface()), border = Glass.edge()) {
         Row(Modifier.padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
             Icon(icon, null, Modifier.size(26.dp), tint = MaterialTheme.colorScheme.primary)
             Spacer(Modifier.width(16.dp))
@@ -106,7 +106,7 @@ fun PageBar(title: String, back: () -> Unit, actions: @Composable () -> Unit = {
 
 @Composable
 fun Panel(title: String, modifier: Modifier = Modifier, content: @Composable () -> Unit) {
-    Card(modifier, colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow),
+    Card(modifier, colors = CardDefaults.cardColors(containerColor = Glass.surface()), border = Glass.edge(),
         shape = RoundedCornerShape(16.dp)) {
         Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold)
@@ -120,7 +120,7 @@ fun Panel(title: String, modifier: Modifier = Modifier, content: @Composable () 
 fun StatTile(label: String, value: String, detail: String = "", modifier: Modifier = Modifier,
              color: androidx.compose.ui.graphics.Color = MaterialTheme.colorScheme.onSurface) {
     Card(modifier, shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainerLow)) {
+        colors = CardDefaults.cardColors(containerColor = Glass.surface()), border = Glass.edge()) {
         Column(Modifier.fillMaxWidth().padding(14.dp)) {
             Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
             AnimatedNumber(value, color)

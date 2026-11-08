@@ -60,6 +60,11 @@ class MedicineService:
                            d.log.taken if d.log else False, d.log.at if d.log else None, is_late(d, minute))
                 for d in self._plan(day)]
 
+    def pending(self) -> list[DoseRecord]:
+        """Today's doses not ticked yet, the next one due first: what "Medicine taken" on the main page offers.
+        Extras taken as needed (planned -1) are left out."""
+        return sorted((d for d in self.day() if not d.done and d.planned >= 0), key=lambda d: d.planned)
+
     def mark(self, medicine_id: int, day: date, planned: int, taken: bool = True) -> None:
         """Tick a dose as taken (or as skipped). Doing it again changes it, never adds a second one."""
         now = self._clock.now()

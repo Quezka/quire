@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.42.0" date="2026-11-08">
+      <description>
+        <p>Quick log on the main page (water, sleep, medicine, expense), swiping between sections and a "now" line on the phone, a glass look with brighter colours, a redone Settings window, and the phone's note cursor fixed.</p>
+      </description>
+    </release>
     <release version="0.41.0" date="2026-11-04">
       <description>
         <p>The phone apps use the same indigo and colours as the computer.</p>

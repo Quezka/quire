@@ -33,6 +33,18 @@ data class DayAgenda(
 )
 
 object Agenda {
+    /** Where today's "now" line goes in a list of items sorted by start: before the first one that hasn't begun.
+     *  All-day items always stay above it. */
+    fun nowIndex(items: List<AgendaItem>, minute: Int): Int =
+        items.indexOfFirst { !it.isAllDay && it.start > minute }.let { if (it < 0) items.size else it }
+
+    /** How far through an item `minute` is, 0..1, or null when it isn't on right now (or is all day / a moment). */
+    fun progress(item: AgendaItem, minute: Int): Float? =
+        if (item.isAllDay || item.isMilestone || minute < item.start || minute >= item.end) null
+        else (minute - item.start).toFloat() / (item.end - item.start)
+
+    fun isOver(item: AgendaItem, minute: Int): Boolean = !item.isAllDay && item.end <= minute
+
     /** Shifts starting on days first..last: one-off ones plus weekly-schedule occurrences,
      *  minus skipped occurrences. */
     fun shifts(jobs: List<Job>, oneOff: List<Shift>, first: LocalDate, last: LocalDate): List<Shift> {

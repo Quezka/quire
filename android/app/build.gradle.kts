@@ -29,7 +29,11 @@ android {
         versionCode = versionParts[0] * 10000 + versionParts[1] * 100 + versionParts[2]
         versionName = desktopVersion
         // Phones only (Tesseract ships native code per ABI); keeps the APK small.
-        ndk { abiFilters += listOf("arm64-v8a", "armeabi-v7a") }
+        ndk {
+            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
+            // `-PemulatorAbi` adds x86_64, for trying a build on the emulator.
+            if (project.hasProperty("emulatorAbi")) abiFilters += "x86_64"
+        }
     }
 
     signingConfigs {

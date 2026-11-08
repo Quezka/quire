@@ -102,7 +102,7 @@ fun WeekScreen(repo: Repository, version: Int, openTask: (String) -> Unit) {
                 }
             },
         )
-        HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, key = { it }) { page ->
+        HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, userScrollEnabled = false, key = { it }) { page ->
             WeekPage(repo, version, mondayOf(page), today, openTask) { editing = it }
         }
     }

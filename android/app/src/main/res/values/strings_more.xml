@@ -397,4 +397,24 @@
     <string name="water_on_goal">%1$d of the last 7 days on goal</string>
     <string name="water_average">%1$d ml a day this week</string>
     <string name="water_manual">Daily goal, ml (empty: from height and weight)</string>
+    <string name="quick_log">Quick log</string>
+    <string name="quick_water">Water</string>
+    <string name="quick_sleep">Sleep</string>
+    <string name="quick_going_to_bed">Going to bed</string>
+    <string name="quick_woke_up">I woke up</string>
+    <string name="quick_medicines">Medicines</string>
+    <string name="quick_took">Took %1$s</string>
+    <string name="quick_none_due">None due</string>
+    <string name="quick_money">Money</string>
+    <string name="quick_add_expense">Add an expense</string>
+    <string name="quick_add_expense_title">Add an expense</string>
+    <string name="quick_amount">Amount</string>
+    <string name="quick_what_for">What for (optional)</string>
+    <string name="quick_not_amount">That isn\'t an amount.</string>
+    <string name="quick_logged_water">Logged %1$d ml of water.</string>
+    <string name="quick_good_night">Good night. Tap I woke up in the morning.</string>
+    <string name="quick_good_morning">Good morning. Your night is logged.</string>
+    <string name="quick_took_done">%1$s ticked as taken.</string>
+    <string name="quick_spent">Spent %1$s.</string>
+    <string name="quick_undo">Undo</string>
 </resources>

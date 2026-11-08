@@ -109,7 +109,7 @@ fun WorkScreen(repo: Repository, version: Int, back: () -> Unit) {
                         details = listOfNotNull(relativeDate(context, s.day, today), hoursText(s.paidMinutes),
                             s.pay(job)?.let(::money)).joinToString(" · "),
                         weekly = s.uid == null)
-                    Box(Modifier.animateItem()) { AgendaRow(item) { editing = item } }
+                    Box(Modifier.animateItem()) { AgendaRow(item, onClick = { editing = item }) }
                 }
                 item(key = "jobs") { SectionTitle(stringResource(R.string.jobs)) }
                 if (jobs.isEmpty()) item(key = "no-jobs") { Hint(stringResource(R.string.no_jobs)) }

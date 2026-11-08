@@ -29,6 +29,7 @@ from .common import (
     Card, Page, agenda_block, badge, button, icon_button, menu_button, zoom_controls,
 )
 from ..i18n import _
+from .quick_log import QuickLog
 
 
 class TodayView(Page):
@@ -110,8 +111,10 @@ class TodayView(Page):
         self._journal_day: date | None = None
         self._journal_dirty = False
 
+        self.quick_log = QuickLog(services)
         side = QVBoxLayout()
         side.setSpacing(16)
+        side.addWidget(self.quick_log)
         side.addWidget(due, 3)
         side.addWidget(notes, 1)
         body = QHBoxLayout()
@@ -190,6 +193,8 @@ class TodayView(Page):
             self.refresh()
         elif topic is Topic.JOURNAL:
             self._reload_journal()
+        if topic in (Topic.WATER, Topic.SLEEP, Topic.MEDICINE, Topic.FINANCE):
+            self.quick_log.refresh()
 
     def _reload_journal(self):
         """Show the day note as stored (e.g. after a sync), unless it's being edited."""

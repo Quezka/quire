@@ -16,6 +16,24 @@ import java.time.LocalDate
 class AgendaTest {
     private val saturday = LocalDate.of(2026, 9, 26)
 
+    private fun item(start: Int, end: Int) = io.github.quezka.quire.domain.AgendaItem(
+        io.github.quezka.quire.domain.ItemKind.EVENT, "u$start", saturday, start, end, "t", "#fff")
+
+    @Test fun nowLineSitsBeforeWhatHasntStartedAndShowsProgress() {
+        val allDay = item(0, 24 * 60)
+        val morning = item(9 * 60, 10 * 60)
+        val lunch = item(12 * 60, 13 * 60)
+        val items = listOf(allDay, morning, lunch)
+        assertEquals(1, Agenda.nowIndex(items, 8 * 60))
+        assertEquals(2, Agenda.nowIndex(items, 9 * 60 + 30))
+        assertEquals(3, Agenda.nowIndex(items, 14 * 60))
+        assertEquals(0.5f, Agenda.progress(morning, 9 * 60 + 30))
+        assertEquals(null, Agenda.progress(allDay, 9 * 60 + 30))
+        assertEquals(null, Agenda.progress(lunch, 9 * 60 + 30))
+        assertTrue(Agenda.isOver(morning, 10 * 60))
+        assertTrue(!Agenda.isOver(allDay, 23 * 60))
+    }
+
     @Test fun overnightWeeklyShiftSpansTwoDays() {
         val bar = Job("j", "Bar", patterns = listOf(ShiftPattern(5, 19 * 60, 6 * 60)))
         val sat = Agenda.itemsOn(saturday, emptyList(), emptyList(), listOf(bar), emptyList())

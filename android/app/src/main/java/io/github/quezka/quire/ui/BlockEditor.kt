@@ -315,7 +315,7 @@ private val INLINE = Regex(
         """|\[([^\]\n]+)\]\(([^)\s]+)\)""" +
         """|\\([\\`*_{}\[\]()#+\-.!~>|])""")
 
-private class InlineStyler(private val source: String, private val hide: Boolean,
+internal class InlineStyler(private val source: String, private val hide: Boolean,
                            private val accent: Color, private val faint: Color, private val codeBg: Color) {
     val builder = AnnotatedString.Builder()
     val toTransformed = IntArray(source.length + 1)
@@ -323,7 +323,9 @@ private class InlineStyler(private val source: String, private val hide: Boolean
 
     private fun show(from: Int, to: Int, style: SpanStyle?) {
         val start = builder.length
-        for (k in from until to) { toTransformed[k] = builder.length; toOriginal += k }
+        // Each character keeps its own place: the cursor is drawn where it really is (a tap, the handle and the
+        // keyboard's spacebar slide all move it through this), and the keyboard gets real character positions.
+        for (k in from until to) { toTransformed[k] = start + (k - from); toOriginal += k }
         builder.append(source.substring(from, to))
         if (style != null && to > from) builder.addStyle(style, start, builder.length)
     }
@@ -439,7 +441,7 @@ fun BlockEditor(state: BlockEditorState, image: (String) -> ByteArray?, placehol
                         NotePicture(b.extra, b.text, image)
                         if (selected) IconButton(onClick = { state.remove(index) },
                             modifier = Modifier.align(Alignment.TopEnd).padding(4.dp)
-                                .background(c.surface.copy(alpha = 0.85f), RoundedCornerShape(50))) {
+                                .background(c.surfaceContainerHigh.copy(alpha = 0.9f), RoundedCornerShape(50))) {
                             Icon(Icons.Filled.Delete, stringResource(R.string.remove_picture))
                         }
                     }

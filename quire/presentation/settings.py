@@ -3,10 +3,7 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (
-    QCheckBox, QComboBox, QDialog, QMessageBox, QDialogButtonBox, QFormLayout, QHBoxLayout, QLabel, QPushButton,
-    QVBoxLayout,
-)
+from PySide6.QtWidgets import QCheckBox, QComboBox, QHBoxLayout, QLabel, QMessageBox, QPushButton, QWidget
 
 from .. import __version__
 from ..application.errors import ApplicationError
@@ -16,10 +13,10 @@ from .dialogs import attempt
 from .formatting import money
 from .notify import play_chime
 from . import uiscale
-from .fit import scrollable
 from .i18n import LANGUAGES, chosen_language, language, resolve, set_chosen_language
 from .preferences import CURRENCIES, preferences
 from .i18n import _
+from quezka_ui.settings import SettingsWindow, Switch
 
 
 def restart_app():
@@ -40,14 +37,14 @@ def restart_app():
         QApplication.quit()
 
 
-class SettingsDialog(QDialog):
+class SettingsDialog(SettingsWindow):
+    """Sections on the left (Look, Money, Reminders, Sync, Startup, Your data), cards of rows on the right."""
+
     def __init__(self, services: Services, backup, parent=None, sync_runner=None, updater=None):
-        super().__init__(parent)
+        super().__init__(_("Settings"), _("Close"), parent)
         self.services = services
         self.sync_runner = sync_runner
         self.updater = updater
-        self.setWindowTitle(_("Settings"))
-        self.setMinimumWidth(765)
 
         self.appearance = QComboBox()
         for mode, text in (("system", _("Match system")), ("light", _("Light")),
@@ -108,23 +105,23 @@ class SettingsDialog(QDialog):
             box.toggled.connect(lambda _on: self._reminders_changed())
         remind_kinds.addStretch()
         self.remind.currentIndexChanged.connect(lambda _row: self._reminders_changed())
-        self.chime = QCheckBox(_("Play Quire's chime with notifications"),
-                               checked=preferences().notification_sound())
+        self.chime = Switch(preferences().notification_sound())
         self.chime.toggled.connect(preferences().set_notification_sound)
         play = QPushButton(_("Play"))
         play.clicked.connect(play_chime)
         chime_row = QHBoxLayout()
-        chime_row.addWidget(self.chime)
+        chime_row.setSpacing(10)
         chime_row.addWidget(play)
-        chime_row.addStretch()
+        chime_row.addWidget(self.chime)
+        chime_box = QWidget()
+        chime_box.setLayout(chime_row)
         remind_hint = QLabel(_("A desktop notification before things start, while Quire is open."),
                              objectName="hint")
         remind_hint.setWordWrap(True)
         self._reminders_changed(save=False)
 
         quiet = services.quiet.settings()
-        self.calendar_on = QCheckBox(_("Show my agenda in the computer's calendar"),
-                                     checked=services.calendar.enabled())
+        self.calendar_on = Switch(services.calendar.enabled())
         self.calendar_on.toggled.connect(lambda on: attempt(self, lambda: services.calendar.set_enabled(on)))
         calendar_open = QPushButton(_("Open in the calendar app"))
         calendar_open.clicked.connect(lambda: attempt(self, services.calendar.open))
@@ -136,7 +133,7 @@ class SettingsDialog(QDialog):
                                _("Windows has no way to follow a file: each time you open it, your calendar app "
                                  "imports the agenda as it is then."), objectName="hint")
         calendar_hint.setWordWrap(True)
-        self.quiet_on = QCheckBox(_("Silence notifications while things are on"), checked=quiet.enabled)
+        self.quiet_on = Switch(quiet.enabled)
         self.quiet_classes = QCheckBox(_("Classes"), checked=quiet.classes)
         self.quiet_events = QCheckBox(_("Events"), checked=quiet.events)
         self.quiet_shifts = QCheckBox(_("Work shifts"), checked=quiet.shifts)
@@ -178,28 +175,20 @@ class SettingsDialog(QDialog):
         self._show_sync()
 
         startup = services.startup
-        self.background = QCheckBox(_("Keep running in the background when the window is "
-                                      "closed"), checked=startup.background_on_close())
+        self.background = Switch(startup.background_on_close())
         self.background.toggled.connect(startup.set_background_on_close)
-        self.start_on_login = QCheckBox(_("Start Quire when I log in"),
-                                        checked=startup.start_on_login())
+        self.start_on_login = Switch(startup.start_on_login())
         self.start_on_login.setEnabled(startup.can_start_on_login())
         self.start_on_login.toggled.connect(self._start_on_login_toggled)
         startup_hint = QLabel(_("In the background, reminders, sync and school updates keep "
                                 "working; Quire waits in the system tray."), objectName="hint")
         startup_hint.setWordWrap(True)
-        self._startup_rows = (self.background, self.start_on_login, startup_hint)
 
-        self.auto_update = QCheckBox(_("Check for updates automatically"),
-                                     checked=services.updates.auto_check())
+        self.auto_update = Switch(services.updates.auto_check())
         self.auto_update.toggled.connect(services.updates.set_auto_check)
         check_now = QPushButton(_("Check now"))
         check_now.clicked.connect(lambda: updater.check_now() if updater else None)
         check_now.setEnabled(updater is not None)
-        update_row = QHBoxLayout()
-        update_row.addWidget(self.auto_update)
-        update_row.addStretch()
-        update_row.addWidget(check_now)
 
         backup_btn = QPushButton(_("Back up data…"))
         backup_btn.clicked.connect(backup)
@@ -211,77 +200,69 @@ class SettingsDialog(QDialog):
         data_row.addWidget(folder)
         data_row.addStretch()
 
-        # Two columns, so the dialog is wide rather than tall: preferences on the left,
-        # sync, updates and data on the right.
-        form = QFormLayout()
-        form.setVerticalSpacing(12)
-        right = QFormLayout()
-        right.setVerticalSpacing(12)
-        form.addRow(self._section(_("Look")))
-        form.addRow(_("Appearance"), self.appearance)
         manager = theme.manager()
-        contrast = QCheckBox(_("High contrast (black and white, thick lines)"))
-        contrast.setChecked(manager.contrast)
-        contrast.toggled.connect(manager.set_contrast)
-        form.addRow("", contrast)
-        form.addRow(_("Language"), language_row)
-        form.addRow("", self.language_hint)
-        form.addRow(_("Interface size"), self.scale)
-        form.addRow("", self.scale_hint)
-        form.addRow(self._section(_("Money")))
-        form.addRow(_("Currency"), self.currency)
-        form.addRow("", self.sample)
-        form.addRow(self._section(_("Reminders")))
-        form.addRow(_("Remind me"), self.remind)
-        form.addRow(_("For"), remind_kinds)
-        form.addRow("", remind_hint)
-        form.addRow(_("Sound"), chime_row)
-        form.addRow(self._section(_("Do Not Disturb")))
-        form.addRow("", self.quiet_on)
-        form.addRow(_("For"), quiet_kinds)
-        form.addRow("", quiet_hint)
+        look = self.section(_("Look"), "palette")
+        card = look.card()
+        card.row(_("Appearance"), self.appearance, stretch_control=True)
+        card.switch(_("Glass look"), manager.glass,
+                    _("Frosted, see-through surfaces over a soft wash of colour."), manager.set_glass)
+        self.contrast = card.switch(_("High contrast (black and white, thick lines)"), manager.contrast,
+                                    on_toggled=manager.set_contrast)
+        card = look.card()
+        language_box = QWidget()
+        language_box.setLayout(language_row)
+        card.row(_("Language"), language_box, self.language_hint, stretch_control=True)
+        card.row(_("Interface size"), self.scale, self.scale_hint, stretch_control=True)
 
-        right.addRow(self._section(_("Sync")))
-        right.addRow(self.sync_status)
-        right.addRow(sync_row)
-        right.addRow(self._section(_("Calendar")))
-        right.addRow(self.calendar_on)
-        right.addRow(calendar_row)
-        right.addRow(calendar_hint)
-        right.addRow(self._section(_("Updates")))
-        right.addRow(update_row)
-        right.addRow(self._section(_("Startup")))
-        for widget in self._startup_rows:
-            right.addRow(widget)
-        right.addRow(self._section(_("Your data")))
-        right.addRow(data_row)
-        location = QLabel(str(services.storage.location), objectName="hint")
-        location.setWordWrap(True)
-        location.setTextInteractionFlags(Qt.TextSelectableByMouse)
-        right.addRow(_("Stored in"), location)
+        money_page = self.section(_("Money"), "wallet")
+        money_page.card().row(_("Currency"), self.currency, self.sample, stretch_control=True)
 
-        columns = QHBoxLayout()
-        columns.setSpacing(36)
-        columns.addLayout(form, 1)
-        columns.addLayout(right, 1)
+        remind_page = self.section(_("Reminders"), "bell")
+        card = remind_page.card()
+        card.row(_("Remind me"), self.remind, remind_hint, stretch_control=True)
+        card.wide(layout=self._labelled(_("For"), remind_kinds))
+        card.row(_("Play Quire's chime with notifications"), chime_box)
+        card = remind_page.card(_("Do Not Disturb"))
+        card.row(_("Silence notifications while things are on"), self.quiet_on, quiet_hint)
+        card.wide(layout=self._labelled(_("For"), quiet_kinds))
 
-        close = QDialogButtonBox(QDialogButtonBox.Close)
-        close.rejected.connect(self.accept)
-        bottom = QHBoxLayout()
-        bottom.addWidget(QLabel(_("Quire {version}").format(version=__version__),
-                                objectName="hint"))
-        bottom.addStretch()
-        bottom.addWidget(close)
-        layout = QVBoxLayout(self)
-        layout.setContentsMargins(22, 18, 22, 16)
-        layout.addLayout(columns)
-        layout.addStretch()
-        layout.addLayout(bottom)
-        scrollable(self)
+        sync_page = self.section(_("Sync"), "refresh")
+        card = sync_page.card()
+        card.wide(self.sync_status)
+        card.wide(layout=sync_row)
+        card = sync_page.card(_("Calendar"))
+        card.row(_("Show my agenda in the computer's calendar"), self.calendar_on, calendar_hint)
+        card.wide(layout=calendar_row)
+
+        startup_page = self.section(_("Startup"), "play")
+        card = startup_page.card()
+        card.row(_("Keep running in the background when the window is closed"), self.background)
+        card.row(_("Start Quire when I log in"), self.start_on_login, startup_hint)
+        card = startup_page.card(_("Updates"))
+        card.row(_("Check for updates automatically"), self.auto_update)
+        card.wide(layout=self._end_aligned(check_now))
+
+        data_page = self.section(_("Your data"), "database")
+        card = data_page.card()
+        location = QLabel(str(services.storage.location))
+        card.row(_("Stored in"), None, location)
+        card.wide(layout=data_row)
+        data_page.add(QLabel(_("Quire {version}").format(version=__version__), objectName="hint"))
 
     @staticmethod
-    def _section(text: str) -> QLabel:
-        return QLabel(_("<b>{text}</b>").format(text=text))
+    def _labelled(text: str, row: QHBoxLayout) -> QHBoxLayout:
+        line = QHBoxLayout()
+        line.setSpacing(16)
+        line.addWidget(QLabel(text, objectName="rowTitle"))
+        line.addLayout(row, 1)
+        return line
+
+    @staticmethod
+    def _end_aligned(widget) -> QHBoxLayout:
+        line = QHBoxLayout()
+        line.addWidget(widget)
+        line.addStretch()
+        return line
 
     def _language_picked(self):
         code = self.language.currentData()

@@ -397,4 +397,24 @@
     <string name="water_on_goal">%1$d degli ultimi 7 giorni in obiettivo</string>
     <string name="water_average">%1$d ml al giorno questa settimana</string>
     <string name="water_manual">Obiettivo giornaliero, ml (vuoto: da altezza e peso)</string>
+    <string name="quick_log">Registra al volo</string>
+    <string name="quick_water">Acqua</string>
+    <string name="quick_sleep">Sonno</string>
+    <string name="quick_going_to_bed">Vado a dormire</string>
+    <string name="quick_woke_up">Mi sono svegliato</string>
+    <string name="quick_medicines">Farmaci</string>
+    <string name="quick_took">Preso %1$s</string>
+    <string name="quick_none_due">Nessuno da prendere</string>
+    <string name="quick_money">Soldi</string>
+    <string name="quick_add_expense">Aggiungi una spesa</string>
+    <string name="quick_add_expense_title">Aggiungi una spesa</string>
+    <string name="quick_amount">Importo</string>
+    <string name="quick_what_for">Per cosa (facoltativo)</string>
+    <string name="quick_not_amount">Non è un importo.</string>
+    <string name="quick_logged_water">Registrati %1$d ml d\'acqua.</string>
+    <string name="quick_good_night">Buonanotte. Al mattino tocca «Mi sono svegliato».</string>
+    <string name="quick_good_morning">Buongiorno. La notte è registrata.</string>
+    <string name="quick_took_done">%1$s segnato come preso.</string>
+    <string name="quick_spent">Spesi %1$s.</string>
+    <string name="quick_undo">Annulla</string>
 </resources>
