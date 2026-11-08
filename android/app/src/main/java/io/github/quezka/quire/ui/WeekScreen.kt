@@ -41,6 +41,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -79,8 +80,8 @@ fun WeekScreen(repo: Repository, version: Int, openTask: (String) -> Unit) {
     val monday = mondayOf(pager.currentPage)
     var editing by remember { mutableStateOf<AgendaItem?>(null) }
 
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(
+    GlassScreen(bar = {
+TopAppBar(
             title = {
                 AnimatedContent(monday, transitionSpec = {
                     val dir = if (targetState > initialState) 1 else -1
@@ -100,10 +101,10 @@ fun WeekScreen(repo: Repository, version: Int, openTask: (String) -> Unit) {
                 IconButton(onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } }) {
                     Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(R.string.next_week))
                 }
-            },
-        )
+            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = ClearBar, scrolledContainerColor = ClearBar))
+}) { glass ->
         HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, userScrollEnabled = false, key = { it }) { page ->
-            WeekPage(repo, version, mondayOf(page), today, openTask) { editing = it }
+            WeekPage(repo, version, mondayOf(page), today, openTask, glass) { editing = it }
         }
     }
     AgendaEditors(repo, editing, null, editing?.day ?: today) { editing = null }
@@ -120,10 +121,10 @@ private fun weekTitle(monday: LocalDate, thisMonday: LocalDate): String {
 
 @Composable
 private fun WeekPage(repo: Repository, version: Int, monday: LocalDate, today: LocalDate,
-                     openTask: (String) -> Unit, onItem: (AgendaItem) -> Unit) {
+                     openTask: (String) -> Unit, glass: PaddingValues, onItem: (AgendaItem) -> Unit) {
     val days = remember(version, monday) { repo.week(monday) }
     val due = remember(version, monday) { repo.tasksDue(monday, monday.plusDays(6)).groupBy { it.due } }
-    LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 24.dp),
+    LazyColumn(Modifier.fillMaxSize(), contentPadding = glass.plus(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 24.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp)) {
         items(days, key = { it.first.toString() }) { (day, items) ->
             val tasks = due[day].orEmpty()

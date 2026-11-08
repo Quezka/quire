@@ -97,6 +97,7 @@ import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -201,7 +202,9 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
     else mapOf("" to shown)
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
+        // The title, the search and the filter chips float on glass; the notes scroll under them.
+        GlassScreen(bar = {
+          Column(Modifier.padding(bottom = 8.dp)) {
             TopAppBar(title = {
                 AnimatedContent(searching, label = "search") { on ->
                     if (!on) Text(stringResource(R.string.nav_notes))
@@ -213,7 +216,7 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                 IconButton(onClick = { searching = !searching; if (!searching) query = "" }) {
                     Icon(if (searching) Icons.Filled.Close else Icons.Filled.Search, stringResource(R.string.search_notes))
                 }
-            })
+            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = ClearBar, scrolledContainerColor = ClearBar))
             // Course and notebook chips, then (for one of them) its topics.
             Row(Modifier.fillMaxWidth().horizontalScroll(rememberScrollState()).padding(horizontal = 16.dp),
                 horizontalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -247,11 +250,13 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                     for (t in topics) FilterChip(topic == t, { topic = if (topic == t) null else t }, { Text(t) })
                 }
             }
-            if (shown.isEmpty()) Box(Modifier.padding(16.dp)) {
-                Hint(stringResource(if (notes.isEmpty()) R.string.no_notes else R.string.no_matching_notes))
-            }
-            LazyColumn(contentPadding = PaddingValues(16.dp, 8.dp, 16.dp, 96.dp),
+          }
+        }) { glass ->
+            LazyColumn(contentPadding = glass.plus(start = 16.dp, top = 8.dp, end = 16.dp, bottom = 96.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (shown.isEmpty()) item(key = "empty") {
+                    Hint(stringResource(if (notes.isEmpty()) R.string.no_notes else R.string.no_matching_notes))
+                }
                 for ((groupTopic, list) in grouped) {
                     if (grouped.size > 1) item(key = "topic-$groupTopic") {
                         Text(groupTopic.ifEmpty { stringResource(R.string.no_topic) },
@@ -291,7 +296,7 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                 }
             }
         }
-        Column(Modifier.align(Alignment.BottomEnd).padding(20.dp), horizontalAlignment = Alignment.End) {
+        Column(Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 20.dp + LocalBottomInset.current), horizontalAlignment = Alignment.End) {
             FloatingActionButton(onClick = { menu = true }) {
                 val turn by animateFloatAsState(if (menu) 45f else 0f, Motion.bouncy(), label = "fab")
                 Icon(Icons.Filled.Add, stringResource(R.string.new_note), Modifier.graphicsLayer { rotationZ = turn })

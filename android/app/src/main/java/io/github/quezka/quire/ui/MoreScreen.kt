@@ -35,6 +35,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -55,9 +56,10 @@ import io.github.quezka.quire.R
 fun MoreScreen(container: Container, open: (Page) -> Unit) {
     val focusVersion by container.focus.changes.collectAsState()
     val school = remember(focusVersion) { container.school.status() }
-    Column(Modifier.fillMaxSize()) {
-        TopAppBar(title = { Text(stringResource(R.string.nav_more)) })
-        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(16.dp),
+    GlassScreen(bar = {
+TopAppBar(title = { Text(stringResource(R.string.nav_more)) }, colors = TopAppBarDefaults.topAppBarColors(containerColor = ClearBar, scrolledContainerColor = ClearBar))
+}) { glass ->
+        Column(Modifier.fillMaxSize().verticalScroll(rememberScrollState()).padding(glass).padding(16.dp),
             verticalArrangement = Arrangement.spacedBy(10.dp)) {
             val timer = container.focus.timer
             MoreRow(Icons.Filled.School, stringResource(R.string.nav_school),

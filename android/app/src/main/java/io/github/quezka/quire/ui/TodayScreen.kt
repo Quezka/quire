@@ -57,6 +57,7 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -130,8 +131,8 @@ fun TodayScreen(container: Container, version: Int, openTask: (String) -> Unit, 
     var menu by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            TopAppBar(
+        GlassScreen(bar = {
+TopAppBar(
                 title = {
                     // The date slides the same way as the page.
                     AnimatedContent(day, transitionSpec = {
@@ -159,8 +160,8 @@ fun TodayScreen(container: Container, version: Int, openTask: (String) -> Unit, 
                     IconButton(onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage + 1) } }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowRight, stringResource(R.string.next_day))
                     }
-                },
-            )
+                }, colors = TopAppBarDefaults.topAppBarColors(containerColor = ClearBar, scrolledContainerColor = ClearBar))
+}) { glass ->
             // Swiping sideways moves between Today, Week, Tasks and Notes; the day changes with the arrows above.
             HorizontalPager(pager, Modifier.fillMaxSize(), beyondViewportPageCount = 1, userScrollEnabled = false,
                 key = { it }) { page ->
@@ -171,13 +172,14 @@ fun TodayScreen(container: Container, version: Int, openTask: (String) -> Unit, 
                     val scale = 1f - offset * 0.04f
                     scaleX = scale; scaleY = scale
                 }) {
-                    DayPage(container, version, dayOf(page), today, openTask, onItem = { editing = it }, logged = ::showLogged)
+                    DayPage(container, version, dayOf(page), today, openTask, onItem = { editing = it }, logged = ::showLogged,
+                        glass = glass)
                 }
             }
         }
-        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp))
+        SnackbarHost(snackbar, Modifier.align(Alignment.BottomCenter).padding(bottom = 88.dp + LocalBottomInset.current))
         FloatingActionButton(onClick = { menu = true },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)) {
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 20.dp + LocalBottomInset.current)) {
             val turn by animateFloatAsState(if (menu) 45f else 0f, Motion.bouncy(), label = "fab")
             Icon(Icons.Filled.Add, stringResource(R.string.add), Modifier.graphicsLayer { rotationZ = turn })
             DropdownMenu(menu, onDismissRequest = { menu = false }) {
@@ -206,7 +208,8 @@ fun TodayScreen(container: Container, version: Int, openTask: (String) -> Unit, 
 /** One day: schedule, tasks, quick add and the day note. */
 @Composable
 private fun DayPage(container: Container, version: Int, day: LocalDate, today: LocalDate,
-                    openTask: (String) -> Unit, onItem: (AgendaItem) -> Unit, logged: (Logged) -> Unit) {
+                    openTask: (String) -> Unit, onItem: (AgendaItem) -> Unit, logged: (Logged) -> Unit,
+                    glass: PaddingValues = PaddingValues()) {
     val repo = container.repository
     val agenda = remember(version, day) { repo.day(day) }
     // The minute of the day, ticking, for the "now" line (today only).
@@ -224,7 +227,7 @@ private fun DayPage(container: Container, version: Int, day: LocalDate, today: L
         // Edge-to-edge: the window no longer resizes for the keyboard, so lift the list
         // above it, or the day note (the last item) is typed under the keyboard.
         Modifier.fillMaxSize().imePadding(),
-        contentPadding = PaddingValues(16.dp, 4.dp, 16.dp, 96.dp),
+        contentPadding = glass.plus(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (isToday) {

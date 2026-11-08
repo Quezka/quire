@@ -12,6 +12,12 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.runtime.CompositionLocalProvider
+import dev.chrisbanes.haze.HazeState
+import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.hazeChild
+import io.github.quezka.quire.ui.LocalBottomInset
+import io.github.quezka.quire.ui.glassStyle
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.material3.MaterialTheme
@@ -35,6 +41,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
@@ -115,8 +122,10 @@ class MainActivity : ComponentActivity() {
                         // The bar and the pages follow each other: a swipe changes the tab, a tap slides the pages.
                         LaunchedEffect(tab) { if (tabs.currentPage != tab) tabs.animateScrollToPage(tab) }
                         LaunchedEffect(tabs.settledPage) { tab = tabs.settledPage }
-                        Scaffold(containerColor = Color.Transparent, bottomBar = {
-                            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.86f)) {
+                        // The bottom bar is glass: the pages run under it and it blurs them.
+                        val pagesHaze = remember { HazeState() }
+                        Scaffold(bottomBar = {
+                            NavigationBar(Modifier.hazeChild(pagesHaze, glassStyle()), containerColor = Color.Transparent) {
                                 val items = listOf(
                                     Triple(R.string.nav_today, Icons.Filled.Today, 0),
                                     Triple(R.string.nav_week, Icons.Filled.CalendarViewWeek, 1),
@@ -131,7 +140,8 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }) { padding ->
-                            Box(Modifier.padding(padding).fillMaxSize()) {
+                            Box(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().haze(pagesHaze)) {
+                              CompositionLocalProvider(LocalBottomInset provides padding.calculateBottomPadding()) {
                                 HorizontalPager(tabs, Modifier.fillMaxSize(), beyondViewportPageCount = 1, key = { it }) { shown ->
                                     when (shown) {
                                         0 -> TodayScreen(container, version,
@@ -145,6 +155,7 @@ class MainActivity : ComponentActivity() {
                                         else -> MorePages(container, version, page) { page = it }
                                     }
                                 }
+                              }
                             }
                         }
                     }

@@ -76,6 +76,8 @@ dependencies {
     val composeBom = platform("androidx.compose:compose-bom:2024.12.01")
     implementation(composeBom)
     implementation("androidx.compose.material3:material3")
+    // Real blur behind the glass bars (Android 12+; older phones get a see-through tint). Apache 2.0.
+    implementation("dev.chrisbanes.haze:haze:1.1.1")
     implementation("androidx.compose.material:material-icons-extended")
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.ui:ui-tooling-preview")

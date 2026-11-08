@@ -34,6 +34,7 @@ import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.material3.rememberModalBottomSheetState
@@ -79,16 +80,17 @@ fun TasksScreen(repo: Repository, version: Int, openTask: (String?) -> Unit) {
     val courses = remember(version) { repo.courses().associateBy { it.uid } }
 
     Box(Modifier.fillMaxSize()) {
-        Column(Modifier.fillMaxSize()) {
-            TopAppBar(title = { Text(stringResource(R.string.nav_tasks)) }, actions = {
+        GlassScreen(bar = {
+TopAppBar(title = { Text(stringResource(R.string.nav_tasks)) }, actions = {
                 FilterChip(selected = showDone, onClick = { showDone = !showDone },
                     label = { Text(stringResource(R.string.show_completed)) },
                     modifier = Modifier.padding(end = 12.dp))
-            })
-            if (groups.isEmpty()) {
-                Box(Modifier.padding(16.dp)) { Hint(stringResource(R.string.no_tasks)) }
-            }
-            LazyColumn(contentPadding = PaddingValues(16.dp, 0.dp, 16.dp, 96.dp)) {
+            }, colors = TopAppBarDefaults.topAppBarColors(containerColor = ClearBar, scrolledContainerColor = ClearBar))
+}) { glass ->
+            LazyColumn(contentPadding = glass.plus(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
+                if (groups.isEmpty()) item(key = "empty") {
+                    Box(Modifier.padding(vertical = 16.dp)) { Hint(stringResource(R.string.no_tasks)) }
+                }
                 for ((bucket, tasks) in groups) {
                     item(key = bucket.name) {
                         Text("${stringResource(bucketLabel(bucket))}  ${tasks.size}",
@@ -105,7 +107,7 @@ fun TasksScreen(repo: Repository, version: Int, openTask: (String?) -> Unit) {
             }
         }
         FloatingActionButton(onClick = { openTask(null) },
-            modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp)) {
+            modifier = Modifier.align(Alignment.BottomEnd).padding(end = 20.dp, bottom = 20.dp + LocalBottomInset.current)) {
             Icon(Icons.Filled.Add, stringResource(R.string.new_task))
         }
     }

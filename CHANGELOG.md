@@ -4,6 +4,13 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.43.0] - 2026-11-09
+
+### Changed
+- **Liquid glass done properly, the Apple way, on both apps.** Backgrounds are plain again and content stays solid; the colour wash is gone.
+  - Computer: menus, drop-down lists and tooltips blur what's really under them, settings headers float over their cards and blur them as they scroll, and the sidebar floats as an inset panel. On Windows 11 the window shows the system's Mica behind the sidebar.
+  - Phone: the top bar of Today, Week, Tasks, Notes and More, and the bottom bar, are glass: the content scrolls under them and shows through, blurred (Android 13 and newer; older phones get a see-through tint). Notes keeps its filters in the glass bar.
+
 ## [0.42.0] - 2026-11-08
 
 ### Added

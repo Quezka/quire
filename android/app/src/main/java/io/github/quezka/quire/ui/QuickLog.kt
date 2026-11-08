@@ -143,9 +143,8 @@ private fun QuickTile(icon: ImageVector, title: String, detail: String, modifier
     Box(modifier) {
         Surface(
             shape = RoundedCornerShape(20.dp),
-            color = if (enabled) c.primaryContainer.copy(alpha = Glass.tint) else c.surfaceVariant.copy(alpha = Glass.tint),
+            color = if (enabled) c.primaryContainer else c.surfaceVariant,
             contentColor = if (enabled) c.onPrimaryContainer else c.onSurfaceVariant,
-            border = Glass.edge(),
             modifier = Modifier.fillMaxWidth().heightIn(min = 76.dp).combinedClickable(
                 enabled = enabled,
                 onClick = { haptics.performHapticFeedback(HapticFeedbackType.TextHandleMove); onTap() },
