@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 18
+SCHEMA_VERSION = 19
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -238,7 +238,10 @@ class SqliteDatabase:
                 ("contract_end", "TEXT"), ("tax_model", "TEXT NOT NULL DEFAULT 'flat'"),
                 ("inps", "REAL NOT NULL DEFAULT 9.19"), ("addizionali", "REAL NOT NULL DEFAULT 0"),
                 ("fixed_term", "INTEGER NOT NULL DEFAULT 1"),
-                ("cuneo", "INTEGER NOT NULL DEFAULT 0")):
+                ("cuneo", "INTEGER NOT NULL DEFAULT 0"),
+                # v19: payday, the pay added to Money by itself
+                ("payday", "INTEGER"), ("pays_previous_month", "INTEGER NOT NULL DEFAULT 1"),
+                ("payday_since", "TEXT")):
             self._add_column("jobs", column, definition)
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
                           " ON tasks(external_id) WHERE external_id IS NOT NULL")

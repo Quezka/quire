@@ -180,7 +180,9 @@ class SqliteSyncStore:
                     "contract_start": r["contract_start"], "contract_end": r["contract_end"],
                     "tax_model": r["tax_model"], "inps": r["inps"],
                     "addizionali": r["addizionali"], "fixed_term": bool(r["fixed_term"]),
-                    "cuneo": bool(r["cuneo"]), "patterns": [list(p) for p in patterns],
+                    "cuneo": bool(r["cuneo"]), "payday": r["payday"],
+                    "pays_previous_month": bool(r["pays_previous_month"]),
+                    "payday_since": r["payday_since"], "patterns": [list(p) for p in patterns],
                     "skips": [list(s) for s in skips]}
         if kind == "event":
             return {"day": r["day"], "start": r["start_min"], "end": r["end_min"],
@@ -286,7 +288,9 @@ class SqliteSyncStore:
                       "tax_model": d.get("tax_model", "flat"), "inps": d.get("inps", 9.19),
                       "addizionali": d.get("addizionali", 0),
                       "fixed_term": int(d.get("fixed_term", True)),
-                      "cuneo": int(bool(d.get("cuneo")))}
+                      "cuneo": int(bool(d.get("cuneo"))), "payday": d.get("payday"),
+                      "pays_previous_month": int(d.get("pays_previous_month", True)),
+                      "payday_since": d.get("payday_since")}
         elif s.kind == "event":
             values = {"day": d["day"], "start_min": d["start"], "end_min": d["end"],
                       "title": d["title"], "details": d.get("details", ""),

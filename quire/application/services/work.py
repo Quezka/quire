@@ -6,10 +6,12 @@ from ...domain import (
     Job, NotFound, Payslip, Shift, ShiftPattern, TimeRange, ValidationError, monthly_gross,
     monthly_share, reschedule, take_home, work_shifts, year_payslips,
 )
+from ...domain.finance import Transaction
+from ...domain.payroll import due_paydays
 from ..bus import ChangeBus, Topic
 from ..dto import AgendaItem, ItemKind, JobTotal, ShiftItem, ShiftPreview, WorkSummary
 from ..inputs import JobInput, PatternInput, ShiftInput
-from ..ports import Clock, JobRepository, ShiftRepository
+from ..ports import Clock, JobRepository, ShiftRepository, TransactionRepository
 from ..records import (
     JobRecord, PayslipRecord, ShiftRecord, job_record, payslip_record, shift_record, span,
 )
@@ -21,11 +23,12 @@ class WorkService:
     """Use cases for jobs and work shifts."""
 
     def __init__(self, jobs: JobRepository, shifts: ShiftRepository, clock: Clock,
-                 bus: ChangeBus):
+                 bus: ChangeBus, money: TransactionRepository | None = None):
         self._jobs = jobs
         self._shifts = shifts
         self._clock = clock
         self._bus = bus
+        self._money = money
 
     # ---- jobs -------------------------------------------------------------------
 
@@ -60,6 +63,10 @@ class WorkService:
         job.contract_start, job.contract_end = data.contract_start, data.contract_end
         job.tax_model, job.inps, job.addizionali = data.tax_model, data.inps, data.addizionali
         job.fixed_term, job.cuneo = data.fixed_term, data.cuneo
+        if data.payday != job.payday:
+            # Counting starts now: switching payday on never books months already paid.
+            job.payday_since = self._clock.today() if data.payday is not None else None
+        job.payday, job.pays_previous_month = data.payday, data.pays_previous_month
         if weekly is not None:
             wanted = [ShiftPattern.between(p.weekday, p.start, p.end, p.break_minutes)
                       for p in weekly]
@@ -71,6 +78,25 @@ class WorkService:
             self._jobs.update(job)
         self._bus.publish(Topic.WORK)
         return job.id
+
+    def book_pay(self, category: str = "Salary") -> int:
+        """Adds each job's net pay to Money on its payday (once per month, on any device). Returns how many
+        entries it added. Safe to call often: at start and every so often while running."""
+        if self._money is None:
+            return 0
+        today, cache, added = self._clock.today(), {}, 0
+        for job in self._jobs.list():
+            for day, year, month in due_paydays(job.payday, job.pays_previous_month, job.payday_since, today):
+                net = self._slips(job, year, cache)[month - 1].net
+                cents = int(round(net * 100))
+                if cents <= 0:
+                    continue
+                entry = Transaction(day, cents, True, category, f"{job.name} {month:02d}/{year}")
+                if self._money.add_pay(job.id, year, month, entry):
+                    added += 1
+        if added:
+            self._bus.publish(Topic.FINANCE)
+        return added
 
     def delete_job(self, job_id: int):
         """Delete a job together with all of its shifts."""

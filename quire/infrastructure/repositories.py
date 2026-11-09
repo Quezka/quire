@@ -442,6 +442,18 @@ class SqliteTransactionRepository(_Repo):
     def delete(self, transaction_id) -> None:
         self._write("DELETE FROM transactions WHERE id = ?", transaction_id)
 
+    def add_pay(self, job_id, year, month, t: Transaction) -> bool:
+        job = self._one("SELECT uid FROM jobs WHERE id = ?", job_id)
+        if job is None or job["uid"] is None:
+            return False
+        uid = f"pay:{job['uid']}:{year:04d}-{month:02d}"
+        if (self._one("SELECT 1 FROM transactions WHERE uid = ?", uid)
+                or self._one("SELECT 1 FROM sync_tombstones WHERE kind = 'money' AND uid = ?", uid)):
+            return False  # booked already, here or on another device, or deleted by the user
+        self._write("INSERT INTO transactions (day, cents, income, category, note, uid) VALUES (?, ?, ?, ?, ?, ?)",
+                    t.day.isoformat(), t.cents, int(t.income), t.category, t.note, uid)
+        return True
+
     def categories(self):
         return [r["category"] for r in self._all(
             "SELECT category, COUNT(*) AS n FROM transactions WHERE category != '' GROUP BY category"
@@ -604,7 +616,9 @@ class SqliteJobRepository(_Repo):
             pay_mode=r["pay_mode"], monthly_pay=r["monthly_pay"], mensilities=r["mensilities"],
             contract_start=_date(r["contract_start"]), contract_end=_date(r["contract_end"]),
             tax_model=r["tax_model"], inps=r["inps"], addizionali=r["addizionali"],
-            fixed_term=bool(r["fixed_term"]), cuneo=bool(r["cuneo"])) for r in rows}
+            fixed_term=bool(r["fixed_term"]), cuneo=bool(r["cuneo"]), payday=r["payday"],
+            pays_previous_month=bool(r["pays_previous_month"]), payday_since=_date(r["payday_since"]))
+            for r in rows}
         if jobs:
             marks = ",".join("?" * len(jobs))
             for p in self._all(f"SELECT * FROM shift_patterns WHERE job_id IN ({marks})"
@@ -636,14 +650,16 @@ class SqliteJobRepository(_Repo):
                 job.monthly_pay, job.mensilities,
                 job.contract_start.isoformat() if job.contract_start else None,
                 job.contract_end.isoformat() if job.contract_end else None, job.tax_model,
-                job.inps, job.addizionali, int(job.fixed_term), int(job.cuneo))
+                job.inps, job.addizionali, int(job.fixed_term), int(job.cuneo), job.payday,
+                int(job.pays_previous_month), job.payday_since.isoformat() if job.payday_since else None)
 
     def add(self, job: Job) -> int:
         with self._conn:
             job.id = self._conn.execute(
                 "INSERT INTO jobs (name, color, hourly_rate, deductions, pay_mode, monthly_pay,"
                 " mensilities, contract_start, contract_end, tax_model, inps, addizionali,"
-                " fixed_term, cuneo) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                " fixed_term, cuneo, payday, pays_previous_month, payday_since)"
+                " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 self._pay_columns(job)).lastrowid
             self._write_schedule(job)
         return job.id
@@ -654,7 +670,8 @@ class SqliteJobRepository(_Repo):
                 "UPDATE jobs SET name = ?, color = ?, hourly_rate = ?, deductions = ?,"
                 " pay_mode = ?, monthly_pay = ?, mensilities = ?, contract_start = ?,"
                 " contract_end = ?, tax_model = ?, inps = ?, addizionali = ?, fixed_term = ?,"
-                " cuneo = ? WHERE id = ?", (*self._pay_columns(job), job.id))
+                " cuneo = ?, payday = ?, pays_previous_month = ?, payday_since = ? WHERE id = ?",
+                (*self._pay_columns(job), job.id))
             self._write_schedule(job)
 
     def delete(self, job_id):

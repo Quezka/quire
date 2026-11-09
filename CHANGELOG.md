@@ -4,6 +4,12 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.46.0] - 2026-11-09
+
+- **Payday:** give a job a payday (Work → edit the job) and on that day its take-home pay goes into Money as
+  income by itself, once a month ("pays the month before" by default). It starts from the day you switch it on,
+  never books the past, and an entry you delete stays deleted. Two devices make one entry between them.
+
 ## [0.45.1] - 2026-11-09
 
 - Smoother scrolling and window moves: the app only asks GNOME's Blur my Shell to blur behind its windows while they're see-through (with see-through off, that blur was redone on every frame for nothing). The glass header over scrolling pages is cheaper to draw.

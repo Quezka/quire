@@ -732,6 +732,24 @@ class JobDialog(QDialog):
         self._rows["italy"] = self._row(form, "", italy_row)
         self._rows["cuneo"] = self._row(form, "", self.cuneo)
         self._rows["flat"] = self._row(form, "", deduction_row)
+        # Payday: the month's take-home pay goes into Money by itself on that day.
+        self.payday = QComboBox()
+        self.payday.addItem(_("Off"), None)
+        for day in range(1, 32):
+            self.payday.addItem(str(day), day)
+        self.pays_previous = QCheckBox(_("Pays the month before"))
+        self.pays_previous.setChecked(True)
+        payday_row = QHBoxLayout()
+        payday_row.addWidget(self.payday)
+        payday_row.addSpacing(12)
+        payday_row.addWidget(self.pays_previous)
+        payday_row.addStretch()
+        self.payday.currentIndexChanged.connect(lambda _i: self.pays_previous.setEnabled(self.payday.currentData() is not None))
+        self.pays_previous.setEnabled(False)
+        form.addRow(_("Payday"), payday_row)
+        payday_hint = QLabel(_("On payday the take-home pay is added to Money as income, once."), objectName="hint")
+        payday_hint.setWordWrap(True)
+        form.addRow("", payday_hint)
         hint = QLabel(_("Take-home pay is an estimate: it follows the Italian rules for an employee, but what's really withheld depends on your contract and your total income for the year."), objectName="hint")
         hint.setWordWrap(True)
         form.addRow("", hint)
@@ -786,6 +804,8 @@ class JobDialog(QDialog):
             self.inps.setText(f"{job.inps:g}")
             self.addizionali.setText(f"{job.addizionali:g}" if job.addizionali else "")
             self.cuneo.setChecked(job.cuneo)
+            select_data(self.payday, job.payday)
+            self.pays_previous.setChecked(job.pays_previous_month)
             # One row per time slot, with every day it repeats on.
             rows: dict[tuple, list[int]] = {}
             for p in job.weekly:
@@ -899,7 +919,8 @@ class JobDialog(QDialog):
         data = JobInput(self.name.text(), self.color.color(), rate, deductions,
                         self.pay_mode.currentData(), monthly, self.mensilities.currentData(),
                         start, end, self.tax_model.currentData(), 9.19 if inps is None else inps,
-                        addizionali, fixed_term=dated, cuneo=self.cuneo.isChecked())
+                        addizionali, fixed_term=dated, cuneo=self.cuneo.isChecked(),
+                        payday=self.payday.currentData(), pays_previous_month=self.pays_previous.isChecked())
 
         def save():
             self.job_id = self.work.save_job(self.job_id, data, weekly=weekly)

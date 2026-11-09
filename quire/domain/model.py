@@ -363,6 +363,12 @@ class Job:
     addizionali: float = 0.0  # "italy": regional + municipal surtax, percent
     fixed_term: bool = True
     cuneo: bool = False  # "italy": add the low-income cuneo fiscale bonus
+    # Payday: the day of the month the pay arrives (1-31, the month's last day when shorter); None = don't add it
+    # to Money by itself. `pays_previous_month`: on the 10th of November it's October's pay (the usual in Italy).
+    # `payday_since`: when it was switched on, so turning it on never books the past.
+    payday: int | None = None
+    pays_previous_month: bool = True
+    payday_since: date | None = None
 
     @property
     def terms(self) -> PayTerms:
@@ -388,6 +394,8 @@ class Job:
         if (self.contract_start and self.contract_end
                 and self.contract_end < self.contract_start):
             raise ValidationError("The contract can't end before it starts.")
+        if self.payday is not None and not 1 <= self.payday <= 31:
+            raise ValidationError("Payday is a day of the month, 1 to 31.")
         for pattern in self.schedule:
             pattern.validate()
 

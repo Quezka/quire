@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import calendar
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 PAY_MODES = ("hourly", "monthly")
 TAX_MODELS = ("italy", "flat")
@@ -48,6 +48,24 @@ class PayTerms:
         """Take-home share before any income tax: what's left after the contributions."""
         rate = self.inps if self.tax_model == "italy" else self.deductions
         return 1 - rate / 100
+
+
+def due_paydays(payday: int | None, pays_previous_month: bool, since: date | None,
+                today: date) -> list[tuple[date, int, int]]:
+    """Paydays from `since` to `today`, each with the (year, month) it pays: oldest first. A payday past the
+    month's end falls on its last day."""
+    if payday is None or since is None or since > today:
+        return []
+    out = []
+    year, month = since.year, since.month
+    while (year, month) <= (today.year, today.month):
+        last = (date(year + month // 12, month % 12 + 1, 1) - timedelta(days=1)).day
+        day = date(year, month, min(payday, last))
+        if since <= day <= today:
+            paid = (year, month - 1) if month > 1 else (year - 1, 12)
+            out.append((day, *(paid if pays_previous_month else (year, month))))
+        year, month = (year + 1, 1) if month == 12 else (year, month + 1)
+    return out
 
 
 @dataclass(frozen=True)

@@ -271,6 +271,8 @@ class JobRecord:
     addizionali: float = 0.0
     fixed_term: bool = True
     cuneo: bool = False
+    payday: int | None = None
+    pays_previous_month: bool = True
 
 
 @dataclass(frozen=True)
@@ -485,7 +487,7 @@ def job_record(j: Job, today: date) -> JobRecord:
                      tuple(pattern_record(p) for p in j.active_schedule(today)),
                      j.pay_mode, j.monthly_pay, j.mensilities, j.contract_start,
                      j.contract_end, j.tax_model, j.inps, j.addizionali, j.fixed_term,
-                     j.cuneo)
+                     j.cuneo, j.payday, j.pays_previous_month)
 
 
 def payslip_record(p: Payslip) -> PayslipRecord:

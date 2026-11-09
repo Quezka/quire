@@ -128,6 +128,8 @@ class JobInput:
     addizionali: float = 0.0
     fixed_term: bool = True
     cuneo: bool = False
+    payday: int | None = None  # add the pay to Money by itself on this day of the month
+    pays_previous_month: bool = True
 
 
 @dataclass(frozen=True)

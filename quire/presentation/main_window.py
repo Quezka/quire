@@ -130,6 +130,10 @@ class MainWindow(QMainWindow):
         self._calendar_timer = QTimer(self, singleShot=True, interval=3000, timeout=self._publish_calendar)
         relay.changed.connect(self._agenda_changed)
         self._calendar_timer.start()  # at start: the days have moved on since last time
+        # Payday: each job's pay goes into Money by itself, at start and every hour after.
+        self._pay_timer = QTimer(self, interval=3600_000, timeout=self._book_pay)
+        self._pay_timer.start()
+        QTimer.singleShot(2000, self._book_pay)
         self.sync = SyncRunner(services, relay, self)
         self.updater = UpdateChecker(services, self)  # not `update`: that's QWidget's
 
@@ -333,6 +337,12 @@ class MainWindow(QMainWindow):
     def _agenda_changed(self, topic):
         if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS, Topic.WORK):
             self._calendar_timer.start()  # a burst of changes (a sync) writes the file once
+
+    def _book_pay(self):
+        try:
+            self.services.work.book_pay(_("Salary"))
+        except Exception:  # never let a payday sum stop the app
+            pass
 
     def _publish_calendar(self):
         try:
