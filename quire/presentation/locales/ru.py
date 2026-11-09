@@ -948,7 +948,6 @@ MESSAGES = {
     'Log the night first.': 'Сначала запишите ночь.',
     "You can't log a day that hasn't come yet.": 'Нельзя записать день, который ещё не наступил.',
     "Glass look": "Эффект стекла",
-    "Frosted, see-through surfaces over a soft wash of colour.": "Матовые полупрозрачные поверхности на мягком цветном фоне.",
     "Add an expense": "Добавить расход",
     "e.g. 4,50": "напр. 4,50",
     "What for (optional)": "На что (необязательно)",
@@ -974,4 +973,8 @@ MESSAGES = {
     "Sleep\ngoing to bed": "Сон\nиду спать",
     "Sleep\nwoke up": "Сон\nпроснулся",
     "Money\nadd an expense": "Деньги\nдобавить расход",
+    "Menus, bars and headers blur what's under them.": 'Меню, панели и заголовки размывают то, что под ними.',
+    'See-through windows': 'Прозрачные окна',
+    'The desktop shows through, blurred. Takes effect the next time the app starts.': 'Сквозь окно виден рабочий стол, размытый. Действует после перезапуска приложения.',
+    'On GNOME this needs the Blur my Shell extension.': 'В GNOME для этого нужно расширение Blur my Shell.',
 }

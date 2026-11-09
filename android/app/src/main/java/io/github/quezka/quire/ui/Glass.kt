@@ -19,6 +19,7 @@ import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.graphics.luminance
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
@@ -28,15 +29,17 @@ import dev.chrisbanes.haze.hazeChild
 /** Room the glass bottom bar takes over the pages: lists add it at their end, so nothing stays hidden under it. */
 val LocalBottomInset = compositionLocalOf { 0.dp }
 
-/** The glass the bars are made of: a strong blur of what's under them, lightly tinted, so text stays clear. */
+/** The glass the bars are made of: a strong blur of what's under them with only a light tint, so what's beneath
+ *  clearly shows through (the user asked for real transparency) while the bar's text stays readable. */
 @Composable
 fun glassStyle(): HazeStyle {
     val c = MaterialTheme.colorScheme
+    val dark = c.background.luminance() < 0.5f
     return HazeStyle(
         backgroundColor = c.background,
-        tint = HazeTint(c.surface.copy(alpha = 0.45f)),
-        blurRadius = 24.dp,
-        noiseFactor = 0.04f,
+        tint = HazeTint(c.surface.copy(alpha = if (dark) 0.30f else 0.22f)),
+        blurRadius = 28.dp,
+        noiseFactor = 0f,
         fallbackTint = HazeTint(c.surface.copy(alpha = 0.94f)),
     )
 }

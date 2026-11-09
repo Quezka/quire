@@ -946,7 +946,6 @@ MESSAGES = {
     'Log the night first.': 'Registra prima la notte.',
     "You can't log a day that hasn't come yet.": 'Non puoi registrare un giorno che non è ancora arrivato.',
     "Glass look": "Aspetto vetro",
-    "Frosted, see-through surfaces over a soft wash of colour.": "Superfici smerigliate e trasparenti su una leggera sfumatura di colore.",
     "Add an expense": "Aggiungi una spesa",
     "e.g. 4,50": "es. 4,50",
     "What for (optional)": "Per cosa (facoltativo)",
@@ -972,4 +971,8 @@ MESSAGES = {
     "Sleep\ngoing to bed": "Sonno\nvado a dormire",
     "Sleep\nwoke up": "Sonno\nmi sono svegliato",
     "Money\nadd an expense": "Soldi\naggiungi una spesa",
+    "Menus, bars and headers blur what's under them.": 'Menu, barre e intestazioni sfocano ciò che sta sotto.',
+    'See-through windows': 'Finestre trasparenti',
+    'The desktop shows through, blurred. Takes effect the next time the app starts.': "Si vede il desktop dietro, sfocato. Vale dal prossimo avvio dell'app.",
+    'On GNOME this needs the Blur my Shell extension.': "Su GNOME serve l'estensione Blur my Shell.",
 }
