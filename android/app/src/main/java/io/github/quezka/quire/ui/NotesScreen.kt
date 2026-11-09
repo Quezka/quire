@@ -90,15 +90,12 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
-import androidx.compose.material3.SwipeToDismissBox
-import androidx.compose.material3.SwipeToDismissBoxValue
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.TextField
 import androidx.compose.material3.TextFieldDefaults
 import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.TopAppBarDefaults
-import androidx.compose.material3.rememberSwipeToDismissBoxState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -265,28 +262,9 @@ fun NotesScreen(repo: Repository, version: Int, openNote: (String) -> Unit) {
                             modifier = Modifier.animateItem().padding(top = 8.dp))
                     }
                     items(list, key = { it.uid }) { note ->
-                        val dismiss = rememberSwipeToDismissBoxState(confirmValueChange = { value ->
-                            if (value == SwipeToDismissBoxValue.Settled) return@rememberSwipeToDismissBoxState false
-                            val kept = note
-                            repo.deleteNote(note.uid)
-                            scope.launch {
-                                val result = snackbar.showSnackbar(context.getString(R.string.note_deleted),
-                                    context.getString(R.string.undo), duration = SnackbarDuration.Short)
-                                if (result == SnackbarResult.ActionPerformed) repo.saveNote(kept)
-                            }
-                            true
-                        })
-                        SwipeToDismissBox(dismiss, modifier = Modifier.animateItem(), backgroundContent = {
-                            val active = dismiss.targetValue != SwipeToDismissBoxValue.Settled
-                            val bg by animateColorAsState(if (active) MaterialTheme.colorScheme.errorContainer else Color.Transparent,
-                                label = "swipe")
-                            Box(Modifier.fillMaxSize().background(bg, RoundedCornerShape(16.dp)).padding(horizontal = 24.dp),
-                                contentAlignment = if (dismiss.dismissDirection == SwipeToDismissBoxValue.StartToEnd)
-                                    Alignment.CenterStart else Alignment.CenterEnd) {
-                                Icon(Icons.Filled.Delete, stringResource(R.string.delete),
-                                    tint = MaterialTheme.colorScheme.onErrorContainer)
-                            }
-                        }) {
+                        // No swipe to delete: a sideways swipe moves between sections, and notes went missing that
+                        // way. Deleting is in the note's own menu.
+                        Box(Modifier.animateItem()) {
                             NoteCard(note, courseIndex[note.courseUid], notebookIndex[note.notebookUid],
                                 repo.today(), showCourse = !homed(filter),
                                 onOpen = { openNote(note.uid) },
@@ -559,6 +537,10 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
     DisposableEffect(uid) { onDispose { flush() } }
     BackHandler { flush(); close() }
 
+    // Outside a Surface icons default to black, which vanished on the dark theme (the format bar): give the
+    // whole editor the theme's text colour.
+    androidx.compose.runtime.CompositionLocalProvider(
+        androidx.compose.material3.LocalContentColor provides MaterialTheme.colorScheme.onSurface) {
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize().imePadding()) {
             TopAppBar(
@@ -603,6 +585,7 @@ fun NoteEditor(repo: Repository, version: Int, uid: String, close: () -> Unit) {
             FormatBar(editor)
         }
         ScanProgress(scanner.busy)
+    }
     }
 
     if (newNotebook) NotebookDialog(null, onDismiss = { newNotebook = false }, onDelete = null,

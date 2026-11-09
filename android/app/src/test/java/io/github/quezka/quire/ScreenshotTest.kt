@@ -153,6 +153,14 @@ class ScreenshotTest {
         shoot("note_editor")
     }
 
+    /** The format bar's icons once came out black on the dark theme. */
+    @Test @org.robolectric.annotation.Config(qualifiers = "+night") fun noteEditorDark() {
+        val repo = repo()
+        val note = repo.saveNote(io.github.quezka.quire.domain.Note("n1", "# Dark\n\nSome **text**.", topic = "Test"))
+        compose.setContent { QuireTheme { io.github.quezka.quire.ui.NoteEditor(repo, 0, note.uid) {} } }
+        shoot("note_editor_dark")
+    }
+
     @Test fun more() {
         val c = container()
         compose.setContent { Shell(4) { MoreScreen(c) {} } }

@@ -24,6 +24,8 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.haze
+import dev.chrisbanes.haze.ExperimentalHazeApi
+import dev.chrisbanes.haze.HazeInputScale
 import dev.chrisbanes.haze.hazeChild
 
 /** Room the glass bottom bar takes over the pages: lists add it at their end, so nothing stays hidden under it. */
@@ -59,12 +61,21 @@ fun GlassScreen(bar: @Composable () -> Unit, content: @Composable (PaddingValues
         Box(Modifier.fillMaxSize().haze(haze)) {
             content(PaddingValues(top = top, bottom = LocalBottomInset.current))
         }
-        Column(Modifier.fillMaxWidth().hazeChild(haze, glassStyle()).onSizeChanged { barPx = it.height }) {
+        Column(Modifier.fillMaxWidth().glass(haze, glassStyle()).onSizeChanged { barPx = it.height }) {
             bar()
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
         }
     }
 }
+
+/**
+ * The glass modifier every bar uses. The content under a bar is blurred at a third of its size and scaled back:
+ * a 28 dp blur hides the difference, and it's far less work per frame for the phone's GPU (scrolling under the
+ * bars was janky at full size).
+ */
+@OptIn(ExperimentalHazeApi::class)
+fun Modifier.glass(state: HazeState, style: HazeStyle): Modifier =
+    hazeChild(state, style) { inputScale = HazeInputScale.Fixed(0.33f) }
 
 /** Adds a screen's own padding to the glass padding. */
 fun PaddingValues.plus(start: Dp = 0.dp, top: Dp = 0.dp, end: Dp = 0.dp, bottom: Dp = 0.dp): PaddingValues =

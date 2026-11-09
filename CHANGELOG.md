@@ -4,6 +4,14 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.46.1] - 2026-11-09
+
+- Phone: no more deleting a note by swiping it sideways (a swipe moves between sections, and notes went missing
+  that way). Delete a note from its own menu, which asks first.
+- Phone: the formatting buttons above the keyboard are white on the dark theme (they were black and hard to see).
+- Phone: the glass bars blur what's under them at a third of the size, much less work per frame, so scrolling
+  under them is smoother.
+
 ## [0.46.0] - 2026-11-09
 
 - **Payday:** give a job a payday (Work → edit the job) and on that day its take-home pay goes into Money as

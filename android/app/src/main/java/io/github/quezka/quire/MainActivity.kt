@@ -15,8 +15,8 @@ import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.runtime.CompositionLocalProvider
 import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.haze
-import dev.chrisbanes.haze.hazeChild
 import io.github.quezka.quire.ui.LocalBottomInset
+import io.github.quezka.quire.ui.glass
 import io.github.quezka.quire.ui.glassStyle
 import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.pager.rememberPagerState
@@ -125,7 +125,7 @@ class MainActivity : ComponentActivity() {
                         // The bottom bar is glass: the pages run under it and it blurs them.
                         val pagesHaze = remember { HazeState() }
                         Scaffold(bottomBar = {
-                            NavigationBar(Modifier.hazeChild(pagesHaze, glassStyle()), containerColor = Color.Transparent) {
+                            NavigationBar(Modifier.glass(pagesHaze, glassStyle()), containerColor = Color.Transparent) {
                                 val items = listOf(
                                     Triple(R.string.nav_today, Icons.Filled.Today, 0),
                                     Triple(R.string.nav_week, Icons.Filled.CalendarViewWeek, 1),
