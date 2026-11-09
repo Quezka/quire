@@ -23,40 +23,12 @@ private val Manrope = FontFamily(
 )
 
 /** Material's type scale in the suite's typeface. */
-private val SuiteType = Typography().run {
-    copy(displayLarge.copy(fontFamily = Manrope), displayMedium.copy(fontFamily = Manrope), displaySmall.copy(fontFamily = Manrope),
-        headlineLarge.copy(fontFamily = Manrope), headlineMedium.copy(fontFamily = Manrope), headlineSmall.copy(fontFamily = Manrope),
-        titleLarge.copy(fontFamily = Manrope), titleMedium.copy(fontFamily = Manrope), titleSmall.copy(fontFamily = Manrope),
-        bodyLarge.copy(fontFamily = Manrope), bodyMedium.copy(fontFamily = Manrope), bodySmall.copy(fontFamily = Manrope),
-        labelLarge.copy(fontFamily = Manrope), labelMedium.copy(fontFamily = Manrope), labelSmall.copy(fontFamily = Manrope))
-}
+private val SuiteType = SuiteTokens.typography(Manrope)
 
 /** The suite's palette, the same as the desktop's (quezka_ui/theme.py), Cadence's and Vesper's. */
-internal val Light = lightColorScheme(
-    primary = Color(0xFF4F46E5), onPrimary = Color.White,
-    primaryContainer = Color(0xFFDCDBFF), onPrimaryContainer = Color(0xFF1E1A78),
-    secondaryContainer = Color(0xFFDCDBFF), onSecondaryContainer = Color(0xFF1E1A78),
-    background = Color(0xFFF3F2FF), onBackground = Color(0xFF0B0D14),
-    surface = Color(0xFFF3F2FF), onSurface = Color(0xFF0B0D14),
-    surfaceVariant = Color(0xFFE9E8FF), onSurfaceVariant = Color(0xFF343B4D),
-    surfaceContainer = Color(0xFFECEAFF), surfaceContainerLow = Color(0xFFFFFFFF),
-    surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFE9E8FF),
-    outline = Color(0xFFB3B6CC), outlineVariant = Color(0xFFDEDCF7),
-    error = Color(0xFFD0262D), tertiary = Color(0xFF127A46),
-)
+internal val Light = SuiteTokens.Light
 
-internal val Dark = darkColorScheme(
-    primary = Color(0xFFA9A6FF), onPrimary = Color(0xFF0B0B14),
-    primaryContainer = Color(0xFF3B3984), onPrimaryContainer = Color(0xFFE4E3FF),
-    secondaryContainer = Color(0xFF3B3984), onSecondaryContainer = Color(0xFFE4E3FF),
-    background = Color(0xFF0E0E19), onBackground = Color(0xFFF6F7FB),
-    surface = Color(0xFF0E0E19), onSurface = Color(0xFFF6F7FB),
-    surfaceVariant = Color(0xFF27273F), onSurfaceVariant = Color(0xFFCBCFDD),
-    surfaceContainer = Color(0xFF13131F), surfaceContainerLow = Color(0xFF1A1A2B),
-    surfaceContainerHigh = Color(0xFF1A1A2B), surfaceContainerHighest = Color(0xFF27273F),
-    outline = Color(0xFF4B4E66), outlineVariant = Color(0xFF2D2D47),
-    error = Color(0xFFFF7B80), tertiary = Color(0xFF4ADE80),
-)
+internal val Dark = SuiteTokens.Dark
 
 /**
  * Liquid glass, Apple style, as across the suite: backgrounds and content stay solid, and the bars that float over
