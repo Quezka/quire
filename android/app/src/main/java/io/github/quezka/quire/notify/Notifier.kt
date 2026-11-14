@@ -49,6 +49,15 @@ class Notifier(private val context: Context) {
         const val ACTION_WATER = "io.github.quezka.quire.WATER"
         const val ACTION_MEDICINE = "io.github.quezka.quire.MEDICINE"
         const val ACTION_SLEEP = "io.github.quezka.quire.SLEEP"
+        const val ACTION_DIGEST = "io.github.quezka.quire.DIGEST"
+        const val ACTION_NOW = "io.github.quezka.quire.NOW"
+        const val ACTION_NUDGE = "io.github.quezka.quire.NUDGE"
+        const val ACTION_BATCH = "io.github.quezka.quire.BATCH"
+        const val ACTION_FOCUS_ON = "io.github.quezka.quire.FOCUS_ON"
+        private const val NOW_ID = 6
+        private const val DIGEST_ID = 7
+        private const val NUDGE_ID = 8
+        private const val BATCH_ID = 9
         private const val SLEEP_ID = 5
         private const val WATER_ID = 4
         private const val MEDICINE_ID = 40  // up to MEDICINE_ID + 19: one per dose, so they don't replace each other
@@ -144,6 +153,76 @@ class Notifier(private val context: Context) {
             .setContentIntent(openApp(MainActivity.TAB_FOCUS)).setAutoCancel(true))
     }
 
+    // ---- the assistant ----
+
+    @Suppress("MissingPermission")
+    fun nowNext(now: io.github.quezka.quire.domain.AgendaItem?, next: io.github.quezka.quire.domain.AgendaItem?,
+                step: io.github.quezka.quire.domain.Task?, drunk: Int, goal: Int) {
+        val title = when {
+            now != null -> context.getString(R.string.glance_now, now.title, minutes(now.end))
+            next != null -> context.getString(R.string.glance_next, next.title, minutes(next.start))
+            step != null -> context.getString(R.string.glance_step, step.title)
+            else -> context.getString(R.string.glance_free)
+        }
+        val lines = buildList {
+            if (now != null && next != null) add(context.getString(R.string.glance_then, next.title, minutes(next.start)))
+            if (step != null && (now != null || next != null)) add(context.getString(R.string.glance_step, step.title))
+            add(context.getString(R.string.glance_water, drunk / 1000.0, goal / 1000.0))
+        }
+        val builder = NotificationCompat.Builder(context, NOW)
+            .setSmallIcon(R.drawable.ic_n_now).setContentTitle(title).setContentText(lines.joinToString(" · "))
+            .setStyle(NotificationCompat.BigTextStyle().bigText(lines.joinToString("\n")))
+            .setOngoing(true).setSilent(true).setShowWhen(false).setOnlyAlertOnce(true)
+            .setPriority(NotificationCompat.PRIORITY_LOW).setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
+            .setColor(ContextCompat.getColor(context, R.color.notification_accent))
+            .setContentIntent(openApp(0))
+        if (allowed()) NotificationManagerCompat.from(context).notify(NOW_ID, builder.build())
+    }
+
+    fun cancelNow() = NotificationManagerCompat.from(context).cancel(NOW_ID)
+
+    fun digest(morning: Boolean, items: List<io.github.quezka.quire.domain.AgendaItem>,
+               due: List<io.github.quezka.quire.domain.Task>, overdue: Int, ideas: List<String>,
+               held: List<Pair<String, Int>>) {
+        val lines = buildList {
+            if (items.isEmpty()) add(context.getString(if (morning) R.string.digest_free_today else R.string.digest_free_tomorrow))
+            for (i in items.sortedBy { it.start }.take(5)) add("${minutes(i.start)}  ${i.title}")
+            for (t in due.take(4)) add(context.getString(R.string.digest_task, t.title))
+            if (overdue > 0) add(context.resources.getQuantityString(R.plurals.digest_overdue, overdue, overdue))
+            for (idea in ideas.take(5)) add(context.getString(R.string.digest_idea, idea))
+            for ((app, count) in held.take(6)) add(context.getString(R.string.digest_held, app, count))
+        }
+        val style = NotificationCompat.InboxStyle()
+        lines.forEach(style::addLine)
+        post(DIGEST_ID, NotificationCompat.Builder(context, DIGEST)
+            .setSmallIcon(R.drawable.ic_n_digest)
+            .setContentTitle(context.getString(if (morning) R.string.digest_morning else R.string.digest_evening))
+            .setContentText(lines.firstOrNull().orEmpty()).setStyle(style)
+            .setContentIntent(openApp(0)).setAutoCancel(true))
+    }
+
+    fun nudge(task: io.github.quezka.quire.domain.Task) {
+        val start = PendingIntent.getBroadcast(context, ACTION_FOCUS_ON.hashCode(),
+            Intent(context, AlarmReceiver::class.java).setAction(ACTION_FOCUS_ON).putExtra("task", task.uid),
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        post(NUDGE_ID, NotificationCompat.Builder(context, NUDGES)
+            .setSmallIcon(R.drawable.ic_n_nudge)
+            .setContentTitle(context.getString(R.string.nudge_title))
+            .setContentText(context.getString(R.string.nudge_text, task.title))
+            .addAction(0, context.getString(R.string.nudge_start), start)
+            .setContentIntent(openApp(2)).setAutoCancel(true))
+    }
+
+    fun batch(lines: List<Pair<String, Int>>, latest: List<io.github.quezka.quire.domain.Assistant.Held>) {
+        val style = NotificationCompat.InboxStyle()
+        for ((app, count) in lines.take(6)) style.addLine(context.getString(R.string.digest_held, app, count))
+        for (h in latest.reversed()) style.addLine("${h.app}: ${h.title}".take(80))
+        post(BATCH_ID, NotificationCompat.Builder(context, DIGEST)
+            .setSmallIcon(R.drawable.ic_n_digest)
+            .setContentTitle(context.getString(R.string.batch_title, lines.sumOf { it.second }))
+            .setContentText(lines.joinToString(", ") { it.first }).setStyle(style).setAutoCancel(true))
+    }
+
     fun windDown(bedtime: Int) {
         post(SLEEP_ID, NotificationCompat.Builder(context, SLEEP)
             .setSmallIcon(R.drawable.ic_n_sleep).setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -216,6 +295,16 @@ class AlarmReceiver : BroadcastReceiver() {
             Notifier.ACTION_WATER -> container.water.check()
             Notifier.ACTION_MEDICINE -> container.medicines.check()
             Notifier.ACTION_SLEEP -> container.sleepNudge.check()
+            Notifier.ACTION_DIGEST -> container.assistant.digest()
+            Notifier.ACTION_NUDGE -> container.assistant.nudge()
+            Notifier.ACTION_BATCH -> container.assistant.batch()
+            Notifier.ACTION_NOW -> Unit
+            Notifier.ACTION_FOCUS_ON -> {
+                // the nudge's button: focus on that task now
+                container.focus.focusOn(intent.getStringExtra("task"))
+                if (!container.focus.timer.running) container.focus.toggle()
+                androidx.core.app.NotificationManagerCompat.from(context).cancel(8)
+            }
             else -> container.reminders.fire()
         }
         container.reminders.plan()
@@ -223,6 +312,8 @@ class AlarmReceiver : BroadcastReceiver() {
         container.water.plan()
         container.sleepNudge.plan()
         container.focus.planAlarm()
+        container.assistant.plan()
+        container.assistant.updateNow()
         // A start passed, or the clock or time zone changed.
         val pending = goAsync()
         AgendaWidget.scope.launch { try { AgendaWidget.refreshNow(context) } finally { pending.finish() } }

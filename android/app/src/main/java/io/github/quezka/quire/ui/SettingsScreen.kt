@@ -1,5 +1,8 @@
 package io.github.quezka.quire.ui
 
+import androidx.compose.runtime.key
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.clickable
 import android.content.Intent
 import android.os.Build
 import android.provider.Settings as AndroidSettings
@@ -106,6 +109,7 @@ fun SettingsScreen(container: Container, back: () -> Unit) {
                     SyncSetup(sync, status.projectId, status.email, status.backend)
                 }
             }
+            AssistantPanel(container)
             RemindersPanel(container)
             QuietPanel(container)
             UpdatesPanel(container)
@@ -280,6 +284,62 @@ private fun RemindersPanel(container: Container) {
                 context.startActivity(Intent(AndroidSettings.ACTION_REQUEST_SCHEDULE_EXACT_ALARM,
                     android.net.Uri.parse("package:" + context.packageName)))
             }) { Text(stringResource(R.string.allow_exact_alarms)) }
+        }
+    }
+}
+
+@Composable
+private fun AssistantPanel(container: Container) {
+    val context = LocalContext.current
+    val assistant = container.assistant
+    val hub = container.hub
+    var shown by remember { mutableStateOf(0) }
+    var access by remember { mutableStateOf(hub.access()) }
+    LaunchedEffect(Unit) { access = hub.access() }
+    @Composable
+    fun row(title: Int, hint: Int, on: Boolean, set: (Boolean) -> Unit) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Column(Modifier.weight(1f)) {
+                Text(stringResource(title))
+                Hint(stringResource(hint))
+            }
+            Switch(on, { set(it); shown++ })
+        }
+    }
+    Panel(stringResource(R.string.assistant), Modifier.animateContentSize(Motion.gentle())) {
+        key(shown) {
+            row(R.string.assistant_glance, R.string.assistant_glance_hint, assistant.isOn("glance")) { assistant.set("glance", it) }
+            row(R.string.assistant_digest, R.string.assistant_digest_hint, assistant.isOn("digest")) { assistant.set("digest", it) }
+            row(R.string.assistant_nudges, R.string.assistant_nudges_hint, assistant.isOn("nudges")) { assistant.set("nudges", it) }
+            row(R.string.hub, R.string.hub_hint, hub.enabled) { hub.enabled = it; assistant.plan() }
+            if (hub.enabled) {
+                if (!access) OutlinedButton(onClick = {
+                    context.startActivity(Intent("android.settings.ACTION_NOTIFICATION_LISTENER_SETTINGS"))
+                }) { Text(stringResource(R.string.hub_access)) }
+                Text(stringResource(R.string.hub_batch))
+                Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    for (h in listOf(0, 1, 2, 3, 4)) FilterChip(hub.batchHours == h, { hub.batchHours = h; assistant.plan(); shown++ },
+                        label = { Text(if (h == 0) stringResource(R.string.hub_batch_never) else hoursText(h * 60)) })
+                }
+                val apps = hub.apps()
+                if (apps.isNotEmpty()) {
+                    Text(stringResource(R.string.hub_apps), style = MaterialTheme.typography.titleSmall)
+                    for ((pkg, label) in apps) {
+                        val rule = hub.rule(pkg)
+                        Row(Modifier.fillMaxWidth().clickable {
+                            val next = io.github.quezka.quire.notify.Hub.Rule.entries.let { it[(it.indexOf(rule) + 1) % it.size] }
+                            hub.setRule(pkg, next); shown++
+                        }.padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Text(label, Modifier.weight(1f))
+                            Text(stringResource(when (rule) {
+                                io.github.quezka.quire.notify.Hub.Rule.PASS -> R.string.hub_rule_pass
+                                io.github.quezka.quire.notify.Hub.Rule.HOLD -> R.string.hub_rule_hold
+                                io.github.quezka.quire.notify.Hub.Rule.MUTE -> R.string.hub_rule_mute
+                            }), color = MaterialTheme.colorScheme.primary)
+                        }
+                    }
+                }
+            }
         }
     }
 }

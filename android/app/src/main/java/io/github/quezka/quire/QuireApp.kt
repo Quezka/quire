@@ -56,6 +56,8 @@ class Container(
     val water = WaterManager(repository, settings, notifier)
     val medicines = io.github.quezka.quire.notify.MedicineManager(repository, settings, notifier)
     val sleepNudge = SleepManager(repository, settings, notifier)
+    val hub = io.github.quezka.quire.notify.Hub(context, settings)
+    val assistant = io.github.quezka.quire.notify.AssistantManager(repository, settings, notifier, hub, water)
     val school = SchoolSync(Classeviva(), repository, RegisterStore(settings), settings, KeystoreBox())
     val updater = Updater(context)
 
@@ -68,7 +70,7 @@ class Container(
         io.github.quezka.quire.ui.currencyCode = settings.get("currency") ?: "EUR"
         sync.start()
         SchoolWorker.schedule(context)
-        repository.onChanged = { reminders.plan(); quiet.update(); AgendaWidget.refresh(context) }
+        repository.onChanged = { reminders.plan(); quiet.update(); assistant.updateNow(); AgendaWidget.refresh(context) }
         reminders.plan()
         quiet.update()
         water.plan()
@@ -76,6 +78,8 @@ class Container(
         sleepNudge.plan()
         focus.tick(announce = false)
         focus.planAlarm()
+        assistant.plan()
+        assistant.updateNow()
     }
 
     /** Fetch from the register (call off the main thread) and apply it on the main thread.

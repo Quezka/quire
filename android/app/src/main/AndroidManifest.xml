@@ -65,6 +65,14 @@
         </receiver>
         <receiver android:name=".update.InstallReceiver" android:exported="false" />
 
+        <!-- the notification hub: other apps' notifications held for the digest (needs notification access) -->
+        <service android:name=".notify.HubListener" android:exported="true" android:label="@string/hub_listener"
+            android:permission="android.permission.BIND_NOTIFICATION_LISTENER_SERVICE">
+            <intent-filter>
+                <action android:name="android.service.notification.NotificationListenerService" />
+            </intent-filter>
+        </service>
+
         <provider
             android:name=".bedside.BedsideProvider"
             android:authorities="io.github.quezka.quire.bedside"
