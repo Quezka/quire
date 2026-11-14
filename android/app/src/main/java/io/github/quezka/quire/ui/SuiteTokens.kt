@@ -17,24 +17,24 @@ object SuiteTokens {
         primary = Color(0xFF4F46E5), onPrimary = Color(0xFFFFFFFF),
         primaryContainer = Color(0xFFE3E2FB), onPrimaryContainer = Color(0xFF1E1A78),
         secondaryContainer = Color(0xFFE3E2FB), onSecondaryContainer = Color(0xFF1E1A78),
-        background = Color(0xFFF4F4F2), onBackground = Color(0xFF111111),
-        surface = Color(0xFFF4F4F2), onSurface = Color(0xFF111111),
-        surfaceVariant = Color(0xFFEBEBE8), onSurfaceVariant = Color(0xFF3C3C39),
-        surfaceContainer = Color(0xFFEEEEEB), surfaceContainerLow = Color(0xFFFFFFFF),
-        surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFEBEBE8),
-        outline = Color(0xFFB4B4AE), outlineVariant = Color(0xFFE2E2DE),
+        background = Color(0xFFF7F7FB), onBackground = Color(0xFF111116),
+        surface = Color(0xFFF7F7FB), onSurface = Color(0xFF111116),
+        surfaceVariant = Color(0xFFEAEAF2), onSurfaceVariant = Color(0xFF3D3D46),
+        surfaceContainer = Color(0xFFF7F7FB), surfaceContainerLow = Color(0xFFFFFFFF),
+        surfaceContainerHigh = Color(0xFFFFFFFF), surfaceContainerHighest = Color(0xFFEAEAF2),
+        outline = Color(0xFFB6B6C4), outlineVariant = Color(0xFFE4E4EE),
         error = Color(0xFFD0262D), tertiary = Color(0xFF127A46),
     )
     val Dark: ColorScheme = darkColorScheme(
         primary = Color(0xFFA9A6FF), onPrimary = Color(0xFF0B0B14),
         primaryContainer = Color(0xFF37356E), onPrimaryContainer = Color(0xFFE4E3FF),
         secondaryContainer = Color(0xFF37356E), onSecondaryContainer = Color(0xFFE4E3FF),
-        background = Color(0xFF111112), onBackground = Color(0xFFF5F5F4),
-        surface = Color(0xFF111112), onSurface = Color(0xFFF5F5F4),
-        surfaceVariant = Color(0xFF2A2A2D), onSurfaceVariant = Color(0xFFD0D0CC),
-        surfaceContainer = Color(0xFF161618), surfaceContainerLow = Color(0xFF1C1C1E),
-        surfaceContainerHigh = Color(0xFF1C1C1E), surfaceContainerHighest = Color(0xFF2A2A2D),
-        outline = Color(0xFF4B4B50), outlineVariant = Color(0xFF303034),
+        background = Color(0xFF121218), onBackground = Color(0xFFF8F7FC),
+        surface = Color(0xFF121218), onSurface = Color(0xFFF8F7FC),
+        surfaceVariant = Color(0xFF2A2A33), onSurfaceVariant = Color(0xFFCFCFD9),
+        surfaceContainer = Color(0xFF121218), surfaceContainerLow = Color(0xFF1D1D24),
+        surfaceContainerHigh = Color(0xFF1D1D24), surfaceContainerHighest = Color(0xFF2A2A33),
+        outline = Color(0xFF4A4A56), outlineVariant = Color(0xFF30303A),
         error = Color(0xFFFF7B80), tertiary = Color(0xFF4ADE80),
     )
     val HighLight: ColorScheme = lightColorScheme(
@@ -65,7 +65,7 @@ object SuiteTokens {
     val RADIUS_SM = 8.dp
     val RADIUS_MD = 12.dp
     val RADIUS_POPUP = 14.dp
-    val RADIUS_LG = 20.dp
+    val RADIUS_LG = 28.dp
     val RADIUS_XL = 30.dp
     val SPACE_1 = 4.dp
     val SPACE_2 = 8.dp

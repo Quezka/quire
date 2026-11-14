@@ -177,14 +177,14 @@ class MainWindow(QMainWindow):
     def _focus_status(self, remaining: str):
         """Show the running focus timer on its sidebar entry and in the title bar."""
         button = self.sidebar.group.button(self.stack.indexOf(self.focus))
-        button.setText("  " + _("Focus") + (f"   {remaining}" if remaining else ""))
+        button.setText(_("Focus") + (f"\n{remaining}" if remaining else ""))  # rail: time under the name
         self.setWindowTitle(_("{remaining} · Quire").format(remaining=remaining) if remaining else _("Quire"))
 
     def _school_news(self, count: int):
         button = self.sidebar.group.button(self.stack.indexOf(self.school))
         seen = self.stack.currentWidget() is self.school
-        badge = "   " + _("{count} new").format(count=count) if count and not seen else ""
-        button.setText("  " + _("School") + badge)
+        badge = "\n" + _("{count} new").format(count=count) if count and not seen else ""
+        button.setText(_("School") + badge)
 
     def _shortcut(self, keys, slot):
         action = QAction(self)
