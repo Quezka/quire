@@ -429,4 +429,9 @@
     <string name="channel_nudges">Nudges (assistant)</string>
     <string name="channel_digest">Morning and evening digest</string>
     <string name="channel_now">Now and next (lock screen)</string>
+    <string name="nav_ideas">Ideas</string>
+    <string name="idea_jot">Jot an idea…</string>
+    <string name="ideas_hint">Catch it now, look at it later: new ideas come back in the evening digest.</string>
+    <string name="ideas_none">No ideas yet. The next one that comes to mind goes here.</string>
+    <string name="ideas_more_hint">Catch an idea in a second</string>
 </resources>

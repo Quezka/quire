@@ -445,4 +445,9 @@
     <string name="channel_nudges">Подсказки ассистента</string>
     <string name="channel_digest">Утренняя и вечерняя сводка</string>
     <string name="channel_now">Сейчас и дальше (экран блокировки)</string>
+    <string name="nav_ideas">Идеи</string>
+    <string name="idea_jot">Запиши идею…</string>
+    <string name="ideas_hint">Запиши сейчас, подумай потом: новые идеи вернутся в вечерней сводке.</string>
+    <string name="ideas_none">Идей пока нет. Следующая, что придёт в голову, пойдёт сюда.</string>
+    <string name="ideas_more_hint">Записать идею за секунду</string>
 </resources>

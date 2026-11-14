@@ -1,5 +1,7 @@
 package io.github.quezka.quire.data
 
+import io.github.quezka.quire.domain.Idea
+import io.github.quezka.quire.domain.Ideas
 import io.github.quezka.quire.domain.Agenda
 import io.github.quezka.quire.domain.AgendaItem
 import io.github.quezka.quire.domain.Course
@@ -121,6 +123,24 @@ class Repository(
     fun unmarkDose(medicineUid: String, day: LocalDate, planned: Int) {
         doseLogs().filter { it.medicineUid == medicineUid && it.day == day && it.planned == planned }
             .forEach { records.delete("dose", it.uid) }
+        changed()
+    }
+    fun ideas(): List<Idea> = Ideas.sorted(records.live("idea").mapNotNull(Codec::idea))
+    fun addIdea(text: String): Idea? {
+        val clean = text.trim()
+        if (!Ideas.valid(clean)) return null
+        val idea = Idea(Codec.newUid(), clean, now().withNano(0))
+        records.save("idea", idea.uid, Codec.ideaData(idea, null))
+        changed()
+        return idea
+    }
+    fun setIdeaDone(uid: String, done: Boolean) {
+        val idea = ideas().firstOrNull { it.uid == uid } ?: return
+        records.save("idea", uid, Codec.ideaData(idea.copy(done = done), records.get("idea", uid)?.data))
+        changed()
+    }
+    fun deleteIdea(uid: String) {
+        records.delete("idea", uid)
         changed()
     }
     fun routines(): List<Routine> = records.live("routine").map(Codec::routine)

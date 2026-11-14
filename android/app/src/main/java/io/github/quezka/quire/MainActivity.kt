@@ -66,13 +66,14 @@ import io.github.quezka.quire.ui.WorkScreen
 import java.time.LocalDate
 
 /** Pages reached from the More tab. */
-enum class Page { SCHOOL, WORK, FOCUS, SLEEP, WATER, MEDICINE, COURSES, SETTINGS }
+enum class Page { SCHOOL, WORK, FOCUS, SLEEP, WATER, MEDICINE, COURSES, SETTINGS, IDEAS }
 
 class MainActivity : ComponentActivity() {
     companion object {
         // Tabs are 0-4; 10 + a Page's position opens that page under More.
         const val TAB_SCHOOL = 10
         const val TAB_FOCUS = 12
+        const val TAB_IDEAS = 18
     }
 
     private var requested by mutableStateOf<Int?>(null)
@@ -199,6 +200,7 @@ private fun MorePages(container: Container, version: Int, page: Page?, open: (Pa
             Page.MEDICINE -> io.github.quezka.quire.ui.MedicineScreen(container, version, back)
             Page.COURSES -> CoursesScreen(container.repository, version, back)
             Page.SETTINGS -> SettingsScreen(container, back)
+            Page.IDEAS -> io.github.quezka.quire.ui.IdeasScreen(container, version, back)
         }
     }
 }

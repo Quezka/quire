@@ -1,5 +1,6 @@
 package io.github.quezka.quire.data
 
+import io.github.quezka.quire.domain.Idea
 import io.github.quezka.quire.domain.ClassSlot
 import io.github.quezka.quire.domain.Course
 import io.github.quezka.quire.domain.Event
@@ -162,6 +163,20 @@ object Codec {
     fun doseData(l: DoseLog, previous: JsonObject?) = merged(previous, mapOf(
         "medicine" to JsonPrimitive(l.medicineUid), "day" to JsonPrimitive(l.day.toString()),
         "planned" to JsonPrimitive(l.planned), "taken" to JsonPrimitive(l.taken), "at" to JsonPrimitive(l.at)))
+
+    // ---- ideas ----
+
+    private val SECONDS = java.time.format.DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss")
+
+    fun idea(r: SyncRecord): Idea? {
+        val d = r.data!!
+        val created = d.strOrNull("created")?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() } ?: return null
+        return Idea(r.uid, d.str("text"), created, d.bool("done"))
+    }
+
+    fun ideaData(i: Idea, previous: JsonObject?) = merged(previous, mapOf(
+        "text" to JsonPrimitive(i.text), "created" to JsonPrimitive(i.created.format(SECONDS)),
+        "done" to JsonPrimitive(i.done)))
 
     // ---- routines ----
 

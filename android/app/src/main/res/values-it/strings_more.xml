@@ -429,4 +429,9 @@
     <string name="channel_nudges">Promemoria dell\'assistente</string>
     <string name="channel_digest">Riepilogo del mattino e della sera</string>
     <string name="channel_now">Adesso e dopo (schermata di blocco)</string>
+    <string name="nav_ideas">Idee</string>
+    <string name="idea_jot">Annota un\'idea…</string>
+    <string name="ideas_hint">Prendila al volo, guardala dopo: le idee nuove tornano nel riepilogo della sera.</string>
+    <string name="ideas_none">Ancora nessuna idea. La prossima che ti viene in mente va qui.</string>
+    <string name="ideas_more_hint">Annota un\'idea in un secondo</string>
 </resources>
