@@ -5,6 +5,7 @@ from datetime import date, datetime, timedelta
 
 import json
 
+from ..domain.ideas import Idea
 from ..domain.medicine import DoseLog, Medicine
 from ..domain import (
     Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
@@ -349,6 +350,30 @@ class SqliteSleepRepository(_Repo):
 
     def delete(self, day):
         self._write("DELETE FROM sleep_logs WHERE day = ?", day.isoformat())
+
+
+class SqliteIdeaRepository(_Repo):
+    @staticmethod
+    def _idea(r) -> Idea:
+        return Idea(r["text"], datetime.fromisoformat(r["created"]), bool(r["done"]), r["id"])
+
+    def list(self):
+        return [self._idea(r) for r in self._all("SELECT * FROM ideas ORDER BY created DESC, id DESC")]
+
+    def get(self, idea_id):
+        row = self._one("SELECT * FROM ideas WHERE id = ?", idea_id)
+        return self._idea(row) if row else None
+
+    def add(self, idea: Idea) -> int:
+        return self._write("INSERT INTO ideas (text, created, done) VALUES (?, ?, ?)",
+                           idea.text, idea.created.isoformat(timespec="seconds"), int(idea.done))
+
+    def update(self, idea: Idea) -> None:
+        self._write("UPDATE ideas SET text = ?, created = ?, done = ? WHERE id = ?",
+                    idea.text, idea.created.isoformat(timespec="seconds"), int(idea.done), idea.id)
+
+    def delete(self, idea_id) -> None:
+        self._write("DELETE FROM ideas WHERE id = ?", idea_id)
 
 
 class SqliteWaterRepository(_Repo):

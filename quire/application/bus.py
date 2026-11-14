@@ -8,6 +8,7 @@ from typing import Callable
 class Topic(Enum):
     COURSES = "courses"
     EVENTS = "events"
+    IDEAS = "ideas"
     TASKS = "tasks"
     NOTES = "notes"
     JOURNAL = "journal"

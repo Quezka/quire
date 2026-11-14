@@ -6,6 +6,7 @@ from .model import (
     NoteImage, Notebook, Routine, Shift, ShiftPattern, Subject, Task, TaskKind, TimeRange, average, derive_note_title,
     image_markdown, image_uids, all_day_time, milestone_time, net_pay, normalize_topic, note_snippet, reschedule, work_shifts,
 )
+from .ideas import Idea
 from .water import WaterLog, expected_ml, reminder_due, water_goal_ml
 from .sleep import SleepLog, SleepStats, bedtime_for, regularity, should_wind_down, sleep_stats
 from .payroll import PayTerms, Payslip, monthly_gross, monthly_share, take_home, year_payslips
@@ -15,6 +16,7 @@ from .register import (
 )
 
 __all__ = [
+    "Idea",
     "WaterLog", "expected_ml", "reminder_due", "water_goal_ml",
     "SleepLog", "SleepStats", "bedtime_for", "regularity", "should_wind_down", "sleep_stats",
     "FocusSession", "FocusSettings", "Phase", "PhaseEnded", "PomodoroTimer",

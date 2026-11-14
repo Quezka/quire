@@ -641,3 +641,14 @@ def test_medicines_and_doses_reach_the_other_device(pair):
     b.sync.sync()
     a.sync.sync()
     assert a.medicine.medicines() == []
+
+
+def test_ideas_reach_the_other_device(pair):
+    a, b = pair
+    first = a.ideas.add("A shelf for the 3DS games")
+    a.ideas.add("Ask about the trip")
+    a.ideas.set_done(first, True)
+    a.sync.sync()
+    b.sync.sync()
+    there = {i.text: i.done for i in b.ideas.ideas()}
+    assert there == {"A shelf for the 3DS games": True, "Ask about the trip": False}

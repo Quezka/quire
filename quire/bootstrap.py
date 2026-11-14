@@ -10,7 +10,7 @@ from .application.ports import (
     UpdateInstaller,
 )
 from .application.services import (
-    CalendarService, FocusService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
+    CalendarService, FocusService, IdeaService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
     SchoolSyncService, Services, StartupService, SyncService, TaskService, TimetableService,
     UpdateService, WorkService,
 )
@@ -23,7 +23,7 @@ from .infrastructure.login_item import platform_login_item
 from .infrastructure.system_calendar import platform_calendar
 from .infrastructure.quiet import platform_quiet
 from .infrastructure.repositories import (
-    SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteWaterRepository, SqliteMedicineRepository, SqliteFocusLogRepository, SqliteJobRepository,
+    SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteWaterRepository, SqliteMedicineRepository, SqliteIdeaRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
     SqliteImageRepository, SqliteKeyValueStore, SqliteNotebookRepository, SqliteNoteRepository, SqliteSchoolRecordRepository,
     SqliteShiftRepository, SqliteTaskRepository,
@@ -78,6 +78,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                            SqliteFocusLogRepository(db)),
         water=WaterService(SqliteWaterRepository(db), settings, clock, bus),
         medicine=MedicineService(SqliteMedicineRepository(db), clock, bus),
+        ideas=IdeaService(SqliteIdeaRepository(db), clock, bus),
         calendar=CalendarService(planner, tasks_service, calendar or platform_calendar(), settings, clock),
         quiet=QuietService(planner, settings, clock, quiet or platform_quiet()),
         reminders=ReminderService(planner, settings, clock),

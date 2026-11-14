@@ -5,6 +5,7 @@ from dataclasses import dataclass
 from ..bus import ChangeBus
 from ..ports import Storage
 from .focus import FocusService, FocusStats
+from .ideas import IdeaService
 from .quiet import QuietService, QuietSettings
 from .sleep import SleepService
 from .calendar import CalendarService
@@ -38,6 +39,7 @@ class Services:
     sleep: SleepService
     water: WaterService
     medicine: MedicineService
+    ideas: IdeaService  # quick ideas, looked at again in the digest
     calendar: CalendarService
     quiet: QuietService  # Do Not Disturb while things are on
     reminders: ReminderService

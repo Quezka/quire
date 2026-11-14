@@ -4,7 +4,7 @@ from __future__ import annotations
 import sqlite3
 from pathlib import Path
 
-SCHEMA_VERSION = 19
+SCHEMA_VERSION = 20
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS courses (
@@ -105,6 +105,12 @@ CREATE TABLE IF NOT EXISTS medicine_doses (
     at_min      INTEGER NOT NULL DEFAULT 0
 );
 CREATE INDEX IF NOT EXISTS idx_dose_day ON medicine_doses(day);
+CREATE TABLE IF NOT EXISTS ideas (
+    id      INTEGER PRIMARY KEY,
+    text    TEXT NOT NULL,
+    created TEXT NOT NULL,
+    done    INTEGER NOT NULL DEFAULT 0
+);
 CREATE TABLE IF NOT EXISTS transactions (
     id       INTEGER PRIMARY KEY,
     day      TEXT NOT NULL,
@@ -245,6 +251,7 @@ class SqliteDatabase:
             self._add_column("jobs", column, definition)
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
                           " ON tasks(external_id) WHERE external_id IS NOT NULL")
+        # v20: ideas (table made by SCHEMA); money no longer used (its table stays).
         # v9: change tracking for sync between devices (ids, timestamps, tombstones).
         from .sync_store import install
         install(self.conn)

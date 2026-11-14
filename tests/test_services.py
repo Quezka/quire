@@ -556,3 +556,30 @@ def test_the_agenda_becomes_a_calendar_file_with_stable_ids(tmp_path):
     assert len(uids) >= 2
     services.calendar.set_enabled(False)
     assert not (tmp_path / "sources" / system.SOURCE).exists()
+
+
+def test_ideas_are_caught_listed_and_checked(tmp_path):
+    from datetime import datetime
+    from quire.application.bus import ChangeBus
+    from quire.application.services.ideas import IdeaService
+    from quire.domain import ValidationError
+    from quire.infrastructure.repositories import SqliteIdeaRepository
+    from quire.infrastructure.sqlite import SqliteDatabase
+
+    class Clock:
+        moment = datetime(2026, 11, 14, 21, 5)
+        def now(self): return self.moment
+        def today(self): return self.moment.date()
+
+    svc = IdeaService(SqliteIdeaRepository(SqliteDatabase(":memory:")), Clock(), ChangeBus())
+    one = svc.add("  a  new   game idea ")
+    two = svc.add("call grandma")
+    svc.set_done(one, True)
+    assert [i.text for i in svc.ideas()] == ["call grandma", "a new game idea"]
+    assert [i.text for i in svc.ideas(include_done=False)] == ["call grandma"]
+    assert len(svc.caught_between(Clock.moment.date(), Clock.moment.date())) == 2
+    import pytest
+    with pytest.raises(ValidationError):
+        svc.add("   ")
+    svc.delete(two)
+    assert len(svc.ideas()) == 1

@@ -135,6 +135,14 @@ class MedicineWeek:
 
 
 @dataclass(frozen=True)
+class IdeaRecord:
+    id: int
+    text: str
+    created: datetime
+    done: bool
+
+
+@dataclass(frozen=True)
 class SleepRecord:
     day: date  # the day you woke up
     asleep: int

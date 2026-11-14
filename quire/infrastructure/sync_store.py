@@ -53,6 +53,7 @@ SYNCED = (
     Synced("focus", "focus_sessions", RANDOM_UID),
     Synced("medicine", "medicines", RANDOM_UID),
     Synced("dose", "medicine_doses", RANDOM_UID),  # after its medicine
+    Synced("idea", "ideas", RANDOM_UID),
 )
 BY_KIND = {s.kind: s for s in SYNCED}
 ORDER = {s.kind: i for i, s in enumerate(SYNCED)}
@@ -214,6 +215,8 @@ class SqliteSyncStore:
         if kind == "dose":
             return {"medicine": self._uid("medicines", r["medicine_id"]), "day": r["day"], "planned": r["planned"],
                     "taken": bool(r["taken"]), "at": r["at_min"]}
+        if kind == "idea":
+            return {"text": r["text"], "created": r["created"], "done": bool(r["done"])}
         if kind == "sleep":
             return {"day": r["day"], "asleep": r["asleep"], "woke": r["woke"],
                     "quality": r["quality"], "note": r["note"]}
@@ -326,6 +329,8 @@ class SqliteSyncStore:
                 return False  # its medicine comes later
             values = {"medicine_id": medicine, "day": d["day"], "planned": d["planned"],
                       "taken": int(d.get("taken", True)), "at_min": d.get("at", 0)}
+        elif s.kind == "idea":
+            values = {"text": d["text"], "created": d["created"], "done": int(bool(d.get("done", False)))}
         elif s.kind == "sleep":
             values = {"day": d["day"], "asleep": d["asleep"], "woke": d["woke"],
                       "quality": d.get("quality"), "note": d.get("note", "")}

@@ -31,6 +31,7 @@ from .views.focus import FocusView
 from .views.sleep import SleepView
 from ..application.bus import Topic
 from .views.medicine import MedicineView
+from .views.ideas import IdeasView
 from .views.water import WaterView
 from .views.work import WorkView
 from .i18n import N_, _
@@ -90,7 +91,7 @@ class MainWindow(QMainWindow):
     PAGES = [("today", N_("Today")), ("week", N_("Week")), ("coursework", N_("Coursework")),
              ("notes", N_("Notes")), ("school", N_("School")), ("briefcase", N_("Work")),
              ("timer", N_("Focus")), ("moon", N_("Sleep")), ("drop", N_("Water")),
-             ("pill", N_("Medicines")), ("wallet", N_("Money"))]
+             ("pill", N_("Medicines")), ("star", N_("Ideas"))]
 
     def __init__(self, services: Services, tray=None):
         super().__init__()
@@ -114,12 +115,13 @@ class MainWindow(QMainWindow):
         self.sleep = SleepView(services, relay)
         self.water = WaterView(services, relay)
         self.medicine = MedicineView(services, relay)
+        self.ideas = IdeasView(services, relay)
 
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         for i, (page, (icon_name, label)) in enumerate(zip(
                 [self.today, self.week, self.coursework, self.notes, self.school, self.work,
-                 self.focus, self.sleep, self.water, self.medicine],
+                 self.focus, self.sleep, self.water, self.medicine, self.ideas],
                 self.PAGES)):
             self.stack.addWidget(page)
             self.sidebar.add_page(icon_name, _(label), f"Ctrl+{i + 1}" if i < 9 else "")
