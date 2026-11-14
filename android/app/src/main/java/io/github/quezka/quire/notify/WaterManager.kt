@@ -34,12 +34,12 @@ class WaterManager(
     /** Show a nudge now if behind the pace and not just reminded; the next check is planned either way. */
     fun check() {
         val p = profile()
-        val goal = p.goal
+        val goal = p.reminderGoal
         val time = now()
         val minute = time.hour * 60 + time.minute
         val last = settings.get("water.last")?.split("@")?.takeIf { it.size == 2 && it[0] == time.toLocalDate().toString() }
             ?.get(1)?.toIntOrNull()
-        if (p.remind && goal != null && Water.reminderDue(goal, drunkToday(), minute, last, p.start, p.end)) {
+        if (p.remind && Water.reminderDue(goal, drunkToday(), minute, last, p.start, p.end)) {
             settings.set("water.last", "${time.toLocalDate()}@$minute")
             notifier.water(drunkToday(), goal)
         }
@@ -49,7 +49,7 @@ class WaterManager(
     /** One alarm for the next check: every half hour in the waking window, else the next morning. */
     fun plan() {
         val p = profile()
-        if (!p.remind || p.goal == null) { notifier.wakeAt(Notifier.ACTION_WATER, null); return }
+        if (!p.remind) { notifier.wakeAt(Notifier.ACTION_WATER, null); return }
         val time = now()
         val minute = time.hour * 60 + time.minute
         val next = when {

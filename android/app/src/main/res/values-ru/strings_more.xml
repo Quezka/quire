@@ -439,4 +439,10 @@
     <string name="focus_block_plan">%1$d раундов концентрации, %2$d мин перерывов между ними.</string>
     <string name="focus_block_done">Блок завершён</string>
     <string name="focus_block_done_text">Отлично. Теперь он в твоей неделе.</string>
+    <string name="channel_water">Вода</string>
+    <string name="channel_medicine">Лекарства</string>
+    <string name="channel_sleep">Сон</string>
+    <string name="channel_nudges">Подсказки ассистента</string>
+    <string name="channel_digest">Утренняя и вечерняя сводка</string>
+    <string name="channel_now">Сейчас и дальше (экран блокировки)</string>
 </resources>

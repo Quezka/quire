@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- the suite's accent (suite-rs/design/tokens.json): tints Quire's notification icons -->
+    <color name="notification_accent">#4F46E5</color>
+</resources>

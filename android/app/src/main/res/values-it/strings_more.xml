@@ -423,4 +423,10 @@
     <string name="focus_block_plan">%1$d turni di concentrazione, %2$d min di pause in mezzo.</string>
     <string name="focus_block_done">Blocco finito</string>
     <string name="focus_block_done_text">Ottimo lavoro. Ora è nella tua settimana.</string>
+    <string name="channel_water">Acqua</string>
+    <string name="channel_medicine">Medicine</string>
+    <string name="channel_sleep">Sonno</string>
+    <string name="channel_nudges">Promemoria dell\'assistente</string>
+    <string name="channel_digest">Riepilogo del mattino e della sera</string>
+    <string name="channel_now">Adesso e dopo (schermata di blocco)</string>
 </resources>

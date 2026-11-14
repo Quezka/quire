@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Material Symbols "pill" (Apache 2.0), from suite-kit/quezka_ui/symbols.py -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp" android:height="24dp" android:viewportWidth="960" android:viewportHeight="960">
+    <group android:translateY="960">
+        <path android:fillColor="#FFFFFFFF" android:pathData="M420-254.5h120v-100h100v-120H540v-100H420v100H320v120h100v100Zm-140 151q-37.54 0-64.27-26.73Q189-156.96 189-194.5v-440q0-37.54 26.73-64.27Q242.46-725.5 280-725.5h400q37.54 0 64.27 26.73Q771-672.04 771-634.5v440q0 37.54-26.73 64.27Q717.54-103.5 680-103.5H280Zm-47.41-662v-91h494.82v91H232.59Z" />
+    </group>
+</vector>

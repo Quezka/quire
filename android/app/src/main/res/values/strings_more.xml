@@ -423,4 +423,10 @@
     <string name="focus_block_plan">%1$d focus rounds, %2$d min of breaks in between.</string>
     <string name="focus_block_done">Focus block done</string>
     <string name="focus_block_done_text">Well done. It\'s in your week now.</string>
+    <string name="channel_water">Water</string>
+    <string name="channel_medicine">Medicines</string>
+    <string name="channel_sleep">Sleep</string>
+    <string name="channel_nudges">Nudges (assistant)</string>
+    <string name="channel_digest">Morning and evening digest</string>
+    <string name="channel_now">Now and next (lock screen)</string>
 </resources>

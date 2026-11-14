@@ -53,4 +53,10 @@ data class WaterProfile(
     val manualGoal: Int? = null, // chosen by hand; otherwise it comes from height and weight
 ) {
     val goal: Int? get() = manualGoal ?: if (heightCm != null && weightKg != null) Water.goal(heightCm, weightKg) else null
+
+    /** What the reminders aim for: the goal, or 2 litres before height and weight are set (so the phone reminds
+     *  you to drink from the first day, without any setup). */
+    val reminderGoal: Int get() = goal ?: WATER_DEFAULT_GOAL
 }
+
+const val WATER_DEFAULT_GOAL = 2000

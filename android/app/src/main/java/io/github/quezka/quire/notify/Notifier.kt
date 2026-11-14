@@ -30,12 +30,18 @@ import java.time.ZoneId
 /** Posts Quire's notifications and wakes the app for reminders and the focus timer. */
 class Notifier(private val context: Context) {
     companion object {
-        // A channel's sound can't change once created, so the chime came with new ids;
-        // the old soundless channels are deleted in createChannels().
-        const val REMINDERS = "reminders_chime"
-        const val FOCUS = "focus_chime"
-        const val SCHOOL = "school_chime"
-        private val OLD_CHANNELS = listOf("reminders", "focus", "school")
+        // one channel per kind, each with its own icon (2026-11-14): the user can silence one kind and keep the rest;
+        // a channel's sound and importance can't change once created, so old ids are deleted in createChannels()
+        const val REMINDERS = "quire_events"
+        const val WATER = "quire_water"
+        const val MEDICINE = "quire_medicine"
+        const val SLEEP = "quire_sleep"
+        const val FOCUS = "quire_focus"
+        const val SCHOOL = "quire_school"
+        const val DIGEST = "quire_digest"
+        const val NUDGES = "quire_nudges"
+        const val NOW = "quire_now"
+        private val OLD_CHANNELS = listOf("reminders", "focus", "school", "reminders_chime", "focus_chime", "school_chime")
         const val ACTION_REMIND = "io.github.quezka.quire.REMIND"
         const val ACTION_FOCUS = "io.github.quezka.quire.FOCUS"
         const val ACTION_QUIET = "io.github.quezka.quire.QUIET"
@@ -63,10 +69,19 @@ class Notifier(private val context: Context) {
         fun channel(id: String, name: Int, importance: Int) =
             NotificationChannel(id, context.getString(name), importance).apply { setSound(chime, audio) }
         OLD_CHANNELS.forEach(manager::deleteNotificationChannel)
+        val high = NotificationManager.IMPORTANCE_HIGH
         manager.createNotificationChannels(listOf(
-            channel(REMINDERS, R.string.channel_reminders, NotificationManager.IMPORTANCE_HIGH),
-            channel(FOCUS, R.string.channel_focus, NotificationManager.IMPORTANCE_HIGH),
+            channel(REMINDERS, R.string.channel_reminders, high),
+            channel(WATER, R.string.channel_water, high),
+            channel(MEDICINE, R.string.channel_medicine, high),
+            channel(SLEEP, R.string.channel_sleep, high),
+            channel(FOCUS, R.string.channel_focus, high),
+            channel(NUDGES, R.string.channel_nudges, high),
+            channel(DIGEST, R.string.channel_digest, NotificationManager.IMPORTANCE_DEFAULT),
             channel(SCHOOL, R.string.channel_school, NotificationManager.IMPORTANCE_DEFAULT),
+            // the lock-screen glance: always there, never a sound
+            NotificationChannel(NOW, context.getString(R.string.channel_now), NotificationManager.IMPORTANCE_LOW)
+                .apply { setSound(null, null); setShowBadge(false); lockscreenVisibility = android.app.Notification.VISIBILITY_PUBLIC },
         ))
     }
 
@@ -81,6 +96,10 @@ class Notifier(private val context: Context) {
 
     @Suppress("MissingPermission")
     private fun post(id: Int, builder: NotificationCompat.Builder) {
+        // every quire notif: high priority, accent colour, shown in full on the lock screen
+        builder.setPriority(NotificationCompat.PRIORITY_HIGH)
+            .setColor(ContextCompat.getColor(context, R.color.notification_accent))
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
         if (allowed()) NotificationManagerCompat.from(context).notify(id, builder.build())
     }
 
@@ -96,7 +115,7 @@ class Notifier(private val context: Context) {
         else context.resources.getQuantityString(R.plurals.starts_in, left, left)
         val place = listOf(r.item.room).filter { it.isNotBlank() }
         post(r.key.hashCode(), NotificationCompat.Builder(context, REMINDERS)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_n_event)
             .setContentTitle(r.item.title)
             .setContentText((listOf("$kind · ${minutes(r.item.start)}", `when`) + place).joinToString(" · "))
             .setCategory(NotificationCompat.CATEGORY_REMINDER)
@@ -112,30 +131,30 @@ class Notifier(private val context: Context) {
             Phase.LONG_BREAK -> if (continuing) R.string.long_break_running else R.string.long_break_ready
         })
         post(FOCUS_ID, NotificationCompat.Builder(context, FOCUS)
-            .setSmallIcon(R.drawable.ic_notification).setContentTitle(title).setContentText(text)
+            .setSmallIcon(R.drawable.ic_n_focus).setContentTitle(title).setContentText(text)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(openApp(MainActivity.TAB_FOCUS)).setAutoCancel(true))
     }
 
     fun focusBlockDone() {
         post(FOCUS_ID, NotificationCompat.Builder(context, FOCUS)
-            .setSmallIcon(R.drawable.ic_notification).setContentTitle(context.getString(R.string.focus_block_done))
+            .setSmallIcon(R.drawable.ic_n_focus).setContentTitle(context.getString(R.string.focus_block_done))
             .setContentText(context.getString(R.string.focus_block_done_text))
             .setCategory(NotificationCompat.CATEGORY_ALARM)
             .setContentIntent(openApp(MainActivity.TAB_FOCUS)).setAutoCancel(true))
     }
 
     fun windDown(bedtime: Int) {
-        post(SLEEP_ID, NotificationCompat.Builder(context, REMINDERS)
-            .setSmallIcon(R.drawable.ic_notification)
+        post(SLEEP_ID, NotificationCompat.Builder(context, SLEEP)
+            .setSmallIcon(R.drawable.ic_n_sleep).setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentTitle(context.getString(R.string.sleep_wind_down_title))
             .setContentText(context.getString(R.string.sleep_wind_down_text, minutes(bedtime)))
             .setContentIntent(openApp(0)).setAutoCancel(true))
     }
 
     fun water(drunk: Int, goal: Int) {
-        post(WATER_ID, NotificationCompat.Builder(context, REMINDERS)
-            .setSmallIcon(R.drawable.ic_notification)
+        post(WATER_ID, NotificationCompat.Builder(context, WATER)
+            .setSmallIcon(R.drawable.ic_n_water).setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentTitle(context.getString(R.string.water_reminder_title))
             .setContentText(context.getString(R.string.water_reminder_text, drunk, goal))
             .setContentIntent(openApp(0)).setAutoCancel(true))
@@ -143,8 +162,8 @@ class Notifier(private val context: Context) {
 
     fun medicine(name: String, dose: String, planned: Int) {
         val what = if (dose.isBlank()) name else "$name · $dose"
-        post(MEDICINE_ID + Math.floorMod((name + planned).hashCode(), 20), NotificationCompat.Builder(context, REMINDERS)
-            .setSmallIcon(R.drawable.ic_notification)
+        post(MEDICINE_ID + Math.floorMod((name + planned).hashCode(), 20), NotificationCompat.Builder(context, MEDICINE)
+            .setSmallIcon(R.drawable.ic_n_medicine).setCategory(NotificationCompat.CATEGORY_REMINDER)
             .setContentTitle(context.getString(R.string.medicine_reminder_title))
             .setContentText(context.getString(R.string.medicine_reminder_text, what, minutes(planned)))
             .setContentIntent(openApp(0)).setAutoCancel(true))
@@ -162,7 +181,7 @@ class Notifier(private val context: Context) {
         val style = NotificationCompat.InboxStyle()
         lines.forEach(style::addLine)
         post(SCHOOL_ID, NotificationCompat.Builder(context, SCHOOL)
-            .setSmallIcon(R.drawable.ic_notification)
+            .setSmallIcon(R.drawable.ic_n_school)
             .setContentTitle(context.getString(R.string.news_from_school))
             .setContentText(lines.first()).setStyle(style)
             .setContentIntent(openApp(MainActivity.TAB_SCHOOL)).setAutoCancel(true))
