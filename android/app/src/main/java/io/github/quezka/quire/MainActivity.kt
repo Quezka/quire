@@ -122,10 +122,9 @@ class MainActivity : ComponentActivity() {
                         // The bar and the pages follow each other: a swipe changes the tab, a tap slides the pages.
                         LaunchedEffect(tab) { if (tabs.currentPage != tab) tabs.animateScrollToPage(tab) }
                         LaunchedEffect(tabs.settledPage) { tab = tabs.settledPage }
-                        // The bottom bar is glass: the pages run under it and it blurs them.
                         val pagesHaze = remember { HazeState() }
                         Scaffold(bottomBar = {
-                            NavigationBar(Modifier.glass(pagesHaze, glassStyle()), containerColor = Color.Transparent) {
+                            NavigationBar(containerColor = MaterialTheme.colorScheme.surfaceContainerHighest) {
                                 val items = listOf(
                                     Triple(R.string.nav_today, Icons.Filled.Today, 0),
                                     Triple(R.string.nav_week, Icons.Filled.CalendarViewWeek, 1),
@@ -140,7 +139,7 @@ class MainActivity : ComponentActivity() {
                                 }
                             }
                         }) { padding ->
-                            Box(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize().haze(pagesHaze)) {
+                            Box(Modifier.padding(top = padding.calculateTopPadding()).fillMaxSize()) {
                               CompositionLocalProvider(LocalBottomInset provides padding.calculateBottomPadding()) {
                                 HorizontalPager(tabs, Modifier.fillMaxSize(), beyondViewportPageCount = 1, key = { it }) { shown ->
                                     when (shown) {

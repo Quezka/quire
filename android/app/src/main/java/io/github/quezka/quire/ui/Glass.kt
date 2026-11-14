@@ -1,5 +1,6 @@
 package io.github.quezka.quire.ui
 
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
@@ -58,12 +59,11 @@ fun GlassScreen(bar: @Composable () -> Unit, content: @Composable (PaddingValues
     var barPx by remember { mutableIntStateOf(0) }
     val top: Dp = with(density) { barPx.toDp() }
     Box(Modifier.fillMaxSize()) {
-        Box(Modifier.fillMaxSize().haze(haze)) {
+        Box(Modifier.fillMaxSize()) {
             content(PaddingValues(top = top, bottom = LocalBottomInset.current))
         }
         Column(Modifier.fillMaxWidth().glass(haze, glassStyle()).onSizeChanged { barPx = it.height }) {
             bar()
-            HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
         }
     }
 }
@@ -73,9 +73,10 @@ fun GlassScreen(bar: @Composable () -> Unit, content: @Composable (PaddingValues
  * a 28 dp blur hides the difference, and it's far less work per frame for the phone's GPU (scrolling under the
  * bars was janky at full size).
  */
-@OptIn(ExperimentalHazeApi::class)
+@Suppress("UNUSED_PARAMETER")
 fun Modifier.glass(state: HazeState, style: HazeStyle): Modifier =
-    hazeChild(state, style) { inputScale = HazeInputScale.Fixed(0.33f) }
+    // m3 tonal (2026-11-14): user rm glass -> solid bar, no blur
+    background(style.backgroundColor)
 
 /** Adds a screen's own padding to the glass padding. */
 fun PaddingValues.plus(start: Dp = 0.dp, top: Dp = 0.dp, end: Dp = 0.dp, bottom: Dp = 0.dp): PaddingValues =

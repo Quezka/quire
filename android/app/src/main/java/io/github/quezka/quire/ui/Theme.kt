@@ -30,10 +30,7 @@ internal val Light = SuiteTokens.Light
 
 internal val Dark = SuiteTokens.Dark
 
-/**
- * Liquid glass, Apple style, as across the suite: backgrounds and content stay solid, and the bars that float over
- * content (the top bar of the main screens, the bottom navigation) blur what scrolls under them. See `Glass.kt`.
- */
+/** Material 3 tonal, as across the suite (since 0.47): solid bars and cards, no blur. */
 object Glass {
     /** A content surface: solid, as content is in Apple's glass design. */
     @Composable
