@@ -24,6 +24,7 @@ from ..widgets import SubjectDelegate, TwoLineDelegate, mark_color
 from .common import Card, Page, StatTile, button, icon_button, label, primary_button
 from .school_panels import AbsencesPanel, BooksPanel, NoticesPanel, SubjectDialog
 from ..i18n import _
+from quezka_ui.fit import exec_menu
 
 AUTO_SYNC_MINUTES = 30
 
@@ -524,7 +525,7 @@ class SchoolView(Page):
         open_notes = menu.addAction(_("Open the class notes"))
         topic = item.data(Qt.UserRole + 30)
         new = menu.addAction(_("New note on this topic")) if topic else None
-        chosen = menu.exec(self.lessons.viewport().mapToGlobal(pos))
+        chosen = exec_menu(menu, self.lessons.viewport().mapToGlobal(pos))
         if chosen is open_notes:
             self._open_lesson_note(item)
         elif chosen is not None and chosen is new:

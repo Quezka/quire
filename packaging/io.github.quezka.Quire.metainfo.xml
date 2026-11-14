@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.46.2" date="2026-11-14">
+      <description>
+        <p>Menus open where you click at any interface size; the sidebar fits its title and goes icons-only in a narrow window.</p>
+      </description>
+    </release>
     <release version="0.46.1" date="2026-11-09">
       <description>
         <p>Phone: no swipe-to-delete on notes, readable format buttons in dark mode, smoother glass bars.</p>

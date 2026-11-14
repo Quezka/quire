@@ -4,6 +4,11 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.46.2] - 2026-11-14
+
+- **Menus open where you click, at any interface size** (they used to drift up and left above 100 %, on Wayland).
+- **The sidebar fits its title and page names**, and shows only icons while the window is narrow.
+
 ## [0.46.1] - 2026-11-09
 
 - Phone: no more deleting a note by swiping it sideways (a swipe moves between sections, and notes went missing

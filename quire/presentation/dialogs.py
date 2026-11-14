@@ -29,6 +29,7 @@ from .widgets import (
     qtime_to_min,
 )
 from .i18n import N_, _, month_name, weekday_name, weekday_names
+from quezka_ui.fit import exec_menu
 
 
 def to_qdate(d: date) -> QDate:
@@ -1301,7 +1302,7 @@ def new_item_menu(parent, services: Services, day: date, minute: int, pos=None):
     event = menu.addAction(_("Event…"))
     milestone = menu.addAction(_("Milestone…"))
     shift = menu.addAction(_("Work shift…"))
-    chosen = menu.exec(pos or QCursor.pos())
+    chosen = exec_menu(menu, pos or QCursor.pos())
     if chosen is event:
         EventDialog(services, day=day, start=minute, parent=parent).exec()
     elif chosen is milestone:

@@ -16,6 +16,7 @@ from .. import theme
 from ..formatting import money
 from ..i18n import _
 from .common import Card
+from quezka_ui.fit import exec_menu
 
 
 def _litres(ml: int) -> str:
@@ -105,7 +106,7 @@ class QuickLog(Card):
     @staticmethod
     def _menu_on_right_click(button: QToolButton, menu):
         button.setContextMenuPolicy(Qt.CustomContextMenu)
-        button.customContextMenuRequested.connect(lambda pos: (m := menu()) and m.exec(button.mapToGlobal(pos)))
+        button.customContextMenuRequested.connect(lambda pos: (m := menu()) and exec_menu(m, button.mapToGlobal(pos)))
 
     def _medicine_menu(self) -> QMenu | None:
         if len(self._pending) < 2:

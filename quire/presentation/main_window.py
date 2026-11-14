@@ -35,13 +35,13 @@ from .views.medicine import MedicineView
 from .views.water import WaterView
 from .views.work import WorkView
 from .i18n import N_, _
+from quezka_ui.fit import fit_sidebar
 
 
 class Sidebar(QFrame):
     def __init__(self, parent=None):
         super().__init__(parent)
         self.setObjectName("sidebar")
-        self.setFixedWidth(181)
         self.group = QButtonGroup(self)
         self.group.setExclusive(True)
 
@@ -67,6 +67,8 @@ class Sidebar(QFrame):
         layout.addLayout(self.nav)
         layout.addStretch()
         layout.addLayout(self.footer)
+
+        fit_sidebar(self, 181)
 
     def nav_button(self, icon_name: str, text: str, checkable: bool = True) -> QToolButton:
         button = QToolButton(objectName="nav", text=f"  {text}", checkable=checkable)

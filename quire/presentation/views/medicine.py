@@ -20,6 +20,7 @@ from ..i18n import _, weekday_names
 from ..notify import notify
 from ..widgets import TwoLineDelegate
 from .common import Card, Page, label, primary_button, scrolling
+from quezka_ui.fit import exec_menu
 
 
 def parse_times(text: str) -> tuple[int, ...]:
@@ -209,7 +210,7 @@ class MedicineView(Page):
         taken = menu.addAction(_("Taken"))
         skipped = menu.addAction(_("Skipped"))
         clear = menu.addAction(_("Not yet"))
-        chosen = menu.exec(self.doses.viewport().mapToGlobal(pos))
+        chosen = exec_menu(menu, self.doses.viewport().mapToGlobal(pos))
         if chosen is taken:
             self.medicine.mark(medicine_id, day, planned, True)
         elif chosen is skipped:

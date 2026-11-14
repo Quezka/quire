@@ -27,6 +27,7 @@ from ..note_images import OPENABLE, load_picture, note_pdf, notes_pdf, picture_f
 from ..widgets import TwoLineDelegate, color_icon, scaled_font
 from .common import Card, Page, icon_button, label, primary_button
 from ..i18n import N_, _
+from quezka_ui.fit import exec_menu
 
 PLACEHOLDER = N_(
     "Start typing. The first line becomes the title.\n\n"
@@ -448,7 +449,7 @@ class NotesView(Page):
             _kind, home, topic = key
             new = menu.addAction(_("New note in this topic"))
             rename = menu.addAction(_("Rename topic…")) if topic else None
-            chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+            chosen = exec_menu(menu, self.list.viewport().mapToGlobal(pos))
             course_id, notebook_id = self._ids_of(home)
             if chosen is new:
                 self._open(self.notes.create("", course_id, topic, notebook_id))
@@ -460,7 +461,7 @@ class NotesView(Page):
             new = menu.addAction(_("New note in this notebook") if notebook_id is not None
                                  else _("New note in this class"))
             edit = menu.addAction(_("Edit notebook…")) if notebook_id is not None else None
-            chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+            chosen = exec_menu(menu, self.list.viewport().mapToGlobal(pos))
             if chosen is new:
                 self._open(self.notes.create("", course_id, "", notebook_id))
             elif chosen is not None and chosen is edit:
@@ -471,7 +472,7 @@ class NotesView(Page):
             if len(chosen_ids) > 1:
                 together = menu.addAction(_("Export {notes} as one PDF…").format(notes=plural(len(chosen_ids), "note")))
             delete = menu.addAction(_("Delete note")) if together is None else None
-            chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+            chosen = exec_menu(menu, self.list.viewport().mapToGlobal(pos))
             if chosen is not None and chosen is together:
                 self.export_many(chosen_ids)
             elif chosen is not None and chosen is delete:
@@ -728,7 +729,7 @@ class NotesView(Page):
         standard = self.editor.createStandardContextMenu(pos)
         for action in standard.actions():
             menu.addAction(action)
-        menu.exec(self.editor.viewport().mapToGlobal(pos))
+        exec_menu(menu, self.editor.viewport().mapToGlobal(pos))
 
     def _copy_picture(self, uid: str):
         record = self.notes.image(uid)

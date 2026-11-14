@@ -19,6 +19,7 @@ from ..i18n import _
 from ..notify import notify
 from ..widgets import ProgressRing, min_to_qtime, qtime_to_min
 from .common import Card, Page, label, primary_button, scrolling
+from quezka_ui.fit import exec_menu
 
 
 class WeekBars(QWidget):
@@ -227,7 +228,7 @@ class WaterView(Page):
             return
         menu = QMenu(self)
         remove = menu.addAction(_("Remove this entry"))
-        if menu.exec(self.entries.viewport().mapToGlobal(pos)) is remove:
+        if exec_menu(menu, self.entries.viewport().mapToGlobal(pos)) is remove:
             self.water.delete(item.data(Qt.UserRole))
 
     def _pick_day(self, day):

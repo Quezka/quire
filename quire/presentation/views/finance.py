@@ -25,6 +25,7 @@ from ..i18n import _, month_name
 from quezka_ui.widgets import Segmented
 from ..widgets import TwoLineDelegate
 from .common import Card, Page, StatTile, button, icon_button, label, primary_button, scrolling
+from quezka_ui.fit import exec_menu
 
 
 def cents_text(cents: int) -> str:
@@ -225,7 +226,7 @@ class FinanceView(Page):
         menu = QMenu(self)
         edit = menu.addAction(_("Edit…"))
         delete = menu.addAction(_("Delete entry"))
-        chosen = menu.exec(self.list.viewport().mapToGlobal(pos))
+        chosen = exec_menu(menu, self.list.viewport().mapToGlobal(pos))
         if chosen is edit:
             self._edit(item)
         elif chosen is delete and confirm(self, _("Delete entry"), _("Delete this entry?")):
