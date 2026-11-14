@@ -456,6 +456,7 @@
     <string name="glance_step">Один шаг: %1$s</string>
     <string name="glance_free">Сейчас ничего не запланировано</string>
     <string name="glance_water">Вода %1$.1f из %2$.1f л</string>
+    <string name="digest_button">Сводка: день одним взглядом</string>
     <string name="digest_morning">Доброе утро: твой день</string>
     <string name="digest_evening">Добрый вечер: завтра и идеи дня</string>
     <string name="digest_free_today">Сегодня ничего не запланировано</string>

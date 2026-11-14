@@ -4,6 +4,12 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.50.0] - 2026-11-14
+
+- **Digest button on Today** (computer and phone): see your day at a glance whenever you want, not only at 7:30 and 21:30. Until 17:00 it shows today (15:00 on the phone), after that tomorrow and today's ideas.
+- **Ideas reach every device:** a record from a newer Quire on another device (like ideas, before this computer had them) used to be skipped for good. It now waits until this copy is updated, and every device fetches everything once more so ideas missed earlier arrive.
+- **Better on a laptop screen:** when the window is too low for the page names under the icons, they move beside the icons instead of squeezing into each other; Today's right-hand column scrolls instead of squashing the Due list.
+
 ## [0.49.0] - 2026-11-14
 
 - **Morning and evening digest on the computer too:** at 7:30 a notification with your day (what's planned, what's due, ideas from yesterday), at 21:30 tomorrow and today's ideas. Each comes once a day; switch it off in Settings › Reminders.

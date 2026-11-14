@@ -1015,6 +1015,8 @@ MESSAGES = {
     "To do: {task}": "Сделать: {task}",
     "{n} late: just start one": "Просрочено {n}: начни с одной",
     "Idea: {idea}": "Идея: {idea}",
+    "Digest": "Сводка",
+    "Digest: your day at a glance": "Сводка: день одним взглядом",
     "Good morning: your day": "Доброе утро: твой день",
     "Good evening: tomorrow and today's ideas": "Добрый вечер: завтра и идеи дня",
     "Morning and evening digest": "Утренняя и вечерняя сводка",

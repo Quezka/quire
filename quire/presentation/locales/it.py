@@ -1013,6 +1013,8 @@ MESSAGES = {
     "To do: {task}": "Da fare: {task}",
     "{n} late: just start one": "{n} in ritardo: inizia da uno",
     "Idea: {idea}": "Idea: {idea}",
+    "Digest": "Riepilogo",
+    "Digest: your day at a glance": "Riepilogo: la giornata a colpo d'occhio",
     "Good morning: your day": "Buongiorno: la tua giornata",
     "Good evening: tomorrow and today's ideas": "Buonasera: domani e le idee di oggi",
     "Morning and evening digest": "Riepilogo del mattino e della sera",

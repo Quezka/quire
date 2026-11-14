@@ -71,6 +71,9 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.ImeAction
@@ -107,6 +110,17 @@ private const val TODAY_PAGE = DAYS / 2
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun TodayScreen(container: Container, version: Int, openTask: (String) -> Unit, newTask: (LocalDate) -> Unit) {
+    var digest by remember { mutableStateOf<Pair<String, List<String>>?>(null) }
+    digest?.let { (title, lines) ->
+        androidx.compose.material3.AlertDialog(onDismissRequest = { digest = null },
+            title = { Text(title) },
+            text = {
+                Column(Modifier.verticalScroll(rememberScrollState())) {
+                    lines.forEach { Text(it, style = MaterialTheme.typography.bodyLarge, modifier = Modifier.padding(vertical = 4.dp)) }
+                }
+            },
+            confirmButton = { androidx.compose.material3.TextButton(onClick = { digest = null }) { Text(stringResource(R.string.close)) } })
+    }
     val repo = container.repository
     val scope = rememberCoroutineScope()
     val today = repo.today()
@@ -149,6 +163,9 @@ TopAppBar(
                     }
                 },
                 actions = {
+                    IconButton(onClick = { digest = container.assistant.digestNow() }) {
+                        Icon(painterResource(R.drawable.ic_n_digest), stringResource(R.string.digest_button))
+                    }
                     IconButton(onClick = { scope.launch { pager.animateScrollToPage(pager.currentPage - 1) } }) {
                         Icon(Icons.AutoMirrored.Filled.KeyboardArrowLeft, stringResource(R.string.previous_day))
                     }

@@ -6,8 +6,8 @@ from datetime import date, datetime, timedelta
 from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
-    QCalendarWidget, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
-    QPlainTextEdit, QScrollArea, QToolButton, QVBoxLayout, QWidgetAction,
+    QCalendarWidget, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
+    QPlainTextEdit, QScrollArea, QToolButton, QVBoxLayout, QWidget, QWidgetAction,
 )
 
 from ...application.bus import Topic
@@ -64,7 +64,10 @@ class TodayView(Page):
         self.today_btn = button(_("Today"))
         self.today_btn.clicked.connect(lambda: self.go_to(self.planner.today()))
         add = menu_button(_("Add"), add_menu(self, self.services, lambda: self.day), primary=True)
-        self.add_actions(pick, self.today_btn, add)
+        brief = button(_("Digest"))
+        brief.setToolTip(_("Digest: your day at a glance"))
+        brief.clicked.connect(self._show_digest)
+        self.add_actions(pick, brief, self.today_btn, add)
 
         # ---- timeline ----
         self.grid = TimeGrid()
@@ -114,16 +117,26 @@ class TodayView(Page):
 
         self.quick_log = QuickLog(services)
         self.now_card = NowCard(services, relay)
-        side = QVBoxLayout()
+        # side column scrolls when short (1366x768 laptop) <- else Due squeezed to 0 rows
+        due.setMinimumHeight(230)
+        notes.setMinimumHeight(130)
+        side_box = QWidget()
+        side = QVBoxLayout(side_box)
+        side.setContentsMargins(0, 0, 0, 0)
         side.setSpacing(16)
         side.addWidget(self.now_card)
         side.addWidget(self.quick_log)
         side.addWidget(due, 3)
         side.addWidget(notes, 1)
+        side_scroll = QScrollArea(widgetResizable=True, frameShape=QFrame.NoFrame)
+        side_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
+        side_scroll.setWidget(side_box)
+        side_scroll.viewport().setAutoFillBackground(False)
+        side_box.setAutoFillBackground(False)
         body = QHBoxLayout()
         body.setSpacing(16)
         body.addWidget(timeline, 5)
-        body.addLayout(side, 3)
+        body.addWidget(side_scroll, 3)
         self.root.addLayout(body, 1)
 
         relay.changed.connect(self._changed)
@@ -134,6 +147,10 @@ class TodayView(Page):
         self.set_day(self.day)
 
     # ---- navigation -----------------------------------------------------
+
+    def _show_digest(self):
+        from ..digest import DigestDialog
+        DigestDialog(self.services.digest.current(), self).exec()
 
     def set_day(self, day: date):
         self.flush_journal()

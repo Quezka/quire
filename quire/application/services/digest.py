@@ -23,6 +23,7 @@ class DigestService:
 
     PREFIX = "digest."
     MORNING, EVENING = 7 * 60 + 30, 21 * 60 + 30
+    SWITCH_HOUR = 17  # by-hand digest: today's before, tomorrow's after
 
     def __init__(self, planner, tasks, ideas, settings: KeyValueStore, clock: Clock):
         self._planner, self._tasks, self._ideas = planner, tasks, ideas
@@ -47,6 +48,11 @@ class DigestService:
                 self._settings.set(self.PREFIX + key, today.isoformat())
                 return self.build(morning, today)
         return None
+
+    def current(self) -> Digest:
+        """The digest for right now, asked for by hand: today's until 17:00, then tomorrow's. Doesn't mark it shown."""
+        now: datetime = self._clock.now()
+        return self.build(now.hour < self.SWITCH_HOUR, now.date())
 
     def build(self, morning: bool, today: date) -> Digest:
         day = today if morning else today + timedelta(days=1)

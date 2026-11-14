@@ -652,3 +652,28 @@ def test_ideas_reach_the_other_device(pair):
     b.sync.sync()
     there = {i.text: i.done for i in b.ideas.ideas()}
     assert there == {"A shelf for the 3DS games": True, "Ask about the trip": False}
+
+
+def test_records_of_a_kind_this_app_does_not_know_wait_for_an_update(pair, monkeypatch):
+    from quire.infrastructure import sync_store
+
+    a, b = pair
+    a.ideas.add("Sent while the other device was older")
+    a.sync.sync()
+    # b is an older app: it doesn't know ideas yet.
+    older = {k: v for k, v in sync_store.BY_KIND.items() if k != "idea"}
+    monkeypatch.setattr(sync_store, "BY_KIND", older)
+    b.sync.sync()
+    assert b.ideas.ideas() == []
+    monkeypatch.undo()
+    # After the update the waiting idea comes in, though the cloud has nothing new.
+    b.sync.sync()
+    assert [i.text for i in b.ideas.ideas()] == ["Sent while the other device was older"]
+
+
+def test_every_device_pulls_everything_once_after_an_update(pair):
+    a, b = pair
+    a.sync.sync()
+    assert a.sync.prepare().cursor is not None
+    a.sync._set("full_pull", None)  # as on a device updated from before the full pull
+    assert a.sync.prepare().cursor is None

@@ -181,10 +181,10 @@ class Notifier(private val context: Context) {
 
     fun cancelNow() = NotificationManagerCompat.from(context).cancel(NOW_ID)
 
-    fun digest(morning: Boolean, items: List<io.github.quezka.quire.domain.AgendaItem>,
-               due: List<io.github.quezka.quire.domain.Task>, overdue: Int, ideas: List<String>,
-               held: List<Pair<String, Int>>) {
-        val lines = buildList {
+    /** The digest's lines: for the notification and for the Digest button on Today. */
+    fun digestLines(morning: Boolean, items: List<io.github.quezka.quire.domain.AgendaItem>,
+                    due: List<io.github.quezka.quire.domain.Task>, overdue: Int, ideas: List<String>,
+                    held: List<Pair<String, Int>>): List<String> = buildList {
             if (items.isEmpty()) add(context.getString(if (morning) R.string.digest_free_today else R.string.digest_free_tomorrow))
             for (i in items.sortedBy { it.start }.take(5)) add("${minutes(i.start)}  ${i.title}")
             for (t in due.take(4)) add(context.getString(R.string.digest_task, t.title))
@@ -192,6 +192,14 @@ class Notifier(private val context: Context) {
             for (idea in ideas.take(5)) add(context.getString(R.string.digest_idea, idea))
             for ((app, count) in held.take(6)) add(context.getString(R.string.digest_held, app, count))
         }
+
+    fun digestTitle(morning: Boolean): String =
+        context.getString(if (morning) R.string.digest_morning else R.string.digest_evening)
+
+    fun digest(morning: Boolean, items: List<io.github.quezka.quire.domain.AgendaItem>,
+               due: List<io.github.quezka.quire.domain.Task>, overdue: Int, ideas: List<String>,
+               held: List<Pair<String, Int>>) {
+        val lines = digestLines(morning, items, due, overdue, ideas, held)
         val style = NotificationCompat.InboxStyle()
         lines.forEach(style::addLine)
         post(DIGEST_ID, NotificationCompat.Builder(context, DIGEST)

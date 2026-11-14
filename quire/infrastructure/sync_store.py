@@ -248,10 +248,15 @@ class SqliteSyncStore:
             # Newest version of each record only, parents first.
             latest: dict[tuple[str, str], SyncRecord] = {}
             for record in [*waiting, *records]:
-                if record.kind in BY_KIND:
-                    known = latest.get(record.key)
-                    if known is None or record.modified > known.modified:
-                        latest[record.key] = record
+                known = latest.get(record.key)
+                if known is None or record.modified > known.modified:
+                    latest[record.key] = record
+            # kind unknown here (newer app elsewhere) -> keep in inbox, apply after update
+            # <- drop + cursor move on => record lost for ever
+            for record in [r for r in latest.values() if r.kind not in BY_KIND]:
+                conn.execute("INSERT OR REPLACE INTO sync_inbox VALUES (?, ?, ?)",
+                             (record.kind, record.uid, _dump(record)))
+                del latest[record.key]
             for record in sorted(latest.values(), key=lambda r: ORDER[r.kind]):
                 s = BY_KIND[record.kind]
                 local = self._local_modified(s, record.uid)

@@ -174,16 +174,9 @@ class MainWindow(QMainWindow):
             return
         if d is None:
             return
-        from .formatting import fmt_min
+        from . import digest
         from .notify import notify
-        lines = [f"{fmt_min(m)}  {t}" for m, t in d.items] or [
-            _("Nothing planned today") if d.morning else _("Nothing planned tomorrow")]
-        lines += [_("To do: {task}").format(task=t) for t in d.due]
-        if d.overdue:
-            lines.append(_("{n} late: just start one").format(n=d.overdue))
-        lines += [_("Idea: {idea}").format(idea=i) for i in d.ideas]
-        notify(_("Good morning: your day") if d.morning else _("Good evening: tomorrow and today's ideas"),
-               "\n".join(lines))
+        notify(digest.title(d), "\n".join(digest.lines(d)))
 
     def show_page(self, index: int):
         if self.stack.currentWidget() is self.notes and index != 3:
@@ -196,7 +189,8 @@ class MainWindow(QMainWindow):
     def _focus_status(self, remaining: str):
         """Show the running focus timer on its sidebar entry and in the title bar."""
         button = self.sidebar.group.button(self.stack.indexOf(self.focus))
-        button.setText(_("Focus") + (f"\n{remaining}" if remaining else ""))  # rail: time under the name
+        gap = button.text()[:len(button.text()) - len(button.text().lstrip(" "))]  # rail beside-icon gap
+        button.setText(gap + _("Focus") + (f"\n{remaining}" if remaining else ""))  # rail: time under the name
         self.setWindowTitle(_("{remaining} · Quire").format(remaining=remaining) if remaining else _("Quire"))
 
     def _school_news(self, count: int):

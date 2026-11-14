@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.50.0" date="2026-11-14">
+      <description>
+        <p>A Digest button on Today, ideas that reach every device, and a better fit on laptop screens.</p>
+      </description>
+    </release>
     <release version="0.49.0" date="2026-11-14">
       <description>
         <p>A morning and evening digest on the computer.</p>

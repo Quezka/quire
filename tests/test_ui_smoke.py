@@ -654,15 +654,15 @@ def test_focus_page_start_pause_and_sidebar_countdown(window, services, app):
     page = window.focus
     window.show_page(window.stack.indexOf(page))
     button = window.sidebar.group.button(window.stack.indexOf(page))
-    assert page.start_btn.text() == "Start" and button.text() == "Focus"
+    assert page.start_btn.text() == "Start" and button.text().strip() == "Focus"
 
     page._toggle()
     assert page.start_btn.text() == "Pause"
-    assert button.text().startswith("Focus\n2")  # e.g. "Focus\n25:00", the time under the name in the rail
+    assert button.text().lstrip().startswith("Focus\n2")  # e.g. "Focus\n25:00", the time under the name in the rail
     assert window.windowTitle().endswith("· Quire")
 
     page._toggle()
-    assert page.start_btn.text() == "Resume" and button.text() == "Focus"
+    assert page.start_btn.text() == "Resume" and button.text().strip() == "Focus"
     assert window.windowTitle() == "Quire"
 
     page._skip()

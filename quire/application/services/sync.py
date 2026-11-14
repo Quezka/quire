@@ -18,6 +18,7 @@ from ..ports import (
 TOPICS = {"course": Topic.COURSES, "event": Topic.EVENTS, "routine": Topic.EVENTS, "task": Topic.TASKS,
           "note": Topic.NOTES, "image": Topic.NOTES, "notebook": Topic.NOTES, "journal": Topic.JOURNAL, "idea": Topic.IDEAS, "sleep": Topic.SLEEP, "water": Topic.WATER, "medicine": Topic.MEDICINE, "dose": Topic.MEDICINE, "job": Topic.WORK, "shift": Topic.WORK,
           "focus": Topic.FOCUS}
+FULL_PULL = "v20-ideas"  # change -> every device pull all records once more
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
 _PROJECT = re.compile(r"^[a-z0-9][a-z0-9-]{4,28}[a-z0-9]$")
 
@@ -193,7 +194,9 @@ class SyncService:
         config, saved = self.config(), self._secrets.load()
         if config is None or saved is None:
             raise SyncNotSetUp("Set up sync first.")
-        return SyncJob(config, saved.password, self._get("cursor") or None,
+        # full pull once per FULL_PULL <- old app drop kinds it not know (ideas before v20)
+        cursor = self._get("cursor") or None if self._get("full_pull") == FULL_PULL else None
+        return SyncJob(config, saved.password, cursor,
                        tuple(self._store.outgoing()))
 
     def exchange(self, job: SyncJob) -> SyncExchange:
@@ -214,6 +217,7 @@ class SyncService:
         changed = self._store.apply(list(exchange.incoming))
         self._store.mark_sent(list(exchange.sent))
         self._set("cursor", exchange.cursor)
+        self._set("full_pull", FULL_PULL)
         self._set("last_sync", self._clock.now().isoformat(timespec="seconds"))
         self._set("problem", None)
         saved = self._secrets.load()

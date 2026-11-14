@@ -389,3 +389,13 @@ def test_the_digest_comes_once_in_the_morning_and_once_in_the_evening(focus_env)
     digest.set_enabled(False)
     clock.advance(days=1)
     assert digest.due_now() is None
+
+
+def test_the_digest_button_shows_todays_by_day_and_tomorrows_by_evening(focus_env):
+    services, clock, _ = focus_env
+    digest = services.digest
+    clock.moment = clock.moment.replace(hour=10, minute=0)
+    assert digest.current().morning
+    assert digest.due_now() is not None  # asking by hand doesn't use up the 7:30 one
+    clock.moment = clock.moment.replace(hour=18, minute=0)
+    assert not digest.current().morning

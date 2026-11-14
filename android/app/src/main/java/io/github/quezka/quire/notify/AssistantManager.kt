@@ -71,6 +71,18 @@ class AssistantManager(
         if (!morning) hub.clearHeld()
     }
 
+    /** The digest right now, asked for by hand (Today's Digest button): title and lines; posts and clears nothing. */
+    fun digestNow(): Pair<String, List<String>> {
+        val t = now()
+        val today = t.toLocalDate()
+        val morning = t.hour < 15
+        val day = repo.day(if (morning) today else today.plusDays(1))
+        val tasks = repo.tasks()
+        val ideas = io.github.quezka.quire.domain.Ideas.caughtBetween(repo.ideas(), today.minusDays(if (morning) 1 else 0), today)
+        return notifier.digestTitle(morning) to notifier.digestLines(morning, day.items, Assistant.dueOn(tasks, day.day),
+            Assistant.overdue(tasks, today), ideas.filter { !it.done }.map { it.text }, Assistant.heldLines(hub.held()))
+    }
+
     /** Mid-afternoon: one small step, with a button that starts focusing on it. Nothing when there's nothing due. */
     fun nudge() {
         val step = Assistant.nextStep(repo.tasks(), now().toLocalDate()) ?: return
