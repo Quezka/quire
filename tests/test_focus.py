@@ -371,3 +371,21 @@ def test_a_block_stopped_early_still_counts_until_now(focus_env):
     clock.advance(minutes=40)
     services.focus.reset()
     assert "Focus" in repr(services.planner.week_agenda(T0.date()))
+
+
+def test_the_digest_comes_once_in_the_morning_and_once_in_the_evening(focus_env):
+    services, clock, _ = focus_env
+    digest = services.digest
+    services.ideas.add("A shelf for the games")
+    clock.moment = clock.moment.replace(hour=7, minute=0)
+    assert digest.due_now() is None
+    clock.moment = clock.moment.replace(hour=7, minute=31)
+    morning = digest.due_now()
+    assert morning is not None and morning.morning and "A shelf for the games" in morning.ideas
+    assert digest.due_now() is None  # once a day
+    clock.moment = clock.moment.replace(hour=21, minute=40)
+    evening = digest.due_now()
+    assert evening is not None and not evening.morning
+    digest.set_enabled(False)
+    clock.advance(days=1)
+    assert digest.due_now() is None

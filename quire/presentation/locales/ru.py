@@ -1010,4 +1010,13 @@ MESSAGES = {
     "Next: {what} at {time}": "Дальше: {what} в {time}",
     "at {time}": "в {time}",
     "Nothing to do right now. Breathe.": "Сейчас делать нечего. Выдохни.",
+    "Nothing planned today": "Сегодня ничего не запланировано",
+    "Nothing planned tomorrow": "Завтра ничего не запланировано",
+    "To do: {task}": "Сделать: {task}",
+    "{n} late: just start one": "Просрочено {n}: начни с одной",
+    "Idea: {idea}": "Идея: {idea}",
+    "Good morning: your day": "Доброе утро: твой день",
+    "Good evening: tomorrow and today's ideas": "Добрый вечер: завтра и идеи дня",
+    "Morning and evening digest": "Утренняя и вечерняя сводка",
+    "At 7:30 your day; at 21:30 tomorrow and today's ideas.": "В 7:30 — твой день; в 21:30 — завтра и идеи дня.",
 }

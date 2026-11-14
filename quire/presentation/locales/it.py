@@ -1008,4 +1008,13 @@ MESSAGES = {
     "Next: {what} at {time}": "Dopo: {what} alle {time}",
     "at {time}": "alle {time}",
     "Nothing to do right now. Breathe.": "Niente da fare adesso. Respira.",
+    "Nothing planned today": "Niente in programma oggi",
+    "Nothing planned tomorrow": "Niente in programma domani",
+    "To do: {task}": "Da fare: {task}",
+    "{n} late: just start one": "{n} in ritardo: inizia da uno",
+    "Idea: {idea}": "Idea: {idea}",
+    "Good morning: your day": "Buongiorno: la tua giornata",
+    "Good evening: tomorrow and today's ideas": "Buonasera: domani e le idee di oggi",
+    "Morning and evening digest": "Riepilogo del mattino e della sera",
+    "At 7:30 your day; at 21:30 tomorrow and today's ideas.": "Alle 7:30 la tua giornata; alle 21:30 domani e le idee di oggi.",
 }

@@ -4,6 +4,10 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.49.0] - 2026-11-14
+
+- **Morning and evening digest on the computer too:** at 7:30 a notification with your day (what's planned, what's due, ideas from yesterday), at 21:30 tomorrow and today's ideas. Each comes once a day; switch it off in Settings › Reminders.
+
 ## [0.48.0] - 2026-11-14
 
 Quire becomes more of a personal assistant (easier with ADHD), and Money is gone (your bank app does it).

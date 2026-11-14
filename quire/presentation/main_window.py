@@ -130,6 +130,9 @@ class MainWindow(QMainWindow):
         self.focus.statusChanged.connect(self._focus_status)
         self.today.now_card.focusRequested.connect(lambda: self.show_page(self.PAGES.index(("timer", "Focus"))))
         self.reminders = Reminders(services.reminders, self)
+        # morning / evening digest: checked every minute, each shown once a day
+        self._digest_timer = QTimer(self, interval=60_000, timeout=self._digest)
+        self._digest_timer.start()
         self._calendar_timer = QTimer(self, singleShot=True, interval=3000, timeout=self._publish_calendar)
         relay.changed.connect(self._agenda_changed)
         self._calendar_timer.start()  # at start: the days have moved on since last time
@@ -163,6 +166,24 @@ class MainWindow(QMainWindow):
         self.show_page(int(settings.value("window/tab", 0)))
 
     # ---- navigation -------------------------------------------------------
+
+    def _digest(self):
+        try:
+            d = self.services.digest.due_now()
+        except Exception:  # never let the digest stop the app
+            return
+        if d is None:
+            return
+        from .formatting import fmt_min
+        from .notify import notify
+        lines = [f"{fmt_min(m)}  {t}" for m, t in d.items] or [
+            _("Nothing planned today") if d.morning else _("Nothing planned tomorrow")]
+        lines += [_("To do: {task}").format(task=t) for t in d.due]
+        if d.overdue:
+            lines.append(_("{n} late: just start one").format(n=d.overdue))
+        lines += [_("Idea: {idea}").format(idea=i) for i in d.ideas]
+        notify(_("Good morning: your day") if d.morning else _("Good evening: tomorrow and today's ideas"),
+               "\n".join(lines))
 
     def show_page(self, index: int):
         if self.stack.currentWidget() is self.notes and index != 3:

@@ -220,6 +220,8 @@ class SettingsDialog(SettingsWindow):
         card.row(_("Remind me"), self.remind, remind_hint, stretch_control=True)
         card.wide(layout=self._labelled(_("For"), remind_kinds))
         card.row(_("Play Quire's chime with notifications"), chime_box)
+        card.switch(_("Morning and evening digest"), self.services.digest.enabled(),
+                    _("At 7:30 your day; at 21:30 tomorrow and today's ideas."), self.services.digest.set_enabled)
         card = remind_page.card(_("Do Not Disturb"))
         card.row(_("Silence notifications while things are on"), self.quiet_on, quiet_hint)
         card.wide(layout=self._labelled(_("For"), quiet_kinds))

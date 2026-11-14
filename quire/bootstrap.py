@@ -10,7 +10,7 @@ from .application.ports import (
     UpdateInstaller,
 )
 from .application.services import (
-    CalendarService, FocusService, IdeaService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
+    CalendarService, DigestService, FocusService, IdeaService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
     SchoolSyncService, Services, StartupService, SyncService, TaskService, TimetableService,
     UpdateService, WorkService,
 )
@@ -63,6 +63,7 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     planner = PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts,
                               SqliteRoutineRepository(db))
     tasks_service = TaskService(tasks, courses, clock, bus)
+    ideas = IdeaService(SqliteIdeaRepository(db), clock, bus)
     services = Services(
         timetable=TimetableService(courses, bus),
         planner=planner,
@@ -78,7 +79,8 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
                            SqliteFocusLogRepository(db)),
         water=WaterService(SqliteWaterRepository(db), settings, clock, bus),
         medicine=MedicineService(SqliteMedicineRepository(db), clock, bus),
-        ideas=IdeaService(SqliteIdeaRepository(db), clock, bus),
+        ideas=ideas,
+        digest=DigestService(planner, tasks_service, ideas, settings, clock),
         calendar=CalendarService(planner, tasks_service, calendar or platform_calendar(), settings, clock),
         quiet=QuietService(planner, settings, clock, quiet or platform_quiet()),
         reminders=ReminderService(planner, settings, clock),
