@@ -1000,4 +1000,12 @@ MESSAGES = {
     "No ideas yet. The next one that comes to mind goes here.": "Ancora nessuna idea. La prossima che ti viene in mente va qui.",
     "Bring back": "Riporta tra le aperte",
     "Idea saved.": "Idea salvata.",
+    "Start focusing": "Inizia a concentrarti",
+    "Done, what's next?": "Fatto, e dopo?",
+    "Now": "Adesso",
+    "The one thing now": "L'unica cosa adesso",
+    "until {time}": "fino alle {time}",
+    "Next: {what} at {time}": "Dopo: {what} alle {time}",
+    "at {time}": "alle {time}",
+    "Nothing to do right now. Breathe.": "Niente da fare adesso. Respira.",
 }

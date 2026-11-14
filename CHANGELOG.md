@@ -4,6 +4,19 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.48.0] - 2026-11-14
+
+Quire becomes more of a personal assistant (easier with ADHD), and Money is gone (your bank app does it).
+
+- **The one thing now:** Today starts with one card: what's on now, or the one task to do next, with **Start focusing** and **Done, what's next?**
+- **Focus blocks:** choose "focus for 2 hours" and Quire splits it into rounds and breaks by itself; when it ends it's in your week as an event.
+- **Ideas:** a new page to catch an idea in a second (Enter and it's saved), synced with the phone and shown again in the evening digest.
+- **Phone assistant** (Settings › Assistant): a quiet *now and next* notification on the lock screen (what's on, what's next, the next step, water), a **morning and evening digest**, an afternoon **nudge** with one small step, and a **notification hub**: with notification access, other apps' notifications wait for the digest (or come in batches every few hours), calls and alarms always come through, and each app can be set to show, wait or be muted.
+- **Phone notifications:** one channel per kind (water, medicines, events, sleep, focus, school, digest, nudges), each with its own icon and high importance.
+- **Water reminders on the phone** work from the first day, without entering height and weight (2 litres until you do).
+- **Tasks on the phone** adapt to wide screens (tablet, landscape) and have a quick add at the top.
+- **Removed: Money** (the page, the expense in Quick log and payday booking). Old entries stay in the database untouched.
+
 ## [0.47.0] - 2026-11-14
 
 The suite's new look: **Material 3, tonal** (no more liquid glass).

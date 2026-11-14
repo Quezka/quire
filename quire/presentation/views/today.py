@@ -30,6 +30,7 @@ from .common import (
 )
 from ..i18n import _
 from .quick_log import QuickLog
+from .now_card import NowCard
 
 
 class TodayView(Page):
@@ -112,8 +113,10 @@ class TodayView(Page):
         self._journal_dirty = False
 
         self.quick_log = QuickLog(services)
+        self.now_card = NowCard(services, relay)
         side = QVBoxLayout()
         side.setSpacing(16)
+        side.addWidget(self.now_card)
         side.addWidget(self.quick_log)
         side.addWidget(due, 3)
         side.addWidget(notes, 1)

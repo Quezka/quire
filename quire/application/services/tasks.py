@@ -59,6 +59,19 @@ class TaskService:
         self._tasks.update(task)
         self._bus.publish(Topic.TASKS)
 
+    def next_step(self) -> TaskRecord | None:
+        """The one task to do next (ADHD-friendly: never a list): the oldest overdue, else one due today, else the
+        soonest due. Tasks without a date don't push themselves forward."""
+        today = self._clock.today()
+        open_ = [t for t in self._tasks.list(include_done=False) if t.due is not None]
+        overdue = sorted((t for t in open_ if t.due < today), key=lambda t: t.due)
+        due_today = sorted((t for t in open_ if t.due == today), key=lambda t: t.title.casefold())
+        later = sorted((t for t in open_ if t.due > today), key=lambda t: t.due)
+        for group in (overdue, due_today, later):
+            if group:
+                return task_record(group[0])
+        return None
+
     def delete(self, task_id: int):
         self._tasks.delete(task_id)
         self._bus.publish(Topic.TASKS)

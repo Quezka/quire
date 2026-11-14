@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.48.0" date="2026-11-14">
+      <description>
+        <p>One-thing-now card, focus blocks, Ideas, the phone assistant (lock-screen glance, digests, nudges, notification hub); Money removed.</p>
+      </description>
+    </release>
     <release version="0.47.0" date="2026-11-14">
       <description>
         <p>The suite's new Material 3 tonal look: a navigation rail, tonal colours, round cards, no glass.</p>

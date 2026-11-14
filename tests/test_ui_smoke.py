@@ -1240,3 +1240,14 @@ def test_quick_log_on_the_main_page(window, services, app):
     log.refresh()
     log.medicine.click()
     assert services.medicine.pending() == []
+
+
+def test_the_now_card_offers_one_step_and_starts_focus(window, services):
+    card = window.today.now_card
+    card.refresh()
+    step = services.tasks.next_step()
+    if step is not None and card.focus_btn.isVisible():
+        assert card.headline.text() == step.title
+        card.focus_btn.click()
+        assert services.focus.state().running
+        services.focus.reset()

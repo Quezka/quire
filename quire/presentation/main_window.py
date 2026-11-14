@@ -128,6 +128,7 @@ class MainWindow(QMainWindow):
         self.sidebar.group.idClicked.connect(self.show_page)
         self.school.newsChanged.connect(self._school_news)
         self.focus.statusChanged.connect(self._focus_status)
+        self.today.now_card.focusRequested.connect(lambda: self.show_page(self.PAGES.index(("timer", "Focus"))))
         self.reminders = Reminders(services.reminders, self)
         self._calendar_timer = QTimer(self, singleShot=True, interval=3000, timeout=self._publish_calendar)
         relay.changed.connect(self._agenda_changed)

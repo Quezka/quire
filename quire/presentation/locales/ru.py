@@ -1002,4 +1002,12 @@ MESSAGES = {
     "No ideas yet. The next one that comes to mind goes here.": "Идей пока нет. Следующая, что придёт в голову, пойдёт сюда.",
     "Bring back": "Вернуть",
     "Idea saved.": "Идея сохранена.",
+    "Start focusing": "Начать концентрацию",
+    "Done, what's next?": "Готово, что дальше?",
+    "Now": "Сейчас",
+    "The one thing now": "Одно дело сейчас",
+    "until {time}": "до {time}",
+    "Next: {what} at {time}": "Дальше: {what} в {time}",
+    "at {time}": "в {time}",
+    "Nothing to do right now. Breathe.": "Сейчас делать нечего. Выдохни.",
 }
