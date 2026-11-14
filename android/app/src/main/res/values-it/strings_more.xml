@@ -417,4 +417,10 @@
     <string name="quick_took_done">%1$s segnato come preso.</string>
     <string name="quick_spent">Spesi %1$s.</string>
     <string name="quick_undo">Annulla</string>
+    <string name="focus_block">Blocco di concentrazione</string>
+    <string name="focus_block_start">Inizia il blocco</string>
+    <string name="focus_block_left">Blocco in corso: mancano %1$s. Quando finisce va nella tua settimana.</string>
+    <string name="focus_block_plan">%1$d turni di concentrazione, %2$d min di pause in mezzo.</string>
+    <string name="focus_block_done">Blocco finito</string>
+    <string name="focus_block_done_text">Ottimo lavoro. Ora è nella tua settimana.</string>
 </resources>

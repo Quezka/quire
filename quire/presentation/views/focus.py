@@ -1,8 +1,8 @@
 """Pomodoro focus timer, in the spirit of KDE's Francis."""
 from __future__ import annotations
 
-from PySide6.QtCore import QTimer, Signal
-from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QVBoxLayout
+from PySide6.QtCore import Qt, QTimer, Signal
+from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from ...application.bus import Topic
 from ...application.errors import ApplicationError, DomainError
@@ -71,11 +71,36 @@ class FocusView(Page):
         task_row.addWidget(self.task)
         task_row.addStretch()
 
+        # A focus block: "focus for 2 hours", split into rounds and breaks, kept in the week as an event.
+        self.block_length = QComboBox()
+        for minutes in (30, 45, 60, 90, 120, 150, 180, 240):
+            hours, rest = divmod(minutes, 60)
+            text = (_("{h} h {m} min").format(h=hours, m=rest) if hours and rest
+                    else _("{h} h").format(h=hours) if hours else _("{m} min").format(m=rest))
+            self.block_length.addItem(text, minutes)
+        self.block_length.setCurrentIndex(self.block_length.findData(120))
+        self.block_btn = QPushButton(_("Start a focus block"))
+        self.block_btn.setCursor(Qt.PointingHandCursor)
+        self.block_btn.clicked.connect(self._start_block)
+        self.block_length.currentIndexChanged.connect(lambda _i: self._render_block_plan())
+        block_row = QHBoxLayout()
+        block_row.addStretch()
+        block_row.addWidget(label(_("Focus for"), "muted"))
+        block_row.addWidget(self.block_length)
+        block_row.addWidget(self.block_btn)
+        block_row.addStretch()
+        self.block_plan = label("", "hint")
+        self.block_plan.setAlignment(Qt.AlignCenter)
+        self.block_plan.setWordWrap(True)
+
         timer_card = Card(padding=24)
         timer_card.add(self.ring, 1)
         timer_card.body.addLayout(controls)
         timer_card.body.addSpacing(6)
         timer_card.body.addLayout(task_row)
+        timer_card.body.addSpacing(10)
+        timer_card.body.addLayout(block_row)
+        timer_card.add(self.block_plan)
 
         # ---- stats ----
         stats = Card(_("Today"))
@@ -141,13 +166,34 @@ class FocusView(Page):
         self.focus.reset()
         self._render()
 
+    def _start_block(self):
+        self._task_picked()
+        self.focus.start_block(self.block_length.currentData())
+        self._render()
+
+    def _render_block_plan(self):
+        left = self.focus.state().block_left_seconds
+        if left is not None:
+            self.block_plan.setText(_("Focus block on: {time} left. It goes into your week when it ends.")
+                                    .format(time=clock_text(left) if left < 3600 else
+                                            _("{h} h {m} min").format(h=int(left // 3600), m=int(left % 3600 // 60))))
+            return
+        plan = self.focus.block_plan(self.block_length.currentData())
+        rounds = sum(1 for phase, _m in plan if phase is Phase.WORK)
+        breaks = sum(m for phase, m in plan if phase is not Phase.WORK)
+        self.block_plan.setText(_("{rounds} focus rounds with {breaks} min of breaks in between.")
+                                .format(rounds=rounds, breaks=breaks))
+
     def _skip(self):
         self.focus.skip()
         self._render()
 
     def _tick(self):
         event = self.focus.tick()
-        if event is not None:
+        if event is not None and event.block_done:
+            notify(_("Focus block done"), _("Well done. It's in your week now."))
+            self._render_stats()
+        elif event is not None:
             if event.phase is Phase.WORK:
                 notify(_("Focus session done"),
                        _("Nice work. Time for a long break.")
@@ -169,6 +215,8 @@ class FocusView(Page):
         self.ring.set_state(timer.progress, clock_text(remaining),
                             PHASE_LABELS[timer.phase], color, (done, timer.rounds))
         running = timer.running
+        self._render_block_plan()
+        self.block_btn.setText(_("Restart the block") if timer.block_left_seconds is not None else _("Start a focus block"))
         self.start_btn.setText(_("Pause") if running else _("Resume") if timer.started
                                else C_("button", "Start"))
         icon = "pause" if running else "play"

@@ -433,4 +433,10 @@
     <string name="quick_took_done">%1$s отмечено как принятое.</string>
     <string name="quick_spent">Потрачено %1$s.</string>
     <string name="quick_undo">Отменить</string>
+    <string name="focus_block">Блок концентрации</string>
+    <string name="focus_block_start">Начать блок</string>
+    <string name="focus_block_left">Блок идёт: осталось %1$s. Когда закончится, он появится в неделе.</string>
+    <string name="focus_block_plan">%1$d раундов концентрации, %2$d мин перерывов между ними.</string>
+    <string name="focus_block_done">Блок завершён</string>
+    <string name="focus_block_done_text">Отлично. Теперь он в твоей неделе.</string>
 </resources>

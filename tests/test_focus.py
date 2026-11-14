@@ -315,3 +315,59 @@ def test_quitting_mid_session_adds_the_focus_so_far(focus_env):
     assert (stats.today_sessions, stats.today_minutes) == (0, 18)
     focus.stop()  # quitting again (nothing running) adds nothing
     assert focus.stats().today_minutes == 18
+
+
+def test_a_two_hour_block_splits_into_rounds_and_ends_with_focus():
+    from quire.domain.focus import plan_block
+    plan = plan_block(120, FocusSettings())
+    assert sum(m for _, m in plan) == 120 and plan[-1][0] is Phase.WORK
+    assert [p for p, _ in plan][:4] == [Phase.WORK, Phase.SHORT_BREAK, Phase.WORK, Phase.SHORT_BREAK]
+    assert plan_block(20, FocusSettings()) == [(Phase.WORK, 20)]
+    assert plan_block(28, FocusSettings()) == [(Phase.WORK, 28)]
+    assert plan_block(60, FocusSettings()) == [(Phase.WORK, 25), (Phase.SHORT_BREAK, 5), (Phase.WORK, 30)]
+    import pytest
+    from quire.domain import ValidationError
+    with pytest.raises(ValidationError):
+        plan_block(0, FocusSettings())
+
+
+def test_a_block_runs_by_itself_and_stops_at_its_end():
+    from datetime import datetime, timedelta
+    t = PomodoroTimer(FocusSettings(work_minutes=25, short_break_minutes=5, auto_continue=False))
+    start = datetime(2026, 11, 14, 9, 0)
+    t.start_block(start, 60)
+    ended, now = [], start
+    while True:
+        now += timedelta(seconds=30)
+        e = t.tick(now)
+        if e:
+            ended.append(e)
+            if e.block_done:
+                break
+        assert now < start + timedelta(minutes=70)
+    assert [e.phase for e in ended] == [Phase.WORK, Phase.SHORT_BREAK, Phase.WORK, Phase.WORK]
+    assert sum(e.minutes for e in ended if e.phase is Phase.WORK) == 55 and not t.in_block and not t.running
+
+
+def test_a_finished_block_goes_into_the_week_as_an_event(focus_env):
+    services, clock, _ = focus_env
+    focus = services.focus
+    focus.set_focus_project("History essay")
+    focus.start_block(30)
+    assert focus.state().block_left_seconds == 30 * 60
+    ended = None
+    for _ in range(40):
+        clock.advance(minutes=1)
+        ended = focus.tick() or ended
+    assert ended is not None and ended.block_done
+    week = services.planner.week_agenda(T0.date())
+    assert "Focus: History essay" in repr(week)
+    assert focus.state().block_left_seconds is None
+
+
+def test_a_block_stopped_early_still_counts_until_now(focus_env):
+    services, clock, _ = focus_env
+    services.focus.start_block(120)
+    clock.advance(minutes=40)
+    services.focus.reset()
+    assert "Focus" in repr(services.planner.week_agenda(T0.date()))

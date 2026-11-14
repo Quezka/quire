@@ -3,14 +3,15 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 
-from ...domain import FocusSession, FocusSettings, Phase, PomodoroTimer, Task
+from ...domain import Event, FocusSession, FocusSettings, Phase, PomodoroTimer, Task, TimeRange
+from ...domain.focus import plan_block
 from ..bus import ChangeBus, Topic
 from ..dto import TaskItem
 from ..records import (
     FocusEvent, FocusSettingsData, FocusState, TaskRecord, course_record, focus_settings_data,
     task_record,
 )
-from ..ports import Clock, CourseRepository, FocusLogRepository, KeyValueStore, TaskRepository
+from ..ports import Clock, CourseRepository, EventRepository, FocusLogRepository, KeyValueStore, TaskRepository
 
 
 @dataclass(frozen=True)
@@ -34,13 +35,14 @@ class FocusService:
 
     def __init__(self, log: FocusLogRepository, settings: KeyValueStore,
                  tasks: TaskRepository, courses: CourseRepository, clock: Clock,
-                 bus: ChangeBus):
+                 bus: ChangeBus, events: EventRepository | None = None):
         self._log = log
         self._settings = settings
         self._tasks = tasks
         self._courses = courses
         self._clock = clock
         self._bus = bus
+        self._events = events
         self._timer = PomodoroTimer(self._load_settings())
 
     # ---- settings ---------------------------------------------------------------
@@ -120,9 +122,46 @@ class FocusService:
     def state(self) -> FocusState:
         """A snapshot of the timer, for showing it."""
         timer, now = self._timer, self._clock.now()
+        block_left = (max(0.0, (timer.block_ends - now).total_seconds()) if timer.block_ends else None)
         return FocusState(timer.phase, timer.remaining(now).total_seconds(), timer.progress(now),
                           timer.running, timer.started, timer.round, timer.settings.rounds,
-                          timer.completed)
+                          timer.completed, block_left)
+
+    BLOCK_COLOR = "#4f46e5"
+
+    def block_plan(self, total_minutes: int) -> list[tuple[Phase, int]]:
+        """How a focus block of that length would run (focus and breaks), for showing before it starts."""
+        return plan_block(total_minutes, self._timer.settings)
+
+    def start_block(self, total_minutes: int):
+        """Focus for a set time (2 hours, say): rounds and breaks run by themselves, and when the block ends it
+        goes into the week as an event."""
+        self._log_cut_short()
+        self._end_block()
+        self._timer.start_block(self._clock.now(), total_minutes)
+        self._bus.publish(Topic.FOCUS)
+
+    def _end_block(self, until: datetime | None = None):
+        """The block (if one is on) goes into the planner as an event, from its start to `until` (now)."""
+        started = self._timer.block_started
+        if started is None:
+            return
+        end = until or self._clock.now()
+        self._timer.block_started = self._timer.block_ends = None
+        self._add_block_event(started, end)
+
+    def _add_block_event(self, started: datetime, end: datetime):
+        if self._events is None or end - started < timedelta(minutes=1):
+            return
+        first = started.hour * 60 + started.minute
+        last = end.hour * 60 + end.minute if end.date() == started.date() else 24 * 60
+        if last <= first:
+            return
+        task = self._focus_task()
+        what = task.title if task else self.focus_project()
+        title = f"Focus: {what}" if what else "Focus"
+        self._events.add(Event(started.date(), TimeRange(first, last), title, "Quire focus block", self.BLOCK_COLOR))
+        self._bus.publish(Topic.EVENTS)
 
     def toggle(self):
         now = self._clock.now()
@@ -130,6 +169,7 @@ class FocusService:
 
     def reset(self):
         self._log_cut_short()
+        self._end_block()
         self._timer.reset()
 
     def skip(self):
@@ -139,6 +179,7 @@ class FocusService:
     def stop(self):
         """Quire is quitting: the timer can't carry on, so the focus so far counts."""
         self._log_cut_short()
+        self._end_block()
         self._timer.reset()
 
     def _log_cut_short(self):
@@ -155,10 +196,14 @@ class FocusService:
         and the latest one is reported.
         """
         last = None
+        block_started = self._timer.block_started
         while (event := self._timer.tick(self._clock.now())) is not None:
-            last = FocusEvent(event.phase, event.next_phase)
+            last = FocusEvent(event.phase, event.next_phase, event.block_done)
             if event.phase is Phase.WORK:
                 self._log_session(event.started, event.minutes, complete=True)
+            if event.block_done and block_started is not None:
+                self._add_block_event(block_started, event.started + timedelta(minutes=event.minutes))
+                block_started = None
         return last
 
     def _log_session(self, started: datetime, minutes: int, complete: bool):

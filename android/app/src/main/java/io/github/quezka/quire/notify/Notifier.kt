@@ -117,6 +117,14 @@ class Notifier(private val context: Context) {
             .setContentIntent(openApp(MainActivity.TAB_FOCUS)).setAutoCancel(true))
     }
 
+    fun focusBlockDone() {
+        post(FOCUS_ID, NotificationCompat.Builder(context, FOCUS)
+            .setSmallIcon(R.drawable.ic_notification).setContentTitle(context.getString(R.string.focus_block_done))
+            .setContentText(context.getString(R.string.focus_block_done_text))
+            .setCategory(NotificationCompat.CATEGORY_ALARM)
+            .setContentIntent(openApp(MainActivity.TAB_FOCUS)).setAutoCancel(true))
+    }
+
     fun windDown(bedtime: Int) {
         post(SLEEP_ID, NotificationCompat.Builder(context, REMINDERS)
             .setSmallIcon(R.drawable.ic_notification)

@@ -48,6 +48,31 @@ class PhaseEnded:
     started: datetime
     minutes: int
     next_phase: Phase
+    block_done: bool = False  # the focus block (see PomodoroTimer.start_block) is over with this phase
+
+
+MAX_BLOCK_MINUTES = 12 * 60
+
+
+def plan_block(total_minutes: int, settings: FocusSettings) -> list[tuple[Phase, int]]:
+    """How a focus block of `total_minutes` splits into focus and breaks: the usual rounds, the last focus
+    cut to fit, and never a break at the end (the block ends with focus)."""
+    if not 1 <= total_minutes <= MAX_BLOCK_MINUTES:
+        raise ValidationError(f"A focus block lasts between 1 minute and {MAX_BLOCK_MINUTES // 60} hours.")
+    plan, left, done = [], total_minutes, 0
+    while left > 0:
+        work = min(settings.work_minutes, left)
+        plan.append((Phase.WORK, work))
+        left -= work
+        done += 1
+        rest = Phase.LONG_BREAK if done % settings.rounds == 0 else Phase.SHORT_BREAK
+        if left <= settings.minutes(rest):
+            # no room for a break and more focus after it: the last focus runs to the end instead
+            plan[-1] = (Phase.WORK, work + left)
+            break
+        plan.append((rest, settings.minutes(rest)))
+        left -= settings.minutes(rest)
+    return plan
 
 
 class PomodoroTimer:
@@ -59,6 +84,8 @@ class PomodoroTimer:
         self._remaining = self._length
         self._ends_at: datetime | None = None  # set while running
         self._started_at: datetime | None = None  # when the current phase first started
+        self.block_started: datetime | None = None  # a focus block (start_block) is on
+        self.block_ends: datetime | None = None
 
     # ---- state ------------------------------------------------------------------
 
@@ -122,10 +149,23 @@ class PomodoroTimer:
             self._ends_at = None
 
     def reset(self):
-        """Back to a fresh focus session; the cycle starts over."""
+        """Back to a fresh focus session; the cycle starts over (and any focus block ends)."""
         self.phase = Phase.WORK
         self.completed = 0
+        self.block_started = self.block_ends = None
         self._enter(self.phase, running_from=None)
+
+    def start_block(self, now: datetime, total_minutes: int):
+        """Focus for `total_minutes` in all, split into rounds and breaks (see plan_block): the phases run one
+        after the other by themselves, the last focus is cut to fit, and the block stops at its end."""
+        plan_block(total_minutes, self.settings)  # checks the length
+        self.reset()
+        self.block_started, self.block_ends = now, now + timedelta(minutes=total_minutes)
+        self._enter(Phase.WORK, running_from=now)
+
+    @property
+    def in_block(self) -> bool:
+        return self.block_ends is not None
 
     def skip(self, now: datetime):
         """Jump to the next phase without counting the current one as done."""
@@ -143,12 +183,25 @@ class PomodoroTimer:
         if not self.running or now < self._ends_at:
             return None
         ended_at = self._ends_at
-        event = PhaseEnded(self.phase, self._started_at or ended_at - self.duration,
-                           round(self.duration.total_seconds() / 60),
-                           self._next_phase(counting=True, dry_run=True))
+        started = self._started_at or ended_at - self.duration
+        minutes = round(self.duration.total_seconds() / 60)
+        ended_phase = self.phase
         next_phase = self._next_phase(counting=True)
-        self._enter(next_phase, running_from=ended_at if self.settings.auto_continue else None)
-        return event
+        if self.block_ends is not None:
+            left = self.block_ends - ended_at
+            room = timedelta(minutes=self.settings.minutes(next_phase))
+            if left <= timedelta(0):
+                # the block is over
+                self.block_started = self.block_ends = None
+                self.phase, self.completed = Phase.WORK, 0
+                self._enter(Phase.WORK, running_from=None)
+                return PhaseEnded(ended_phase, started, minutes, Phase.WORK, block_done=True)
+            if next_phase is not Phase.WORK and left <= room:
+                next_phase = Phase.WORK  # no room for a break and focus after it: focus to the end (see plan_block)
+            self._enter(next_phase, running_from=ended_at)  # a block always carries on by itself
+        else:
+            self._enter(next_phase, running_from=ended_at if self.settings.auto_continue else None)
+        return PhaseEnded(ended_phase, started, minutes, next_phase)
 
     # ---- internals ----------------------------------------------------------------
 
@@ -165,6 +218,9 @@ class PomodoroTimer:
     def _enter(self, phase: Phase, running_from: datetime | None):
         self.phase = phase
         self._length = self._remaining = timedelta(minutes=self.settings.minutes(phase))
+        if self.block_ends is not None and running_from is not None:
+            # the last focus of a block is cut to fit
+            self._length = self._remaining = max(timedelta(minutes=1), min(self._length, self.block_ends - running_from))
         self._started_at = running_from
         self._ends_at = running_from + self._remaining if running_from else None
 

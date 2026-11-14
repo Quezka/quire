@@ -33,7 +33,33 @@ data class FocusSettings(
 }
 
 /** A finished phase, reported by [PomodoroTimer.tick]. */
-data class PhaseEnded(val phase: Phase, val started: Instant, val minutes: Int, val next: Phase)
+data class PhaseEnded(val phase: Phase, val started: Instant, val minutes: Int, val next: Phase,
+                      val blockDone: Boolean = false)
+
+const val MAX_BLOCK_MINUTES = 12 * 60
+
+/** How a focus block of [totalMinutes] splits into focus and breaks (the desktop's plan_block): the usual rounds,
+ *  and never a break at the end: when a break and more focus don't fit, the last focus runs to the end. */
+fun planBlock(totalMinutes: Int, settings: FocusSettings): List<Pair<Phase, Int>> {
+    require(totalMinutes in 1..MAX_BLOCK_MINUTES)
+    val plan = mutableListOf<Pair<Phase, Int>>()
+    var left = totalMinutes
+    var done = 0
+    while (left > 0) {
+        val work = minOf(settings.workMinutes, left)
+        plan += Phase.WORK to work
+        left -= work
+        done += 1
+        val rest = if (done % settings.rounds == 0) Phase.LONG_BREAK else Phase.SHORT_BREAK
+        if (left <= settings.minutes(rest)) {
+            plan[plan.size - 1] = Phase.WORK to (work + left)
+            break
+        }
+        plan += rest to settings.minutes(rest)
+        left -= settings.minutes(rest)
+    }
+    return plan
+}
 
 /** Everything the timer knows; saved so it keeps running while the app is closed. */
 data class TimerState(
@@ -43,6 +69,8 @@ data class TimerState(
     val endsAt: Instant? = null, // set while running
     val startedAt: Instant? = null, // when the current phase first started
     val lengthMs: Long? = null, // the phase's length, fixed once it starts (null: from settings)
+    val blockStarted: Instant? = null, // a focus block is on (PomodoroTimer.startBlock)
+    val blockEnds: Instant? = null,
 )
 
 class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: TimerState = TimerState()) {
@@ -93,6 +121,15 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
         state = TimerState()
     }
 
+    val inBlock get() = state.blockEnds != null
+
+    /** Focus for [totalMinutes] in all: rounds and breaks run by themselves, the block stops at its end. */
+    fun startBlock(now: Instant, totalMinutes: Int) {
+        planBlock(totalMinutes, settings)
+        state = TimerState(blockStarted = now, blockEnds = now.plus(Duration.ofMinutes(totalMinutes.toLong())))
+        enter(Phase.WORK, now)
+    }
+
     /** Jump to the next phase without counting this one as done. */
     fun skip(now: Instant) = enter(nextPhase(counting = false), if (running) now else null)
 
@@ -105,10 +142,23 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
     fun tick(now: Instant): PhaseEnded? {
         val ends = state.endsAt ?: return null
         if (now < ends) return null
-        val event = PhaseEnded(state.phase, state.startedAt ?: (ends - duration),
-            duration.toMinutes().toInt(), nextPhase(counting = true, dryRun = true))
-        enter(nextPhase(counting = true), if (settings.autoContinue) ends else null)
-        return event
+        val ended = state.phase
+        val started = state.startedAt ?: (ends - duration)
+        val minutes = duration.toMinutes().toInt()
+        var next = nextPhase(counting = true)
+        val blockEnds = state.blockEnds
+        if (blockEnds != null) {
+            val left = Duration.between(ends, blockEnds)
+            if (left.isNegative || left.isZero) {
+                state = TimerState()
+                return PhaseEnded(ended, started, minutes, Phase.WORK, blockDone = true)
+            }
+            if (next != Phase.WORK && left <= Duration.ofMinutes(settings.minutes(next).toLong())) next = Phase.WORK
+            enter(next, ends)
+            return PhaseEnded(ended, started, minutes, next)
+        }
+        enter(next, if (settings.autoContinue) ends else null)
+        return PhaseEnded(ended, started, minutes, next)
     }
 
     private fun nextPhase(counting: Boolean, dryRun: Boolean = false): Phase {
@@ -122,7 +172,11 @@ class PomodoroTimer(var settings: FocusSettings = FocusSettings(), var state: Ti
     }
 
     private fun enter(phase: Phase, runningFrom: Instant?) {
-        val length = Duration.ofMinutes(settings.minutes(phase).toLong())
+        var length = Duration.ofMinutes(settings.minutes(phase).toLong())
+        val blockEnds = state.blockEnds
+        if (blockEnds != null && runningFrom != null) {
+            length = minOf(length, Duration.between(runningFrom, blockEnds)).coerceAtLeast(Duration.ofMinutes(1))
+        }
         state = state.copy(phase = phase, remainingMs = null, startedAt = runningFrom,
             endsAt = runningFrom?.plus(length), lengthMs = runningFrom?.let { length.toMillis() })
     }

@@ -349,6 +349,7 @@ class FocusState:
     round: int
     rounds: int
     completed: int  # focus sessions finished in this cycle
+    block_left_seconds: float | None = None  # a focus block is on: how long it still lasts
 
 
 @dataclass(frozen=True)
@@ -357,6 +358,7 @@ class FocusEvent:
 
     phase: Phase
     next_phase: Phase
+    block_done: bool = False  # the whole focus block just ended
 
 
 @dataclass(frozen=True)

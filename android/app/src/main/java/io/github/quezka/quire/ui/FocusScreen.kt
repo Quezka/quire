@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -24,7 +25,9 @@ import androidx.compose.material.icons.filled.Pause
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.SkipNext
+import androidx.compose.material3.Button
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
@@ -125,6 +128,26 @@ fun FocusScreen(container: Container, version: Int, back: () -> Unit) {
                     }
                 }
                 IconButton(onClick = focus::skip) { Icon(Icons.Filled.SkipNext, stringResource(R.string.skip)) }
+            }
+
+            Panel(stringResource(R.string.focus_block), Modifier.fillMaxWidth()) {
+                // "focus for 2 hours": rounds and breaks run by themselves; it goes into the week when it ends
+                val blockEnds = timer.state.blockEnds
+                if (blockEnds != null) {
+                    val left = java.time.Duration.between(focus.now(), blockEnds).toMinutes().coerceAtLeast(0)
+                    Text(stringResource(R.string.focus_block_left, hoursText(left.toInt())))
+                } else {
+                    var length by remember { mutableStateOf(120) }
+                    Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        for (m in listOf(30, 60, 90, 120, 180, 240)) FilterChip(length == m, { length = m },
+                            label = { Text(hoursText(m)) })
+                    }
+                    val plan = remember(length, changes) { io.github.quezka.quire.domain.planBlock(length, timer.settings) }
+                    Text(stringResource(R.string.focus_block_plan, plan.count { it.first == Phase.WORK },
+                        plan.filter { it.first != Phase.WORK }.sumOf { it.second }),
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Button(onClick = { focus.startBlock(length) }) { Text(stringResource(R.string.focus_block_start)) }
+                }
             }
 
             Panel(stringResource(R.string.working_on), Modifier.fillMaxWidth()) {

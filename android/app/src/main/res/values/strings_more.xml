@@ -417,4 +417,10 @@
     <string name="quick_took_done">%1$s ticked as taken.</string>
     <string name="quick_spent">Spent %1$s.</string>
     <string name="quick_undo">Undo</string>
+    <string name="focus_block">Focus block</string>
+    <string name="focus_block_start">Start the block</string>
+    <string name="focus_block_left">Block on: %1$s left. It goes into your week when it ends.</string>
+    <string name="focus_block_plan">%1$d focus rounds, %2$d min of breaks in between.</string>
+    <string name="focus_block_done">Focus block done</string>
+    <string name="focus_block_done_text">Well done. It\'s in your week now.</string>
 </resources>
