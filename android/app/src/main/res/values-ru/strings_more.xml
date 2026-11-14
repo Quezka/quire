@@ -490,4 +490,9 @@
         <item quantity="many">%d задач просрочено: начни с одной</item>
         <item quantity="other">%d задачи просрочено: начни с одной</item>
     </plurals>
+    <string name="now_card_now">Сейчас</string>
+    <string name="now_card_one_thing">Одно дело сейчас</string>
+    <string name="now_card_free">Сейчас делать нечего. Выдохни.</string>
+    <string name="now_card_done">Готово, что дальше?</string>
+    <string name="now_card_until">до %1$s</string>
 </resources>

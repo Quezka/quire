@@ -472,4 +472,9 @@
         <item quantity="one">%d task is late: just start one</item>
         <item quantity="other">%d tasks are late: just start one</item>
     </plurals>
+    <string name="now_card_now">Now</string>
+    <string name="now_card_one_thing">The one thing now</string>
+    <string name="now_card_free">Nothing to do right now. Breathe.</string>
+    <string name="now_card_done">Done, what\'s next?</string>
+    <string name="now_card_until">until %1$s</string>
 </resources>

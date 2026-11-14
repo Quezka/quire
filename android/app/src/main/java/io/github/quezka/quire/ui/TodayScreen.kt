@@ -231,6 +231,7 @@ private fun DayPage(container: Container, version: Int, day: LocalDate, today: L
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
         if (isToday) {
+            item(key = "now-card") { NowCard(container, version, agenda.items, minute) }
             item(key = "quick-title") { SectionTitle(stringResource(R.string.quick_log)) }
             item(key = "quick") { QuickLog(container, version, logged) }
         }
@@ -258,6 +259,42 @@ private fun DayPage(container: Container, version: Int, day: LocalDate, today: L
 
         item(key = "note-title") { SectionTitle(stringResource(R.string.day_note)) }
         item(key = "note-$day") { DayNote(repo, day, agenda.journal) }
+    }
+}
+
+/**
+ * The one thing now (ADHD-friendly, from the suite's concept C): what's on or next, or else the one task to do,
+ * with a single big button that starts focusing on it. Done moves straight on to the next step.
+ */
+@Composable
+private fun NowCard(container: Container, version: Int, items: List<AgendaItem>, minute: Int) {
+    val repo = container.repository
+    val (now, next) = io.github.quezka.quire.domain.Assistant.nowNext(items, minute)
+    val step = remember(version) { io.github.quezka.quire.domain.Assistant.nextStep(repo.tasks(), repo.today()) }
+    val colors = MaterialTheme.colorScheme
+    androidx.compose.material3.Card(Modifier.fillMaxWidth(), shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
+        colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = colors.primaryContainer,
+            contentColor = colors.onPrimaryContainer)) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(stringResource(if (now != null) R.string.now_card_now else R.string.now_card_one_thing),
+                style = MaterialTheme.typography.labelLarge, fontWeight = FontWeight.Bold)
+            Text(now?.title ?: step?.title ?: next?.title ?: stringResource(R.string.now_card_free),
+                style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+            when {
+                now != null -> Text(stringResource(R.string.now_card_until, minutes(now.end)))
+                next != null -> Text(stringResource(R.string.glance_next, next.title, minutes(next.start)))
+                else -> Unit
+            }
+            if (step != null && now == null) Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                androidx.compose.material3.Button(onClick = {
+                    container.focus.focusOn(step.uid)
+                    if (!container.focus.timer.running) container.focus.toggle()
+                }) { Text(stringResource(R.string.nudge_start)) }
+                androidx.compose.material3.OutlinedButton(onClick = { repo.setDone(step.uid, true) }) {
+                    Text(stringResource(R.string.now_card_done))
+                }
+            }
+        }
     }
 }
 
@@ -358,7 +395,7 @@ fun TaskRow(task: Task, course: String?, today: LocalDate, onCheck: (Boolean) ->
 }
 
 @Composable
-private fun QuickAdd(onAdd: (String) -> Unit) {
+fun QuickAdd(onAdd: (String) -> Unit) {
     var text by rememberSaveable { mutableStateOf("") }
     Row(verticalAlignment = Alignment.CenterVertically) {
         OutlinedTextField(text, { text = it }, Modifier.weight(1f),

@@ -1,5 +1,9 @@
 package io.github.quezka.quire.ui
 
+import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -87,12 +91,17 @@ TopAppBar(title = { Text(stringResource(R.string.nav_tasks)) }, actions = {
                     modifier = Modifier.padding(end = 12.dp))
             }, colors = TopAppBarDefaults.topAppBarColors(containerColor = ClearBar, scrolledContainerColor = ClearBar))
 }) { glass ->
-            LazyColumn(contentPadding = glass.plus(start = 16.dp, end = 16.dp, bottom = 96.dp)) {
-                if (groups.isEmpty()) item(key = "empty") {
+            // adaptive: one column on a phone, more side by side on a tablet, a foldable or in landscape
+            LazyVerticalGrid(GridCells.Adaptive(340.dp), contentPadding = glass.plus(start = 16.dp, end = 16.dp, bottom = 96.dp),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                item(key = "quick-add", span = { GridItemSpan(maxLineSpan) }) {
+                    QuickAdd(onAdd = { title -> repo.saveTask(Task(Codec.newUid(), title, due = today)) })
+                }
+                if (groups.isEmpty()) item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                     Box(Modifier.padding(vertical = 16.dp)) { Hint(stringResource(R.string.no_tasks)) }
                 }
                 for ((bucket, tasks) in groups) {
-                    item(key = bucket.name) {
+                    item(key = bucket.name, span = { GridItemSpan(maxLineSpan) }) {
                         Text("${stringResource(bucketLabel(bucket))}  ${tasks.size}",
                             style = MaterialTheme.typography.titleSmall, fontWeight = FontWeight.Bold,
                             color = if (bucket == DueBucket.OVERDUE) MaterialTheme.colorScheme.error
