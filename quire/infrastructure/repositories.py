@@ -5,7 +5,6 @@ from datetime import date, datetime, timedelta
 
 import json
 
-from ..domain.finance import Transaction
 from ..domain.medicine import DoseLog, Medicine
 from ..domain import (
     Absence, AbsenceKind, Book, ClassSlot, Course, DocumentKind, Event, FocusSession, Grade, Job,
@@ -416,48 +415,6 @@ class SqliteMedicineRepository(_Repo):
 
     def delete_log(self, log_id) -> None:
         self._write("DELETE FROM medicine_doses WHERE id = ?", log_id)
-
-
-class SqliteTransactionRepository(_Repo):
-    @staticmethod
-    def _transaction(r) -> Transaction:
-        return Transaction(date.fromisoformat(r["day"]), r["cents"], bool(r["income"]), r["category"], r["note"], r["id"])
-
-    def between(self, first, last):
-        return [self._transaction(r) for r in self._all(
-            "SELECT * FROM transactions WHERE day BETWEEN ? AND ? ORDER BY day, id", first.isoformat(), last.isoformat())]
-
-    def get(self, transaction_id):
-        row = self._one("SELECT * FROM transactions WHERE id = ?", transaction_id)
-        return self._transaction(row) if row else None
-
-    def add(self, t: Transaction) -> int:
-        return self._write("INSERT INTO transactions (day, cents, income, category, note) VALUES (?, ?, ?, ?, ?)",
-                           t.day.isoformat(), t.cents, int(t.income), t.category, t.note)
-
-    def update(self, t: Transaction) -> None:
-        self._write("UPDATE transactions SET day = ?, cents = ?, income = ?, category = ?, note = ? WHERE id = ?",
-                    t.day.isoformat(), t.cents, int(t.income), t.category, t.note, t.id)
-
-    def delete(self, transaction_id) -> None:
-        self._write("DELETE FROM transactions WHERE id = ?", transaction_id)
-
-    def add_pay(self, job_id, year, month, t: Transaction) -> bool:
-        job = self._one("SELECT uid FROM jobs WHERE id = ?", job_id)
-        if job is None or job["uid"] is None:
-            return False
-        uid = f"pay:{job['uid']}:{year:04d}-{month:02d}"
-        if (self._one("SELECT 1 FROM transactions WHERE uid = ?", uid)
-                or self._one("SELECT 1 FROM sync_tombstones WHERE kind = 'money' AND uid = ?", uid)):
-            return False  # booked already, here or on another device, or deleted by the user
-        self._write("INSERT INTO transactions (day, cents, income, category, note, uid) VALUES (?, ?, ?, ?, ?, ?)",
-                    t.day.isoformat(), t.cents, int(t.income), t.category, t.note, uid)
-        return True
-
-    def categories(self):
-        return [r["category"] for r in self._all(
-            "SELECT category, COUNT(*) AS n FROM transactions WHERE category != '' GROUP BY category"
-            " ORDER BY n DESC, category COLLATE NOCASE")]
 
 
 class SqliteSchoolRecordRepository(_Repo):

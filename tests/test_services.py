@@ -511,66 +511,10 @@ def test_medicine_rules_refuse_nonsense():
             svc.save(None, bad)
 
 
-def test_money_parses_every_way_of_writing_it():
-    import pytest
-    from quire.domain import ValidationError
-    from quire.domain.finance import parse_cents
-    for text, cents in (("12,50", 1250), ("12.5", 1250), ("1.234,56", 123456), ("1,234.56", 123456), ("1234", 123400),
-                        ("€ 3", 300), ("0,05", 5), (",5", 50), ("1.234", 123400)):
-        assert parse_cents(text) == cents, text
-    for bad in ("", "abc", "1,2,x"):
-        with pytest.raises(ValidationError):
-            parse_cents(bad)
 
 
-def _finance():
-    from datetime import date, datetime
-    from quire.application.bus import ChangeBus
-    from quire.application.services import FinanceService
-    from quire.infrastructure.repositories import SqliteTransactionRepository
-    from quire.infrastructure.sqlite import SqliteDatabase
-
-    class Settings(dict):
-        def get(self, key, default=None):
-            return dict.get(self, key, default)
-
-        def set(self, key, value):
-            self[key] = value
-
-    class Clock:
-        def now(self):
-            return datetime(2026, 11, 4, 9, 0)
-
-        def today(self):
-            return date(2026, 11, 4)
-
-    return FinanceService(SqliteTransactionRepository(SqliteDatabase(":memory:")), Settings(), Clock(), ChangeBus())
 
 
-def test_a_month_adds_up_exactly_by_category_and_against_the_budget():
-    from datetime import date
-    import pytest
-    from quire.application.inputs import TransactionInput as T
-    from quire.domain import ValidationError
-    svc = _finance()
-    svc.add(T(date(2026, 11, 1), "1000", income=True, category="Pay"))
-    svc.add(T(date(2026, 11, 2), "0,10", category="Food"))
-    svc.add(T(date(2026, 11, 2), "0,20", category="Food"))
-    svc.add(T(date(2026, 11, 3), "50", category="Rent"))
-    svc.add(T(date(2026, 10, 31), "999", category="Food"))  # another month
-    o = svc.month(2026, 11)
-    assert (o.income, o.spent, o.balance) == (100000, 5030, 94970)  # 0,10 + 0,20 is exactly 0,30
-    assert o.categories == (("Rent", 5000), ("Food", 30))
-    assert [t.day.day for t in o.transactions] == [3, 2, 2, 1]
-    assert svc.categories()[0] == "Food"
-    svc.set_budget("40,00")
-    assert svc.month(2026, 11).budget == 4000
-    svc.set_budget("")
-    assert svc.month(2026, 11).budget is None
-    with pytest.raises(ValidationError):
-        svc.add(T(date(2026, 11, 3), "0"))
-    assert svc.csv(2026, 11)[1] == ["2026-11-01", "1000.00", "Pay", ""]
-    assert svc.csv(2026, 11)[2][1] == "-0.10"
 
 
 def test_the_agenda_becomes_a_calendar_file_with_stable_ids(tmp_path):

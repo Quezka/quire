@@ -193,7 +193,7 @@ class TodayView(Page):
             self.refresh()
         elif topic is Topic.JOURNAL:
             self._reload_journal()
-        if topic in (Topic.WATER, Topic.SLEEP, Topic.MEDICINE, Topic.FINANCE):
+        if topic in (Topic.WATER, Topic.SLEEP, Topic.MEDICINE):
             self.quick_log.refresh()
 
     def _reload_journal(self):

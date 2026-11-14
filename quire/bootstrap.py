@@ -10,7 +10,7 @@ from .application.ports import (
     UpdateInstaller,
 )
 from .application.services import (
-    CalendarService, FinanceService, FocusService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
+    CalendarService, FocusService, MedicineService, QuietService, SleepService, WaterService, NoteService, PlannerService, ReminderService, SchoolRecordsService,
     SchoolSyncService, Services, StartupService, SyncService, TaskService, TimetableService,
     UpdateService, WorkService,
 )
@@ -23,7 +23,7 @@ from .infrastructure.login_item import platform_login_item
 from .infrastructure.system_calendar import platform_calendar
 from .infrastructure.quiet import platform_quiet
 from .infrastructure.repositories import (
-    SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteWaterRepository, SqliteMedicineRepository, SqliteTransactionRepository, SqliteFocusLogRepository, SqliteJobRepository,
+    SqliteCourseRepository, SqliteEventRepository, SqliteRoutineRepository, SqliteSleepRepository, SqliteWaterRepository, SqliteMedicineRepository, SqliteFocusLogRepository, SqliteJobRepository,
     SqliteJournalRepository,
     SqliteImageRepository, SqliteKeyValueStore, SqliteNotebookRepository, SqliteNoteRepository, SqliteSchoolRecordRepository,
     SqliteShiftRepository, SqliteTaskRepository,
@@ -72,13 +72,12 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
         school=SchoolRecordsService(courses, tasks, records, clock, register.name.lower()),
         school_sync=SchoolSyncService(register, credentials or KeyringCredentialStore(),
                                       courses, tasks, records, settings, clock, bus),
-        work=WorkService(jobs, shifts, clock, bus, SqliteTransactionRepository(db)),
+        work=WorkService(jobs, shifts, clock, bus),
         focus=FocusService(SqliteFocusLogRepository(db), settings, tasks, courses, clock, bus),
         sleep=SleepService(SqliteSleepRepository(db), settings, clock, bus,
                            SqliteFocusLogRepository(db)),
         water=WaterService(SqliteWaterRepository(db), settings, clock, bus),
         medicine=MedicineService(SqliteMedicineRepository(db), clock, bus),
-        finance=FinanceService(SqliteTransactionRepository(db), settings, clock, bus),
         calendar=CalendarService(planner, tasks_service, calendar or platform_calendar(), settings, clock),
         quiet=QuietService(planner, settings, clock, quiet or platform_quiet()),
         reminders=ReminderService(planner, settings, clock),

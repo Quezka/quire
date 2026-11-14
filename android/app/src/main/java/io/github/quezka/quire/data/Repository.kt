@@ -15,7 +15,6 @@ import io.github.quezka.quire.domain.SleepLog
 import io.github.quezka.quire.domain.WaterLog
 import io.github.quezka.quire.domain.DoseLog
 import io.github.quezka.quire.domain.Medicine
-import io.github.quezka.quire.domain.Transaction
 import io.github.quezka.quire.domain.Shift
 import io.github.quezka.quire.domain.ShiftPattern
 import io.github.quezka.quire.domain.Task
@@ -122,19 +121,6 @@ class Repository(
     fun unmarkDose(medicineUid: String, day: LocalDate, planned: Int) {
         doseLogs().filter { it.medicineUid == medicineUid && it.day == day && it.planned == planned }
             .forEach { records.delete("dose", it.uid) }
-        changed()
-    }
-    fun transactions(first: LocalDate, last: LocalDate): List<Transaction> =
-        records.live("money").mapNotNull(Codec::transaction).filter { it.day in first..last }.sortedBy { it.day }
-    fun transactionCategories(): List<String> =
-        records.live("money").mapNotNull(Codec::transaction).map { it.category }.filter { it.isNotBlank() }
-            .groupingBy { it }.eachCount().entries.sortedByDescending { it.value }.map { it.key }
-    fun saveTransaction(t: Transaction) {
-        records.save("money", t.uid, Codec.transactionData(t, records.get("money", t.uid)?.data))
-        changed()
-    }
-    fun deleteTransaction(uid: String) {
-        records.delete("money", uid)
         changed()
     }
     fun routines(): List<Routine> = records.live("routine").map(Codec::routine)

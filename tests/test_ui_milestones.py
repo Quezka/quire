@@ -228,26 +228,6 @@ def test_medicine_page_ticks_a_dose_and_edits_a_medicine(window, app, services):
     assert services.medicine.medicines()[0].times == (540, 1260)
 
 
-def test_money_page_shows_the_month_and_a_new_entry(window, app, services):
-    from datetime import date
-    from quire.application.inputs import TransactionInput
-    from quire.presentation.views.finance import TransactionDialog
-    view = window.finance
-    window.show_page(window.stack.indexOf(view))
-    today = services.planner.today()
-    dialog = TransactionDialog(services, day=today, parent=window)
-    dialog.amount.setText("12,50")
-    dialog.category.setCurrentText("Food")
-    dialog._save()
-    app.processEvents()
-    assert view.list.count() == 1 and "Food" in view.list.item(0).text()
-    assert "12" in view.spent.value.text() and view.bars.rows == (("Food", 1250),)
-    dialog = TransactionDialog(services, services.finance.transaction(view.list.item(0).data(Qt.UserRole)), parent=window)
-    assert dialog.amount.text() == "12,50"
-    view.go(*services.finance.previous_month(view.year, view.month))
-    assert view.list.count() == 0 and view.nothing.isVisibleTo(view)
-    view.go(today.year, today.month)
-    assert view.list.count() == 1
 
 
 def test_past_days_of_water_can_be_seen_and_fixed(window, app, services):

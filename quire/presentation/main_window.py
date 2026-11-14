@@ -30,7 +30,6 @@ from .updates_ui import UpdateChecker
 from .views.focus import FocusView
 from .views.sleep import SleepView
 from ..application.bus import Topic
-from .views.finance import FinanceView
 from .views.medicine import MedicineView
 from .views.water import WaterView
 from .views.work import WorkView
@@ -115,13 +114,12 @@ class MainWindow(QMainWindow):
         self.sleep = SleepView(services, relay)
         self.water = WaterView(services, relay)
         self.medicine = MedicineView(services, relay)
-        self.finance = FinanceView(services, relay)
 
         self.sidebar = Sidebar()
         self.stack = QStackedWidget()
         for i, (page, (icon_name, label)) in enumerate(zip(
                 [self.today, self.week, self.coursework, self.notes, self.school, self.work,
-                 self.focus, self.sleep, self.water, self.medicine, self.finance],
+                 self.focus, self.sleep, self.water, self.medicine],
                 self.PAGES)):
             self.stack.addWidget(page)
             self.sidebar.add_page(icon_name, _(label), f"Ctrl+{i + 1}" if i < 9 else "")
@@ -133,9 +131,6 @@ class MainWindow(QMainWindow):
         relay.changed.connect(self._agenda_changed)
         self._calendar_timer.start()  # at start: the days have moved on since last time
         # Payday: each job's pay goes into Money by itself, at start and every hour after.
-        self._pay_timer = QTimer(self, interval=3600_000, timeout=self._book_pay)
-        self._pay_timer.start()
-        QTimer.singleShot(2000, self._book_pay)
         self.sync = SyncRunner(services, relay, self)
         self.updater = UpdateChecker(services, self)  # not `update`: that's QWidget's
 
@@ -339,12 +334,6 @@ class MainWindow(QMainWindow):
     def _agenda_changed(self, topic):
         if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS, Topic.WORK):
             self._calendar_timer.start()  # a burst of changes (a sync) writes the file once
-
-    def _book_pay(self):
-        try:
-            self.services.work.book_pay(_("Salary"))
-        except Exception:  # never let a payday sum stop the app
-            pass
 
     def _publish_calendar(self):
         try:

@@ -53,7 +53,6 @@ SYNCED = (
     Synced("focus", "focus_sessions", RANDOM_UID),
     Synced("medicine", "medicines", RANDOM_UID),
     Synced("dose", "medicine_doses", RANDOM_UID),  # after its medicine
-    Synced("money", "transactions", RANDOM_UID),
 )
 BY_KIND = {s.kind: s for s in SYNCED}
 ORDER = {s.kind: i for i, s in enumerate(SYNCED)}
@@ -215,9 +214,6 @@ class SqliteSyncStore:
         if kind == "dose":
             return {"medicine": self._uid("medicines", r["medicine_id"]), "day": r["day"], "planned": r["planned"],
                     "taken": bool(r["taken"]), "at": r["at_min"]}
-        if kind == "money":
-            return {"day": r["day"], "cents": r["cents"], "income": bool(r["income"]),
-                    "category": r["category"], "note": r["note"]}
         if kind == "sleep":
             return {"day": r["day"], "asleep": r["asleep"], "woke": r["woke"],
                     "quality": r["quality"], "note": r["note"]}
@@ -330,9 +326,6 @@ class SqliteSyncStore:
                 return False  # its medicine comes later
             values = {"medicine_id": medicine, "day": d["day"], "planned": d["planned"],
                       "taken": int(d.get("taken", True)), "at_min": d.get("at", 0)}
-        elif s.kind == "money":
-            values = {"day": d["day"], "cents": d["cents"], "income": int(d.get("income", False)),
-                      "category": d.get("category", ""), "note": d.get("note", "")}
         elif s.kind == "sleep":
             values = {"day": d["day"], "asleep": d["asleep"], "woke": d["woke"],
                       "quality": d.get("quality"), "note": d.get("note", "")}

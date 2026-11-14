@@ -10,7 +10,6 @@ from PySide6.QtWidgets import (
 )
 
 from ...application.errors import ApplicationError
-from ...application.inputs import TransactionInput
 from ...application.services import Services
 from .. import theme
 from ..formatting import money
@@ -22,33 +21,6 @@ from quezka_ui.fit import exec_menu
 def _litres(ml: int) -> str:
     from PySide6.QtCore import QLocale
     return QLocale().toString(ml / 1000, "f", 1)
-
-
-class ExpenseDialog(QDialog):
-    """Just what an expense needs right now: how much, and what for."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle(_("Add an expense"))
-        self.amount = QLineEdit(placeholderText=_("e.g. 4,50"))
-        self.what = QLineEdit(placeholderText=_("What for (optional)"))
-        form = QFormLayout()
-        form.addRow(_("Amount"), self.amount)
-        form.addRow(_("What"), self.what)
-        self.error = QLabel(objectName="danger")
-        self.error.setWordWrap(True)
-        self.error.hide()
-        buttons = QDialogButtonBox(QDialogButtonBox.Save | QDialogButtonBox.Cancel)
-        buttons.accepted.connect(self.accept)
-        buttons.rejected.connect(self.reject)
-        layout = QVBoxLayout(self)
-        layout.addLayout(form)
-        layout.addWidget(self.error)
-        layout.addWidget(buttons)
-
-    def show_error(self, text: str):
-        self.error.setText(text)
-        self.error.show()
 
 
 class QuickLog(Card):
@@ -74,10 +46,7 @@ class QuickLog(Card):
         self.medicine.clicked.connect(self._medicine_clicked)
         self._pending = []
         self._menu_on_right_click(self.medicine, self._medicine_menu)
-        self.expense = self._tool("wallet")
-        self.expense.setText(_("Money\nadd an expense"))
-        self.expense.clicked.connect(self._expense)
-        for b in (self.water, self.sleep, self.medicine, self.expense):
+        for b in (self.water, self.sleep, self.medicine):
             row.addWidget(b, 1)
         self.body.addLayout(row)
         status = QHBoxLayout()
@@ -179,21 +148,6 @@ class QuickLog(Card):
         self._attempt(lambda: self.services.medicine.mark(dose.medicine_id, day, dose.planned),
                       _("{name} ticked as taken.").format(name=dose.name),
                       lambda: self.services.medicine.unmark(dose.medicine_id, day, dose.planned))
-
-    def _expense(self):
-        dialog = ExpenseDialog(self)
-        while dialog.exec():
-            try:
-                new_id = self.services.finance.add(TransactionInput(
-                    self.services.planner.today(), dialog.amount.text(), False, "", dialog.what.text()))
-            except ApplicationError as e:
-                dialog.show_error(_(str(e)))
-                continue
-            what = dialog.what.text().strip()
-            self._say((_("Spent {amount} on {what}.") if what else _("Spent {amount}."))
-                      .format(amount=money(self.services.finance.transaction(new_id).cents / 100), what=what),
-                      lambda: self.services.finance.delete(new_id))
-            break
 
     # ---- the status line ----
 

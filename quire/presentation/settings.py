@@ -212,8 +212,8 @@ class SettingsDialog(SettingsWindow):
         card.row(_("Language"), language_box, self.language_hint, stretch_control=True)
         card.row(_("Interface size"), self.scale, self.scale_hint, stretch_control=True)
 
-        money_page = self.section(_("Money"), "wallet")
-        money_page.card().row(_("Currency"), self.currency, self.sample, stretch_control=True)
+        work_page = self.section(_("Work"), "briefcase")
+        work_page.card().row(_("Currency"), self.currency, self.sample, stretch_control=True)
 
         remind_page = self.section(_("Reminders"), "bell")
         card = remind_page.card()

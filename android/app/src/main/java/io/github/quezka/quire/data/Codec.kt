@@ -8,7 +8,6 @@ import io.github.quezka.quire.domain.SleepLog
 import io.github.quezka.quire.domain.WaterLog
 import io.github.quezka.quire.domain.DoseLog
 import io.github.quezka.quire.domain.Medicine
-import io.github.quezka.quire.domain.Transaction
 import io.github.quezka.quire.domain.FocusSession
 import io.github.quezka.quire.domain.Job
 import io.github.quezka.quire.domain.Note
@@ -136,7 +135,7 @@ object Codec {
     fun waterData(w: WaterLog, previous: JsonObject?) = merged(previous, mapOf(
         "day" to JsonPrimitive(w.day.toString()), "at" to JsonPrimitive(w.at), "ml" to JsonPrimitive(w.ml)))
 
-    // ---- medicines, doses and money ----
+    // ---- medicines and doses ----
 
     private fun numbers(d: JsonObject, key: String) = (d[key] as? kotlinx.serialization.json.JsonArray)
         ?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() } ?: emptyList()
@@ -163,17 +162,6 @@ object Codec {
     fun doseData(l: DoseLog, previous: JsonObject?) = merged(previous, mapOf(
         "medicine" to JsonPrimitive(l.medicineUid), "day" to JsonPrimitive(l.day.toString()),
         "planned" to JsonPrimitive(l.planned), "taken" to JsonPrimitive(l.taken), "at" to JsonPrimitive(l.at)))
-
-    fun transaction(r: SyncRecord): Transaction? {
-        val d = r.data!!
-        val day = date(d.strOrNull("day")) ?: return null
-        val cents = (d["cents"] as? JsonPrimitive)?.content?.toLongOrNull() ?: return null
-        return Transaction(r.uid, day, cents, d.bool("income"), d.str("category"), d.str("note"))
-    }
-
-    fun transactionData(t: Transaction, previous: JsonObject?) = merged(previous, mapOf(
-        "day" to JsonPrimitive(t.day.toString()), "cents" to JsonPrimitive(t.cents), "income" to JsonPrimitive(t.income),
-        "category" to JsonPrimitive(t.category), "note" to JsonPrimitive(t.note)))
 
     // ---- routines ----
 

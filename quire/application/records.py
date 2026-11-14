@@ -135,28 +135,6 @@ class MedicineWeek:
 
 
 @dataclass(frozen=True)
-class TransactionRecord:
-    id: int
-    day: date
-    cents: int
-    income: bool
-    category: str
-    note: str
-
-
-@dataclass(frozen=True)
-class MonthOverview:
-    year: int
-    month: int
-    income: int
-    spent: int
-    balance: int
-    categories: tuple[tuple[str, int], ...]  # what went out, biggest first
-    transactions: tuple[TransactionRecord, ...]  # newest first
-    budget: int | None
-
-
-@dataclass(frozen=True)
 class SleepRecord:
     day: date  # the day you woke up
     asleep: int

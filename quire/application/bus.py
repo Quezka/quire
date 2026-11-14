@@ -17,7 +17,6 @@ class Topic(Enum):
     SLEEP = "sleep"
     WATER = "water"
     MEDICINE = "medicine"
-    FINANCE = "finance"
 
 
 Listener = Callable[[Topic], None]

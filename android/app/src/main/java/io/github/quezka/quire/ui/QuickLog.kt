@@ -15,7 +15,6 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bedtime
 import androidx.compose.material.icons.filled.Medication
-import androidx.compose.material.icons.filled.Savings
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.AlertDialog
@@ -47,15 +46,13 @@ import io.github.quezka.quire.Container
 import io.github.quezka.quire.R
 import io.github.quezka.quire.data.Codec
 import io.github.quezka.quire.domain.Doses
-import io.github.quezka.quire.domain.Finance
-import io.github.quezka.quire.domain.Transaction
 
 /** Something just logged, and how to take it back. */
 class Logged(val message: String, val undo: (() -> Unit)?)
 
 /**
- * The main page's quick log: drank water, going to sleep / woke up, took a medicine, an expense. A tap logs it
- * through the same rules as the Water, Sleep, Medicines and Money pages; a long press offers choices.
+ * The main page's quick log: drank water, going to sleep / woke up, took a medicine. A tap logs it
+ * through the same rules as the Water, Sleep, Medicines pages; a long press offers choices.
  */
 @Composable
 fun QuickLog(container: Container, version: Int, logged: (Logged) -> Unit) {
@@ -65,7 +62,6 @@ fun QuickLog(container: Container, version: Int, logged: (Logged) -> Unit) {
     val drunk = remember(version) { repo.waterOn(today).sumOf { it.ml } }
     val since = remember(version) { container.sleepNudge.asleepSince() }
     val pending = remember(version) { Doses.pending(Doses.plan(today, repo.medicines(), repo.doseLogs())) }
-    var spending by remember { mutableStateOf(false) }
     val litres = { ml: Int -> String.format(java.util.Locale.getDefault(), "%.1f", ml / 1000.0) }
 
     val drink = stringResource(R.string.quick_logged_water)
@@ -73,7 +69,6 @@ fun QuickLog(container: Container, version: Int, logged: (Logged) -> Unit) {
     val morning = stringResource(R.string.quick_good_morning)
     val forgot = stringResource(R.string.sleep_forgot)
     val took = stringResource(R.string.quick_took_done)
-    val spent = stringResource(R.string.quick_spent)
 
     fun addWater(ml: Int) {
         val uid = repo.addWater(ml)
@@ -121,15 +116,7 @@ fun QuickLog(container: Container, version: Int, logged: (Logged) -> Unit) {
                     logged(Logged(String.format(took, next.medicine.name)) { repo.unmarkDose(next.medicine.uid, next.day, next.planned) })
                 }
             }
-            QuickTile(Icons.Filled.Savings, stringResource(R.string.quick_money), stringResource(R.string.quick_add_expense),
-                Modifier.weight(1f)) { spending = true }
         }
-    }
-    if (spending) ExpenseDialog(onDismiss = { spending = false }) { cents, what ->
-        val t = Transaction(Codec.newUid(), today, cents, income = false, note = what)
-        repo.saveTransaction(t)
-        spending = false
-        logged(Logged(String.format(spent, money(cents / 100.0))) { repo.deleteTransaction(t.uid) })
     }
 }
 
@@ -165,24 +152,3 @@ private fun QuickTile(icon: ImageVector, title: String, detail: String, modifier
     }
 }
 
-@Composable
-private fun ExpenseDialog(onDismiss: () -> Unit, onSave: (Long, String) -> Unit) {
-    var amount by remember { mutableStateOf("") }
-    var what by remember { mutableStateOf("") }
-    val cents = Finance.parseCents(amount)?.takeIf { it > 0 }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.quick_add_expense_title)) },
-        text = {
-            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                OutlinedTextField(amount, { amount = it }, label = { Text(stringResource(R.string.quick_amount)) },
-                    singleLine = true, keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal))
-                OutlinedTextField(what, { what = it }, label = { Text(stringResource(R.string.quick_what_for)) }, singleLine = true)
-                if (amount.isNotBlank() && cents == null) Text(stringResource(R.string.quick_not_amount),
-                    color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Start)
-            }
-        },
-        confirmButton = { TextButton(onClick = { cents?.let { onSave(it, what.trim()) } }, enabled = cents != null) { Text(stringResource(R.string.save)) } },
-        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
-    )
-}

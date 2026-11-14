@@ -8,7 +8,6 @@ from .focus import FocusService, FocusStats
 from .quiet import QuietService, QuietSettings
 from .sleep import SleepService
 from .calendar import CalendarService
-from .finance import FinanceService
 from .medicine import MedicineService
 from .water import WaterService
 from .notes import NoteService
@@ -39,7 +38,6 @@ class Services:
     sleep: SleepService
     water: WaterService
     medicine: MedicineService
-    finance: FinanceService
     calendar: CalendarService
     quiet: QuietService  # Do Not Disturb while things are on
     reminders: ReminderService

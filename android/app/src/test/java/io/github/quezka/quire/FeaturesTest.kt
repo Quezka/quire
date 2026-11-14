@@ -318,7 +318,7 @@ class FeaturesTest {
         assertTrue(ReminderPlan.upcoming(ReminderSettings(minutesBefore = null), now, { repo.day(it).items }).isEmpty())
     }
 
-    // ---- medicines and money ----
+    // ---- medicines ----
 
     @Test fun medicinesPlanTheDayAndATickChangesInsteadOfDoubling() {
         val repo = repo()
@@ -337,22 +337,6 @@ class FeaturesTest {
         assertNull(io.github.quezka.quire.domain.Doses.parseTimes("25:00"))
         repo.deleteMedicine("m1")
         assertTrue(repo.doseLogs().isEmpty())
-    }
-
-    @Test fun moneyAddsUpExactlyAndParsesLikeTheDesktop() {
-        val f = io.github.quezka.quire.domain.Finance
-        for ((text, cents) in listOf("12,50" to 1250L, "12.5" to 1250L, "1.234,56" to 123456L, "1,234.56" to 123456L,
-            "1234" to 123400L, "€ 3" to 300L, "0,05" to 5L, ",5" to 50L, "1.234" to 123400L)) assertEquals(text, cents, f.parseCents(text))
-        for (bad in listOf("", "abc", "1,2,x")) assertNull(bad, f.parseCents(bad))
-        val repo = repo()
-        val d = java.time.LocalDate.of(2026, 11, 2)
-        repo.saveTransaction(io.github.quezka.quire.domain.Transaction("a", d, 10, false, "Food"))
-        repo.saveTransaction(io.github.quezka.quire.domain.Transaction("b", d, 20, false, "Food"))
-        repo.saveTransaction(io.github.quezka.quire.domain.Transaction("c", d, 5000, false, "Rent"))
-        repo.saveTransaction(io.github.quezka.quire.domain.Transaction("d", d.plusMonths(1), 99, false, "Food"))
-        val month = repo.transactions(d.withDayOfMonth(1), d.withDayOfMonth(30))
-        assertEquals(listOf("Rent" to 5000L, "Food" to 30L), f.byCategory(month))
-        assertEquals("Food", repo.transactionCategories().first())
     }
 
     // ---- school ----

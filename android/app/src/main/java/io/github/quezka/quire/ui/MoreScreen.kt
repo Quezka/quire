@@ -72,7 +72,6 @@ TopAppBar(title = { Text(stringResource(R.string.nav_more)) }, colors = TopAppBa
             MoreRow(Icons.Filled.Bedtime, stringResource(R.string.nav_sleep), stringResource(R.string.sleep_hint)) { open(Page.SLEEP) }
             MoreRow(Icons.Filled.WaterDrop, stringResource(R.string.nav_water), stringResource(R.string.water_hint)) { open(Page.WATER) }
             MoreRow(Icons.Filled.MedicalServices, stringResource(R.string.nav_medicine), stringResource(R.string.medicine_hint)) { open(Page.MEDICINE) }
-            MoreRow(Icons.Filled.AccountBalanceWallet, stringResource(R.string.nav_money), stringResource(R.string.money_hint)) { open(Page.MONEY) }
             MoreRow(Icons.Filled.Class, stringResource(R.string.nav_courses), stringResource(R.string.courses_hint)) { open(Page.COURSES) }
             MoreRow(Icons.Filled.Settings, stringResource(R.string.nav_settings), stringResource(R.string.settings_hint)) { open(Page.SETTINGS) }
         }

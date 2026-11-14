@@ -66,7 +66,7 @@ import io.github.quezka.quire.ui.WorkScreen
 import java.time.LocalDate
 
 /** Pages reached from the More tab. */
-enum class Page { SCHOOL, WORK, FOCUS, SLEEP, WATER, MEDICINE, MONEY, COURSES, SETTINGS }
+enum class Page { SCHOOL, WORK, FOCUS, SLEEP, WATER, MEDICINE, COURSES, SETTINGS }
 
 class MainActivity : ComponentActivity() {
     companion object {
@@ -197,7 +197,6 @@ private fun MorePages(container: Container, version: Int, page: Page?, open: (Pa
             Page.SLEEP -> SleepScreen(container, version, back)
             Page.WATER -> WaterScreen(container, version, back)
             Page.MEDICINE -> io.github.quezka.quire.ui.MedicineScreen(container, version, back)
-            Page.MONEY -> io.github.quezka.quire.ui.FinanceScreen(container, version, back)
             Page.COURSES -> CoursesScreen(container.repository, version, back)
             Page.SETTINGS -> SettingsScreen(container, back)
         }
