@@ -4,6 +4,10 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.50.1] - 2026-11-14
+
+- **New icon** on the computer and the phone, drawn like every other Quezka app: the same rounded square in its own plain colour with a white symbol.
+
 ## [0.50.0] - 2026-11-14
 
 - **Digest button on Today** (computer and phone): see your day at a glance whenever you want, not only at 7:30 and 21:30. Until 17:00 it shows today (15:00 on the phone), after that tomorrow and today's ideas.
