@@ -514,4 +514,15 @@
     <string name="assistant_morning_at">Mattina</string>
     <string name="assistant_evening_at">Sera</string>
     <string name="assistant_nudge_at">Spinta</string>
+    <string name="hub_apps_search">Cerca app</string>
+    <string name="inbox">In arrivo</string>
+    <string name="inbox_empty">Niente in arrivo. Qui finiscono notifiche trattenute e nuove idee.</string>
+    <string name="inbox_held">%1$d notifiche trattenute</string>
+    <string name="inbox_open_held">Vedi</string>
+    <string name="held_title">Notifiche trattenute</string>
+    <string name="held_clear">Cancella tutto</string>
+    <string name="held_empty">Niente trattenuto. Le app impostate su Trattieni in Impostazioni › Assistente finiscono qui.</string>
+    <string name="inbox_to_task">In attività</string>
+    <string name="inbox_done">Fatto</string>
+    <string name="inbox_more_ideas">Altre %1$d in Idee</string>
 </resources>

@@ -22,6 +22,14 @@
         android:label="@string/perm_bedside_label"
         android:protectionLevel="dangerous" />
 
+    <!-- app names for held notifications (android 11+ package visibility) -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
+
     <application
         android:name=".QuireApp"
         android:allowBackup="true"

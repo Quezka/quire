@@ -44,11 +44,29 @@ class Hub(private val context: Context, private val settings: Settings) {
     fun rule(pkg: String): Rule = Rule.of(settings.get("hub.rule.$pkg")) ?: Rule.HOLD
     fun setRule(pkg: String, rule: Rule) = settings.set("hub.rule.$pkg", rule.code)
 
+    /** App name, not package id: the notification carries its app's info (works w/o package visibility),
+     *  else the package manager (visible via manifest `<queries>` launcher intent). */
+    fun label(pkg: String, n: Notification? = null): String {
+        val pm = context.packageManager
+        val fromNotification = runCatching {
+            @Suppress("DEPRECATION")
+            val info = n?.extras?.getParcelable<android.content.pm.ApplicationInfo>("android.appInfo")
+            info?.loadLabel(pm)?.toString()
+        }.getOrNull()
+        if (!fromNotification.isNullOrBlank() && fromNotification != pkg) return fromNotification
+        return runCatching { pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString() }.getOrDefault(pkg)
+    }
+
+    /** Apps seen so far (package to label), for the rules list; ids saved by old versions get their name. */
+    fun appsNamed(): List<Pair<String, String>> = apps().map { (pkg, name) ->
+        if (name == pkg) pkg to label(pkg).also { if (it != pkg) remember(pkg, it) } else pkg to name
+    }.sortedBy { it.second.lowercase() }
+
     /** Apps seen so far (package to label), for the rules list. */
     fun apps(): List<Pair<String, String>> = (settings.get("hub.apps") ?: "").split("\n").filter { it.contains("\t") }
         .map { it.substringBefore("\t") to it.substringAfter("\t") }.sortedBy { it.second.lowercase() }
 
-    private fun remember(pkg: String, label: String) {
+    internal fun remember(pkg: String, label: String) {
         val apps = apps().toMap().toMutableMap()
         if (apps[pkg] == label) return
         apps[pkg] = label
@@ -75,9 +93,7 @@ class Hub(private val context: Context, private val settings: Settings) {
         if (!enabled || sbn.packageName == context.packageName || sbn.isOngoing || !sbn.isClearable) return false
         val n = sbn.notification
         if (n.category in ALWAYS_PASS || n.flags and Notification.FLAG_FOREGROUND_SERVICE != 0) return false
-        val label = runCatching {
-            context.packageManager.getApplicationLabel(context.packageManager.getApplicationInfo(sbn.packageName, 0)).toString()
-        }.getOrDefault(sbn.packageName)
+        val label = label(sbn.packageName, n)
         remember(sbn.packageName, label)
         return when (rule(sbn.packageName)) {
             Rule.PASS -> false

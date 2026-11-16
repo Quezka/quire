@@ -514,4 +514,15 @@
     <string name="assistant_morning_at">Morning</string>
     <string name="assistant_evening_at">Evening</string>
     <string name="assistant_nudge_at">Nudge</string>
+    <string name="hub_apps_search">Search apps</string>
+    <string name="inbox">Inbox</string>
+    <string name="inbox_empty">Inbox empty. Held notifications and new ideas land here.</string>
+    <string name="inbox_held">%1$d held notifications</string>
+    <string name="inbox_open_held">See them</string>
+    <string name="held_title">Held notifications</string>
+    <string name="held_clear">Clear all</string>
+    <string name="held_empty">Nothing held. Apps set to Hold in Settings › Assistant land here.</string>
+    <string name="inbox_to_task">To task</string>
+    <string name="inbox_done">Done</string>
+    <string name="inbox_more_ideas">%1$d more in Ideas</string>
 </resources>

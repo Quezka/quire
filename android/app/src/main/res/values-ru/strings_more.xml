@@ -534,4 +534,15 @@
     <string name="assistant_morning_at">Утро</string>
     <string name="assistant_evening_at">Вечер</string>
     <string name="assistant_nudge_at">Толчок</string>
+    <string name="hub_apps_search">Найти приложение</string>
+    <string name="inbox">Входящие</string>
+    <string name="inbox_empty">Входящих нет. Здесь появляются задержанные уведомления и новые идеи.</string>
+    <string name="inbox_held">Задержано уведомлений: %1$d</string>
+    <string name="inbox_open_held">Показать</string>
+    <string name="held_title">Задержанные уведомления</string>
+    <string name="held_clear">Очистить всё</string>
+    <string name="held_empty">Ничего не задержано. Сюда попадают приложения с правилом «Задержать» в Настройках › Ассистент.</string>
+    <string name="inbox_to_task">В задачу</string>
+    <string name="inbox_done">Готово</string>
+    <string name="inbox_more_ideas">Ещё %1$d в «Идеях»</string>
 </resources>

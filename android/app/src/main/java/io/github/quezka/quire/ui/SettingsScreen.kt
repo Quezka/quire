@@ -21,6 +21,8 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.KeyboardArrowDown
+import androidx.compose.material.icons.filled.KeyboardArrowUp
 import androidx.compose.material.icons.filled.QrCodeScanner
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -327,10 +329,20 @@ private fun AssistantPanel(container: Container) {
                     for (h in listOf(0, 1, 2, 3, 4)) FilterChip(hub.batchHours == h, { hub.batchHours = h; assistant.plan(); shown++ },
                         label = { Text(if (h == 0) stringResource(R.string.hub_batch_never) else hoursText(h * 60)) })
                 }
-                val apps = hub.apps()
+                val apps = remember(shown) { hub.appsNamed() }
                 if (apps.isNotEmpty()) {
-                    Text(stringResource(R.string.hub_apps), style = MaterialTheme.typography.titleSmall)
-                    for ((pkg, label) in apps) {
+                    var open by remember { mutableStateOf(false) }
+                    var query by remember { mutableStateOf("") }
+                    // folded by default <- long list crowded settings (user 2026-11-16)
+                    Row(Modifier.fillMaxWidth().clickable { open = !open }.padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically) {
+                        Text(stringResource(R.string.hub_apps) + " (${apps.size})", Modifier.weight(1f),
+                            style = MaterialTheme.typography.titleSmall)
+                        androidx.compose.material3.Icon(if (open) Icons.Filled.KeyboardArrowUp else Icons.Filled.KeyboardArrowDown, null)
+                    }
+                    if (open && apps.size > 6) OutlinedTextField(query, { query = it }, Modifier.fillMaxWidth(),
+                        singleLine = true, placeholder = { Text(stringResource(R.string.hub_apps_search)) })
+                    if (open) for ((pkg, label) in apps.filter { query.isBlank() || it.second.contains(query, true) }) {
                         val rule = hub.rule(pkg)
                         Row(Modifier.fillMaxWidth().clickable {
                             val next = io.github.quezka.quire.notify.Hub.Rule.entries.let { it[(it.indexOf(rule) + 1) % it.size] }

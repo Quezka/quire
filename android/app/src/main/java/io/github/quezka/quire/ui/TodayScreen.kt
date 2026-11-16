@@ -246,7 +246,7 @@ private fun DayPage(container: Container, version: Int, day: LocalDate, today: L
     val courses = remember(version) { repo.courseIndex() }
     LazyColumn(
         // Edge-to-edge: the window no longer resizes for the keyboard, so lift the list
-        // above it, or the day note (the last item) is typed under the keyboard.
+        // above it, or the quick add box is typed under the keyboard.
         Modifier.fillMaxSize().imePadding(),
         contentPadding = glass.plus(start = 16.dp, top = 4.dp, end = 16.dp, bottom = 96.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp),
@@ -278,8 +278,10 @@ private fun DayPage(container: Container, version: Int, day: LocalDate, today: L
         }
         item(key = "quick-add") { QuickAdd(onAdd = { title -> repo.saveTask(Task(Codec.newUid(), title, due = day)) }) }
 
-        item(key = "note-title") { SectionTitle(stringResource(R.string.day_note)) }
-        item(key = "note-$day") { DayNote(repo, day, agenda.journal) }
+        if (isToday) {
+            item(key = "inbox-title") { SectionTitle(stringResource(R.string.inbox)) }
+            item(key = "inbox") { InboxCard(container, version, day) }
+        }
     }
 }
 
@@ -431,23 +433,3 @@ fun QuickAdd(onAdd: (String) -> Unit) {
     }
 }
 
-/** Saved shortly after typing stops, and when leaving the day. Changes that arrive by sync
- *  replace the text unless it's being edited (then the edit wins, as on the desktop). */
-@Composable
-private fun DayNote(repo: Repository, day: LocalDate, stored: String) {
-    var text by remember(day) { mutableStateOf(stored) }
-    var dirty by remember(day) { mutableStateOf(false) }
-    LaunchedEffect(stored) { if (!dirty) text = stored }
-    LaunchedEffect(text, dirty) {
-        if (dirty) {
-            delay(800)
-            repo.saveJournal(day, text)
-            dirty = false
-        }
-    }
-    DisposableEffect(day) {
-        onDispose { if (dirty) repo.saveJournal(day, text) }
-    }
-    OutlinedTextField(text, { text = it; dirty = true }, Modifier.fillMaxWidth().heightIn(min = 120.dp),
-        placeholder = { Text(stringResource(R.string.day_note_hint)) })
-}
