@@ -1036,4 +1036,5 @@ MESSAGES = {
     'Now a task for today.': 'Теперь это задача на сегодня.',
     'Now a task.': 'Теперь это задача.',
     'Search ideas': 'Поиск идей',
+    'Remember this idea? {idea}': 'Помнишь эту идею? {idea}',
 }

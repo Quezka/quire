@@ -43,7 +43,7 @@ class WidgetScreenshotTest {
 
     private fun shot(name: String, size: DpSize, days: List<WidgetDay>) {
         val context = RuntimeEnvironment.getApplication()
-        render(name, size) { AgendaContent(context, today, days) }
+        render(name, size) { AgendaContent(context, today, days, "Now: Maths until 10:00") }
     }
 
     private fun render(name: String, size: DpSize, content: @Composable () -> Unit): Unit = runBlocking {

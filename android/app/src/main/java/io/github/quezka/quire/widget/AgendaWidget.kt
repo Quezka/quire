@@ -78,10 +78,22 @@ class AgendaWidget : GlanceAppWidget() {
             repo.now() to WidgetAgenda.build(repo.now(), repo.courses(), repo.events(), repo.jobs(),
                 repo.shifts(), repo.tasks(), repo.routines())
         }
+        // the one thing now on top (same words as the lock-screen glance): what's on, what's next, or the main task
+        val focus = withContext(Dispatchers.IO) {
+            val minute = now.hour * 60 + now.minute
+            val (current, next) = io.github.quezka.quire.domain.Assistant.nowNext(repo.day(now.toLocalDate()).items, minute)
+            val step = context.container.assistant.step()
+            when {
+                current != null -> context.getString(R.string.glance_now, current.title, io.github.quezka.quire.ui.minutes(current.end))
+                next != null -> context.getString(R.string.glance_next, next.title, io.github.quezka.quire.ui.minutes(next.start))
+                step != null -> context.getString(R.string.glance_step, step.title)
+                else -> null
+            }
+        }
         provideContent {
             // The system's Material You colours where there are any (Android 12), else Quire's own.
             GlanceTheme(if (Build.VERSION.SDK_INT >= 31) GlanceTheme.colors else QuireWidgetColors) {
-                AgendaContent(context, now.toLocalDate(), days)
+                AgendaContent(context, now.toLocalDate(), days, focus)
             }
         }
     }
@@ -112,7 +124,7 @@ class AgendaWidgetReceiver : GlanceAppWidgetReceiver() {
 internal val QuireWidgetColors = ColorProviders(light = Light, dark = Dark)
 
 @Composable
-internal fun AgendaContent(context: Context, today: LocalDate, days: List<WidgetDay>) {
+internal fun AgendaContent(context: Context, today: LocalDate, days: List<WidgetDay>, focus: String? = null) {
     val colors = GlanceTheme.colors
     val compact = LocalSize.current.height < 150.dp  // a short widget gives its room to the agenda
     val corners = if (Build.VERSION.SDK_INT >= 31) GlanceModifier.cornerRadius(android.R.dimen.system_app_widget_background_radius)
@@ -140,6 +152,14 @@ internal fun AgendaContent(context: Context, today: LocalDate, days: List<Widget
                 .clickable(openApp(context, 2, newTask = true)), contentAlignment = Alignment.Center) {
                 Image(ImageProvider(R.drawable.ic_widget_add), context.getString(R.string.add_task),
                     GlanceModifier.size(24.dp), colorFilter = ColorFilter.tint(colors.onPrimaryContainer))
+            }
+        }
+        if (focus != null) {
+            Box(GlanceModifier.fillMaxWidth().padding(horizontal = 10.dp)) {
+                Text(focus, GlanceModifier.fillMaxWidth().background(colors.primaryContainer).cornerRadius(16.dp)
+                    .padding(horizontal = 14.dp, vertical = if (compact) 6.dp else 10.dp).clickable(openApp(context, 0)),
+                    maxLines = 2, style = TextStyle(color = colors.onPrimaryContainer, fontSize = if (compact) 14.sp else 16.sp,
+                        fontWeight = FontWeight.Medium))
             }
         }
         if (days.isEmpty()) {

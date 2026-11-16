@@ -15,6 +15,7 @@ class Digest:
     due: tuple[str, ...]  # tasks due that day
     overdue: int
     ideas: tuple[str, ...]  # caught today (evening) or since yesterday (morning), still open
+    idea_back: str = ""  # an older open idea, now and then, so it isn't lost
 
 
 class DigestService:
@@ -23,7 +24,7 @@ class DigestService:
 
     PREFIX = "digest."
     MORNING, EVENING = 7 * 60 + 30, 21 * 60 + 30
-    SWITCH_HOUR = 17  # by-hand digest: today's before, tomorrow's after
+    SWITCH_HOUR = 15  # by-hand digest: today's before, tomorrow's after (same as the phone)
 
     def __init__(self, planner, tasks, ideas, settings: KeyValueStore, clock: Clock):
         self._planner, self._tasks, self._ideas = planner, tasks, ideas
@@ -46,15 +47,15 @@ class DigestService:
                 if morning and minute >= self.EVENING:
                     continue  # too late for the morning one
                 self._settings.set(self.PREFIX + key, today.isoformat())
-                return self.build(morning, today)
+                return self.build(morning, today, mark=True)
         return None
 
     def current(self) -> Digest:
-        """The digest for right now, asked for by hand: today's until 17:00, then tomorrow's. Doesn't mark it shown."""
+        """The digest for right now, asked for by hand: today's until 15:00, then tomorrow's. Doesn't mark it shown."""
         now: datetime = self._clock.now()
-        return self.build(now.hour < self.SWITCH_HOUR, now.date())
+        return self.build(now.hour < self.SWITCH_HOUR, now.date(), mark=False)
 
-    def build(self, morning: bool, today: date) -> Digest:
+    def build(self, morning: bool, today: date, mark: bool = False) -> Digest:
         day = today if morning else today + timedelta(days=1)
         agenda = self._planner.day_agenda(day)
         items = tuple(sorted((i.time.start, i.title) for i in agenda.items))[:6]
@@ -62,4 +63,5 @@ class DigestService:
         overdue = sum(1 for g in self._tasks.groups() for t in g.items if t.overdue)
         since = today - timedelta(days=1) if morning else today
         ideas = tuple(i.text for i in self._ideas.caught_between(since, today) if not i.done)[:5]
-        return Digest(morning, items, due, overdue, ideas)
+        back = self._ideas.resurfaced(mark=mark)
+        return Digest(morning, items, due, overdue, ideas, back.text.splitlines()[0] if back else "")

@@ -4,6 +4,15 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.51.0] - 2026-11-16
+
+- **Ideas, better:** tag them with `#words`, search them, and turn one into a task (for today or later) or a note in one tap. Edit them; deleting one has Undo. Now and then an older idea comes back in the digest so it isn't lost.
+- **Catch an idea from anywhere (phone):** a lightbulb button on the widget, a quick-settings tile, the app icon's long-press menu, "Share to Quire" from any app, and a reply field right on the lock-screen glance. On the computer: Ctrl+I, or "New idea…" in the tray menu.
+- **Reminders you notice (phone):** write `travel: 20` in an event's notes and the reminder comes 20 minutes earlier and says when to leave; lines starting with `-` show as what to bring. Snooze 5 min or Got it, right on the notification.
+- **A more proactive assistant (phone):** "Plan tomorrow" on the evening digest picks your one main thing; it comes first in the morning, on Today and on the lock screen. Nudges come up to twice a day when something is stuck, with a tiny first step and Start / Done buttons. Pick your own morning, evening and nudge times in Settings › Assistant.
+- **Widget:** what's on now (or your one thing) at the top, plus an idea button.
+- The Digest button switches to tomorrow at 15:00 on both apps.
+
 ## [0.50.1] - 2026-11-14
 
 - **New icon** on the computer and the phone, drawn like every other Quezka app: the same rounded square in its own plain colour with a white symbol.

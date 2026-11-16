@@ -33,3 +33,10 @@ Python 3.10+ / PySide6 desktop app (Linux + Windows). Clean Architecture; see RE
 - Assistant (0.48, ADHD-friendly; user wants to live "using pretty much only Quire"): phone `notify/AssistantManager.kt` (now/next ongoing notif on the lock screen, morning/evening digest, afternoon nudge, hub batches; Settings › Assistant) and `notify/Hub.kt` (`HubListener`, NotificationListenerService: other apps' notifs held for the digest, rule per app pass/hold/mute, calls/alarms pass). Rules in `domain/Assistant.kt`. One notif channel per kind with its own icon (`res/drawable/ic_n_*`, from the kit's Material Symbols). Today's "one thing now" card on both apps (`ui/TodayScreen.kt` NowCard, `presentation/views/now_card.py`); `TaskService.next_step()` / `Assistant.nextStep`.
 - Ideas (0.48): kind `idea`, table `ideas` (schema v20), desktop page and phone screen (More), in the evening digest.
 - Focus blocks (0.48): `plan_block` / `planBlock`, `PomodoroTimer.start_block`; a finished or stopped block becomes an Event ("Focus: <task>").
+
+## 0.51 (2026-11-16)
+ideas: tags = `#word` in text (no field, payload same); `domain/ideas.py` + `Ideas.kt` same rules (`tags`, `matches`, `resurface`, `first_line`); resurfaced "seen" = per device setting `ideas.seen`
+capture (phone): `capture/CaptureActivity` (widget, tile `IdeaTileService`, `res/xml/shortcuts.xml`, share `text/plain`, Today menu); glance notif `RemoteInput` -> `AlarmReceiver` `ACTION_IDEA`
+! shortcut XML extras = strings -> `MainActivity.tabExtra/newTaskExtra` read int|str
+reminders: `notify/Reminders.kt` `Prep` (notes `travel: N`, `- item` = bring); snooze in setting `reminders.snoozed`
+assistant: main thing per day = phone setting `assistant.main.<day>` (not synced); `capture/PlanTomorrowActivity` from evening digest; nudges max 2/day (`assistant.nudged.<day>`), 2nd only if overdue; `AssistantManager.digestParts` = one builder for notif + Today button

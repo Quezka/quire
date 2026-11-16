@@ -20,6 +20,8 @@ def lines(d: Digest) -> list[str]:
     if d.overdue:
         out.append(_("{n} late: just start one").format(n=d.overdue))
     out += [_("Idea: {idea}").format(idea=i) for i in d.ideas]
+    if d.idea_back:
+        out.append(_("Remember this idea? {idea}").format(idea=d.idea_back))
     return out
 
 
