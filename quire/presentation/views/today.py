@@ -115,7 +115,7 @@ class TodayView(Page):
         self.quick_log = QuickLog(services)
         self.now_card = NowCard(services, relay)
         # side column scrolls when short (1366x768 laptop) <- else Due squeezed to 0 rows
-        due.setMinimumHeight(230)
+        due.setMinimumHeight(180)
         self.inbox.setMinimumHeight(130)
         side_box = QWidget()
         side = QVBoxLayout(side_box)
@@ -123,7 +123,7 @@ class TodayView(Page):
         side.setSpacing(16)
         side.addWidget(self.now_card)
         side.addWidget(self.quick_log)
-        side.addWidget(due, 3)
+        side.addWidget(due, 2)
         side.addWidget(self.inbox, 1)
         side_scroll = QScrollArea(widgetResizable=True, frameShape=QFrame.NoFrame)
         side_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
