@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.51.1" date="2026-11-16">
+      <description>
+        <p>Text and spacing follow the window's size, so small screens fit better.</p>
+      </description>
+    </release>
     <release version="0.51.0" date="2026-11-16">
       <description>
         <p>Better ideas (tags, search, task or note in one tap), capture from anywhere, louder reminders, plan tomorrow, and a smarter widget.</p>

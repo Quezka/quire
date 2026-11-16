@@ -4,6 +4,10 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.51.1] - 2026-11-16
+
+- **Fits small screens better:** on a small screen or a small window (like a 1366×768 laptop) text and spacing get a little tighter instead of being cut or squeezed, and it follows as you resize the window.
+
 ## [0.51.0] - 2026-11-16
 
 - **Ideas, better:** tag them with `#words`, search them, and turn one into a task (for today or later) or a note in one tap. Edit them; deleting one has Undo. Now and then an older idea comes back in the digest so it isn't lost.
