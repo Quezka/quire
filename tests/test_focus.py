@@ -399,3 +399,21 @@ def test_the_digest_button_shows_todays_by_day_and_tomorrows_by_evening(focus_en
     assert digest.due_now() is not None  # asking by hand doesn't use up the 7:30 one
     clock.moment = clock.moment.replace(hour=18, minute=0)
     assert not digest.current().morning
+
+
+def test_the_digest_keeps_every_event_and_folds_routines_into_one_line(focus_env):
+    from datetime import timedelta
+    from quire.application.inputs import EventInput, RoutineInput
+    from quire.presentation.digest import lines
+    services, clock, _ = focus_env
+    day = T0.date() + timedelta(days=1)
+    for minute, title in ((6 * 60, "Wake up"), (7 * 60, "Shower"), (13 * 60, "Lunch"), (20 * 60, "Dinner")):
+        services.planner.save_routine(None, RoutineInput(title, minute))
+    for hour in range(8, 18):
+        services.planner.save_event(None, EventInput(day, hour * 60, hour * 60 + 30, f"Event {hour}"))
+    services.planner.save_event(None, EventInput(day, 0, 0, "Trip", all_day=True))
+    d = services.digest.build(False, T0.date())
+    assert [t for _m, t in d.items] == [f"Event {h}" for h in range(8, 18)]
+    assert [t for _m, t in d.routines] == ["Wake up", "Shower", "Lunch", "Dinner"] and d.all_day == ("Trip",)
+    text = lines(d)
+    assert sum("Routines" in line for line in text) == 1 and any("Trip" in line for line in text)

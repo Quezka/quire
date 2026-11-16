@@ -546,4 +546,7 @@
     <string name="inbox_done">Готово</string>
     <string name="inbox_more_ideas">Ещё %1$d в «Идеях»</string>
     <string name="average_over_time">Средний балл со временем</string>
+    <string name="digest_all_day">Весь день: %1$s</string>
+    <string name="digest_more">…и ещё %1$d</string>
+    <string name="digest_routines">Рутины: %1$s</string>
 </resources>

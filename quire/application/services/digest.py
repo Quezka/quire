@@ -16,6 +16,9 @@ class Digest:
     overdue: int
     ideas: tuple[str, ...]  # caught today (evening) or since yesterday (morning), still open
     idea_back: str = ""  # an older open idea, now and then, so it isn't lost
+    routines: tuple[tuple[int, str], ...] = ()  # folded into one line <- were filling the slots, events dropped
+    all_day: tuple[str, ...] = ()
+    more: int = 0  # timed items past MAX_ITEMS
 
 
 class DigestService:
@@ -24,6 +27,7 @@ class DigestService:
 
     PREFIX = "digest."
     MORNING, EVENING = 7 * 60 + 30, 21 * 60 + 30
+    MAX_ITEMS = 12  # classes, events, shifts: all of a normal day
     SWITCH_HOUR = 15  # by-hand digest: today's before, tomorrow's after (same as the phone)
 
     def __init__(self, planner, tasks, ideas, settings: KeyValueStore, clock: Clock):
@@ -58,10 +62,16 @@ class DigestService:
     def build(self, morning: bool, today: date, mark: bool = False) -> Digest:
         day = today if morning else today + timedelta(days=1)
         agenda = self._planner.day_agenda(day)
-        items = tuple(sorted((i.time.start, i.title) for i in agenda.items))[:6]
+        from ..dto import ItemKind
+        timed = sorted((i.time.start, i.title) for i in agenda.items
+                       if i.kind is not ItemKind.ROUTINE and not i.is_all_day)
+        routines = tuple(sorted((i.time.start, i.title) for i in agenda.items if i.kind is ItemKind.ROUTINE))
+        all_day = tuple(i.title for i in agenda.items if i.is_all_day and i.kind is not ItemKind.ROUTINE)
+        items = tuple(timed[:self.MAX_ITEMS])
         due = tuple(t.task.title for t in agenda.tasks if not t.task.done)[:5]
         overdue = sum(1 for g in self._tasks.groups() for t in g.items if t.overdue)
         since = today - timedelta(days=1) if morning else today
         ideas = tuple(i.text for i in self._ideas.caught_between(since, today) if not i.done)[:5]
         back = self._ideas.resurfaced(mark=mark)
-        return Digest(morning, items, due, overdue, ideas, back.text.splitlines()[0] if back else "")
+        return Digest(morning, items, due, overdue, ideas, back.text.splitlines()[0] if back else "",
+                      routines, all_day, max(0, len(timed) - self.MAX_ITEMS))

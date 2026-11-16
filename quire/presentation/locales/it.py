@@ -1043,4 +1043,7 @@ MESSAGES = {
     'To do': 'Da fare',
     'Health': 'Salute',
     'Average over time': 'Media nel tempo',
+    'All day: {title}': 'Tutto il giorno: {title}',
+    '…and {n} more': '…e altri {n}',
+    'Routines: {list}': 'Routine: {list}',
 }

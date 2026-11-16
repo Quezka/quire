@@ -222,7 +222,16 @@ class Notifier(private val context: Context) {
     fun digestLines(p: AssistantManager.DigestParts): List<String> = buildList {
         p.main?.let { add(context.getString(R.string.digest_main, it)) }
         if (p.items.isEmpty()) add(context.getString(if (p.morning) R.string.digest_free_today else R.string.digest_free_tomorrow))
-        for (i in p.items.sortedBy { it.start }.take(5)) add("${minutes(i.start)}  ${i.title}")
+        // every class/event/shift (cap 12 + "more"); routines folded into one line <- they pushed events out
+        val routine = io.github.quezka.quire.domain.ItemKind.ROUTINE
+        val allDay = p.items.filter { it.kind != routine && it.end - it.start >= 24 * 60 }
+        val timed = p.items.filter { it.kind != routine && it.end - it.start < 24 * 60 }.sortedBy { it.start }
+        for (i in allDay) add(context.getString(R.string.digest_all_day, i.title))
+        for (i in timed.take(12)) add("${minutes(i.start)}  ${i.title}")
+        if (timed.size > 12) add(context.getString(R.string.digest_more, timed.size - 12))
+        p.items.filter { it.kind == routine }.sortedBy { it.start }.takeIf { it.isNotEmpty() }?.let { r ->
+            add(context.getString(R.string.digest_routines, r.joinToString(" · ") { "${minutes(it.start)} ${it.title}" }))
+        }
         for (t in p.due.filter { it.title != p.main }.take(4)) add(context.getString(R.string.digest_task, t.title))
         if (p.overdue > 0) add(context.resources.getQuantityString(R.plurals.digest_overdue, p.overdue, p.overdue))
         for (idea in p.ideas.take(5)) add(context.getString(R.string.digest_idea, idea))

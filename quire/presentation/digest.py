@@ -14,8 +14,14 @@ def title(d: Digest) -> str:
 
 
 def lines(d: Digest) -> list[str]:
-    out = [f"{fmt_min(m)}  {t}" for m, t in d.items] or [
-        _("Nothing planned today") if d.morning else _("Nothing planned tomorrow")]
+    out = [_("All day: {title}").format(title=t) for t in d.all_day]
+    out += [f"{fmt_min(m)}  {t}" for m, t in d.items]
+    if d.more:
+        out.append(_("…and {n} more").format(n=d.more))
+    if not out:
+        out = [_("Nothing planned today") if d.morning else _("Nothing planned tomorrow")]
+    if d.routines:
+        out.append(_("Routines: {list}").format(list=" · ".join(f"{fmt_min(m)} {t}" for m, t in d.routines)))
     out += [_("To do: {task}").format(task=t) for t in d.due]
     if d.overdue:
         out.append(_("{n} late: just start one").format(n=d.overdue))

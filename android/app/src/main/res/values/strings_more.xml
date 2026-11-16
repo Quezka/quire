@@ -526,4 +526,7 @@
     <string name="inbox_done">Done</string>
     <string name="inbox_more_ideas">%1$d more in Ideas</string>
     <string name="average_over_time">Average over time</string>
+    <string name="digest_all_day">All day: %1$s</string>
+    <string name="digest_more">…and %1$d more</string>
+    <string name="digest_routines">Routines: %1$s</string>
 </resources>

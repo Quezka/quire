@@ -1045,4 +1045,7 @@ MESSAGES = {
     'To do': 'Сделать',
     'Health': 'Здоровье',
     'Average over time': 'Средний балл со временем',
+    'All day: {title}': 'Весь день: {title}',
+    '…and {n} more': '…и ещё {n}',
+    'Routines: {list}': 'Рутины: {list}',
 }
