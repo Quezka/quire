@@ -53,6 +53,11 @@
 
   <!-- Newest first. Every released version needs an entry; tests enforce it. -->
   <releases>
+    <release version="0.52.0" date="2026-11-16">
+      <description>
+        <p>Inbox on Today, plan my day, routines that last, shared bedtime across devices, school average chart, notes widget, idea export, and split-screen fit.</p>
+      </description>
+    </release>
     <release version="0.51.1" date="2026-11-16">
       <description>
         <p>Text and spacing follow the window's size, so small screens fit better.</p>

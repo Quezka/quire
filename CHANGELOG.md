@@ -4,6 +4,20 @@ All notable changes to Quire. Versions follow [Semantic Versioning](https://semv
 patch for fixes, minor for new features, major for breaking changes (while below 1.0,
 breaking changes bump the minor version).
 
+## [0.52.0] - 2026-11-16
+
+- **Inbox instead of Day notes** on Today: ideas waiting for a decision (make one a task for today, or clear it, with Undo); on the phone also the notifications Quire held for you, with the full list one tap away.
+- **Held notifications show app names**, not package ids, and the per-app list in Settings folds away and can be searched.
+- **Sleep across devices**: say "going to bed" on one device and "I'm awake" on the other, and the night is logged.
+- **Plan my day** (Add menu): puts the day's tasks into the free time between classes, events and routines; keep the blocks you like.
+- **Routines can last a while** (a shower, 20 minutes) instead of being a single moment.
+- **Average over time** chart on the School page, on both apps.
+- **Digest shows every event** of the day, all-day events too; routines are folded into one line so they no longer push events out.
+- **Export ideas**: copy, save as a file, or put them all in one note (phone: share).
+- **Notes widget** for the phone's home screen: pinned and latest notes, tap to open.
+- **Less crowded**: Sleep, Water and Medicines share one Health entry in the sidebar.
+- **Fits split screen** on a 1366×768 laptop: Today shows one column at a time with a Day / To do switch; trackpad glide works on GNOME; lists and menus open under their box with a custom interface size (kit 0.15.1).
+
 ## [0.51.1] - 2026-11-16
 
 - **Fits small screens better:** on a small screen or a small window (like a 1366×768 laptop) text and spacing get a little tighter instead of being cut or squeezed, and it follows as you resize the window.
