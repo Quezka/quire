@@ -64,3 +64,15 @@ def test_resurfacing_is_remembered(services, clock):
     shown = ideas.resurfaced(mark=True)
     assert shown is not None and shown.text == "an old thought"
     assert ideas.resurfaced() is None  # shown today: not again for two weeks
+
+
+def test_ideas_export_as_one_text_and_as_one_note(services):
+    services.ideas.add("Buy a lamp\nfor the desk")
+    done = services.ideas.add("Old one")
+    services.ideas.set_done(done, True)
+    text = services.ideas.export_text()
+    assert text == "- Buy a lamp\n  for the desk\n"
+    assert "- [x] Old one" in services.ideas.export_text(include_done=True)
+    note = services.ideas.export_to_note("Ideas")
+    assert note is not None and "- Buy a lamp" in services.notes.note(note).body
+    assert services.ideas.export_to_note("Ideas", query="nothing matches") is None

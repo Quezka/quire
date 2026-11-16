@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Checkbox
@@ -81,7 +82,30 @@ fun IdeasScreen(container: Container, version: Int, back: () -> Unit) {
 
     Scaffold(snackbarHost = { SnackbarHost(snackbar) }, containerColor = MaterialTheme.colorScheme.background) { pad ->
         Column(Modifier.fillMaxSize().padding(pad).imePadding()) {
-            PageBar(stringResource(R.string.nav_ideas), back)
+            PageBar(stringResource(R.string.nav_ideas), back) {
+                var exportMenu by remember { mutableStateOf(false) }
+                IconButton(onClick = { exportMenu = true }) { Icon(Icons.Filled.Share, stringResource(R.string.ideas_export)) }
+                androidx.compose.material3.DropdownMenu(exportMenu, { exportMenu = false }) {
+                    androidx.compose.material3.DropdownMenuItem({ Text(stringResource(R.string.ideas_share)) }, onClick = {
+                        exportMenu = false
+                        val text = Ideas.exportText(ideas.filter { !it.done })
+                        if (text.isBlank()) say(context.getString(R.string.ideas_none_to_export))
+                        else context.startActivity(android.content.Intent.createChooser(
+                            android.content.Intent(android.content.Intent.ACTION_SEND).setType("text/plain")
+                                .putExtra(android.content.Intent.EXTRA_TEXT, text), null))
+                    })
+                    androidx.compose.material3.DropdownMenuItem({ Text(stringResource(R.string.ideas_one_note)) }, onClick = {
+                        exportMenu = false
+                        val text = Ideas.exportText(ideas.filter { !it.done })
+                        if (text.isBlank()) say(context.getString(R.string.ideas_none_to_export))
+                        else {
+                            repo.saveNote(io.github.quezka.quire.domain.Note(io.github.quezka.quire.data.Codec.newUid(),
+                                "# " + context.getString(R.string.nav_ideas) + "\n\n" + text))
+                            say(context.getString(R.string.ideas_in_one_note))
+                        }
+                    })
+                }
+            }
             Row(Modifier.fillMaxWidth().padding(horizontal = 16.dp), verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 OutlinedTextField(text, { text = it }, Modifier.weight(1f), label = { Text(stringResource(R.string.idea_jot_tags)) },

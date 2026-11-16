@@ -533,4 +533,9 @@
     <string name="notes_widget_description">Pinned and latest notes; tap one to open it</string>
     <string name="notes_widget_title">Notes</string>
     <string name="notes_widget_empty">No notes yet. Tap to write one.</string>
+    <string name="ideas_export">Export ideas</string>
+    <string name="ideas_share">Share as text</string>
+    <string name="ideas_one_note">Put them all in one note</string>
+    <string name="ideas_none_to_export">No ideas to export.</string>
+    <string name="ideas_in_one_note">Now in one note, under Notes.</string>
 </resources>

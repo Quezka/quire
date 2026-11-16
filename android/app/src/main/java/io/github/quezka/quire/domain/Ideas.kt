@@ -7,6 +7,12 @@ import java.time.LocalDateTime
 data class Idea(val uid: String, val text: String, val created: LocalDateTime, val done: Boolean = false)
 
 object Ideas {
+    /** Ideas as a Markdown list, newest first; extra lines indented (= desktop `export_text`). */
+    fun exportText(ideas: List<Idea>): String = ideas.joinToString("") { idea ->
+        val lines = idea.text.trim().lines()
+        "- " + (if (idea.done) "[x] " else "") + lines.first().trim() + lines.drop(1).joinToString("") { "\n  " + it.trimEnd() } + "\n"
+    }
+
     const val MAX_CHARS = 2000
 
     fun valid(text: String) = text.isNotBlank() && text.length <= MAX_CHARS

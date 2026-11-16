@@ -553,4 +553,9 @@
     <string name="notes_widget_description">Закреплённые и последние заметки; нажмите, чтобы открыть</string>
     <string name="notes_widget_title">Заметки</string>
     <string name="notes_widget_empty">Заметок пока нет. Нажмите, чтобы написать.</string>
+    <string name="ideas_export">Экспорт идей</string>
+    <string name="ideas_share">Поделиться текстом</string>
+    <string name="ideas_one_note">Собрать все в одну заметку</string>
+    <string name="ideas_none_to_export">Нет идей для экспорта.</string>
+    <string name="ideas_in_one_note">Теперь в одной заметке, в «Заметках».</string>
 </resources>

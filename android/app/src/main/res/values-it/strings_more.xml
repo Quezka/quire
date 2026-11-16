@@ -533,4 +533,9 @@
     <string name="notes_widget_description">Note fissate e recenti; tocca per aprirne una</string>
     <string name="notes_widget_title">Note</string>
     <string name="notes_widget_empty">Ancora nessuna nota. Tocca per scriverne una.</string>
+    <string name="ideas_export">Esporta idee</string>
+    <string name="ideas_share">Condividi come testo</string>
+    <string name="ideas_one_note">Mettile tutte in una nota</string>
+    <string name="ideas_none_to_export">Nessuna idea da esportare.</string>
+    <string name="ideas_in_one_note">Ora sono in una nota, in Note.</string>
 </resources>

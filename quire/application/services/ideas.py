@@ -91,6 +91,22 @@ class IdeaService:
         self.set_done(idea_id, True)
         return note.id
 
+    def export_text(self, include_done: bool = False, query: str = "") -> str:
+        """Every idea shown (search + done filter) as a Markdown list, newest first, multi-line kept indented."""
+        out = []
+        for idea in self.ideas(include_done=include_done, query=query):
+            first, *rest = idea.text.strip().split("\n")
+            mark = "[x] " if idea.done else ""
+            out.append(f"- {mark}{first.strip()}" + "".join(f"\n  {line.rstrip()}" for line in rest))
+        return "\n".join(out) + ("\n" if out else "")
+
+    def export_to_note(self, title: str, include_done: bool = False, query: str = "") -> int | None:
+        """All of them in one note (ideas stay as they are); None when there are none."""
+        text = self.export_text(include_done, query)
+        if not text:
+            return None
+        return self._notes.create(f"# {title}\n\n{text}").id
+
     def restore(self, record: IdeaRecord) -> int:
         """Undo a delete: the same text and time, back again."""
         idea = Idea(record.text, record.created, record.done)

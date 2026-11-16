@@ -14,7 +14,7 @@ from ...application.errors import ApplicationError
 from ...application.services import Services
 from ..bridge import ChangeRelay
 from ..i18n import _
-from .common import Card, Page, label, primary_button
+from .common import Card, Page, label, menu_button, primary_button
 
 MAX_TAG_CHIPS = 8  # most used first; more = clutter
 
@@ -25,6 +25,11 @@ class IdeasView(Page):
         self.ideas = services.ideas
         self.title.setText(_("Ideas"))
         self._deleted = None  # last deleted idea, for Undo
+        export = QMenu(self)
+        export.addAction(_("Copy all as text"), self._copy_all)
+        export.addAction(_("Save as a text file…"), self._save_all)
+        export.addAction(_("Put them all in one note"), self._to_one_note)
+        self.add_actions(menu_button(_("Export"), export, "upload"))
 
         self.entry = QLineEdit(placeholderText=_("Jot an idea… (#tag to sort it)"))
         self.entry.returnPressed.connect(self._add)
@@ -191,3 +196,30 @@ class IdeasView(Page):
             self.ideas.restore(self._deleted)
             self._deleted = None
         self._show_notice("")
+
+    # ---- export (all shown: search + done filter) ----
+
+    def _export(self) -> str:
+        return self.ideas.export_text(self.show_done.isChecked(), self.search.text().strip())
+
+    def _copy_all(self):
+        from PySide6.QtWidgets import QApplication
+        text = self._export()
+        QApplication.clipboard().setText(text)
+        self._show_notice(_("Copied.") if text else _("No ideas to export."))
+
+    def _save_all(self):
+        from PySide6.QtWidgets import QFileDialog
+        text = self._export()
+        if not text:
+            self._show_notice(_("No ideas to export."))
+            return
+        path, _filter = QFileDialog.getSaveFileName(self, _("Save ideas"), "ideas.md", _("Text") + " (*.md *.txt)")
+        if path:
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(text)
+            self._show_notice(_("Saved."))
+
+    def _to_one_note(self):
+        note = self.ideas.export_to_note(_("Ideas"), self.show_done.isChecked(), self.search.text().strip())
+        self._show_notice(_("Now in one note, under Notes.") if note else _("No ideas to export."))
