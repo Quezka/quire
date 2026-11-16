@@ -82,8 +82,8 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
-        requested = intent?.getIntExtra("tab", -1)?.takeIf { it >= 0 }
-        addTask = intent?.getBooleanExtra("new_task", false) == true
+        requested = intent?.let(::tabExtra)
+        addTask = intent?.let(::newTaskExtra) == true
         val container = container
         setContent {
             QuireTheme {
@@ -172,8 +172,8 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        requested = intent.getIntExtra("tab", -1).takeIf { it >= 0 }
-        addTask = intent.getBooleanExtra("new_task", false)
+        requested = tabExtra(intent)
+        addTask = newTaskExtra(intent)
     }
 
     override fun onResume() {
@@ -218,3 +218,10 @@ private fun AskForNotifications() {
         }
     }
 }
+
+// launcher shortcuts (res/xml/shortcuts.xml) can only carry strings; widgets and notifications send int/bool
+private fun tabExtra(intent: android.content.Intent): Int? =
+    (intent.extras?.get("tab")?.toString()?.toIntOrNull())?.takeIf { it >= 0 }
+
+private fun newTaskExtra(intent: android.content.Intent): Boolean =
+    intent.extras?.get("new_task")?.toString() == "true"

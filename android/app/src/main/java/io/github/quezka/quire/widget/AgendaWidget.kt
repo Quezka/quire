@@ -127,6 +127,14 @@ internal fun AgendaContent(context: Context, today: LocalDate, days: List<Widget
                 Text(today.format(DateTimeFormatter.ofPattern("d MMMM", Locale.getDefault())),
                     maxLines = 1, style = TextStyle(color = colors.onSurface, fontSize = if (compact) 16.sp else 22.sp, fontWeight = FontWeight.Normal))
             }
+            // catch an idea without opening the app
+            Box(GlanceModifier.size(if (compact) 36.dp else 44.dp).background(colors.primaryContainer).cornerRadius(14.dp)
+                .clickable(actionStartActivity(Intent(context, io.github.quezka.quire.capture.CaptureActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))), contentAlignment = Alignment.Center) {
+                Image(ImageProvider(R.drawable.ic_widget_idea), context.getString(R.string.shortcut_idea),
+                    GlanceModifier.size(24.dp), colorFilter = ColorFilter.tint(colors.onPrimaryContainer))
+            }
+            Spacer(GlanceModifier.width(8.dp))
             // A small tonal button, with Material's rounded square.
             Box(GlanceModifier.size(if (compact) 36.dp else 44.dp).background(colors.primaryContainer).cornerRadius(14.dp)
                 .clickable(openApp(context, 2, newTask = true)), contentAlignment = Alignment.Center) {

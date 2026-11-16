@@ -200,6 +200,10 @@ TopAppBar(
             val turn by animateFloatAsState(if (menu) 45f else 0f, Motion.bouncy(), label = "fab")
             Icon(Icons.Filled.Add, stringResource(R.string.add), Modifier.graphicsLayer { rotationZ = turn })
             DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.shortcut_idea)) },
+                    leadingIcon = { Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_idea), null) },
+                    onClick = { menu = false; context.startActivity(android.content.Intent(context,
+                        io.github.quezka.quire.capture.CaptureActivity::class.java)) })
                 DropdownMenuItem(text = { Text(stringResource(R.string.new_task)) },
                     leadingIcon = { Icon(Icons.Filled.CheckCircle, null) },
                     onClick = { menu = false; newTask(day) })

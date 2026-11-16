@@ -508,4 +508,9 @@
     <string name="idea_now_note">Теперь это заметка.</string>
     <string name="idea_deleted">Идея удалена.</string>
     <string name="idea_edit">Изменить идею</string>
+    <string name="capture_title">Новая идея</string>
+    <string name="capture_tile">Идея</string>
+    <string name="shortcut_idea">Новая идея</string>
+    <string name="shortcut_task">Новая задача</string>
+    <string name="shortcut_ideas">Идеи</string>
 </resources>

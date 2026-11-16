@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- long-press the app icon: the three things done most -->
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut android:shortcutId="idea" android:enabled="true" android:icon="@drawable/ic_shortcut_idea"
+        android:shortcutShortLabel="@string/shortcut_idea">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="io.github.quezka.quire"
+            android:targetClass="io.github.quezka.quire.capture.CaptureActivity" />
+    </shortcut>
+    <shortcut android:shortcutId="task" android:enabled="true" android:icon="@drawable/ic_shortcut_task"
+        android:shortcutShortLabel="@string/shortcut_task">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="io.github.quezka.quire"
+            android:targetClass="io.github.quezka.quire.MainActivity">
+            <extra android:name="tab" android:value="2" />
+            <extra android:name="new_task" android:value="true" />
+        </intent>
+    </shortcut>
+    <shortcut android:shortcutId="ideas" android:enabled="true" android:icon="@drawable/ic_shortcut_ideas"
+        android:shortcutShortLabel="@string/shortcut_ideas">
+        <intent android:action="android.intent.action.VIEW" android:targetPackage="io.github.quezka.quire"
+            android:targetClass="io.github.quezka.quire.MainActivity">
+            <extra android:name="tab" android:value="18" />
+        </intent>
+    </shortcut>
+</shortcuts>

@@ -50,6 +50,8 @@ class Notifier(private val context: Context) {
         const val ACTION_MEDICINE = "io.github.quezka.quire.MEDICINE"
         const val ACTION_SLEEP = "io.github.quezka.quire.SLEEP"
         const val ACTION_DIGEST = "io.github.quezka.quire.DIGEST"
+        const val ACTION_IDEA = "io.github.quezka.quire.IDEA"
+        const val KEY_IDEA = "idea"
         const val ACTION_NOW = "io.github.quezka.quire.NOW"
         const val ACTION_NUDGE = "io.github.quezka.quire.NUDGE"
         const val ACTION_BATCH = "io.github.quezka.quire.BATCH"
@@ -176,10 +178,21 @@ class Notifier(private val context: Context) {
             .setPriority(NotificationCompat.PRIORITY_LOW).setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setColor(ContextCompat.getColor(context, R.color.notification_accent))
             .setContentIntent(openApp(0))
+            .addAction(ideaReplyAction())
         if (allowed()) NotificationManagerCompat.from(context).notify(NOW_ID, builder.build())
     }
 
     fun cancelNow() = NotificationManagerCompat.from(context).cancel(NOW_ID)
+
+    /** "Idea" on the lock-screen glance: type it in the notification, saved without opening the app. */
+    private fun ideaReplyAction(): NotificationCompat.Action {
+        val input = androidx.core.app.RemoteInput.Builder(KEY_IDEA).setLabel(context.getString(R.string.idea_jot)).build()
+        val intent = PendingIntent.getBroadcast(context, ACTION_IDEA.hashCode(),
+            Intent(context, AlarmReceiver::class.java).setAction(ACTION_IDEA),
+            PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
+        return NotificationCompat.Action.Builder(R.drawable.ic_widget_idea, context.getString(R.string.shortcut_idea), intent)
+            .addRemoteInput(input).setAllowGeneratedReplies(false).build()
+    }
 
     /** The digest's lines: for the notification and for the Digest button on Today. */
     fun digestLines(morning: Boolean, items: List<io.github.quezka.quire.domain.AgendaItem>,
@@ -307,6 +320,11 @@ class AlarmReceiver : BroadcastReceiver() {
             Notifier.ACTION_NUDGE -> container.assistant.nudge()
             Notifier.ACTION_BATCH -> container.assistant.batch()
             Notifier.ACTION_NOW -> Unit
+            Notifier.ACTION_IDEA -> {
+                val text = androidx.core.app.RemoteInput.getResultsFromIntent(intent)?.getCharSequence(Notifier.KEY_IDEA)
+                if (!text.isNullOrBlank()) container.repository.addIdea(text.toString())
+                // updateNow below re-posts the glance, which clears the reply spinner
+            }
             Notifier.ACTION_FOCUS_ON -> {
                 // the nudge's button: focus on that task now
                 container.focus.focusOn(intent.getStringExtra("task"))

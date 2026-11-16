@@ -490,4 +490,9 @@
     <string name="idea_now_note">Now a note.</string>
     <string name="idea_deleted">Idea deleted.</string>
     <string name="idea_edit">Edit idea</string>
+    <string name="capture_title">New idea</string>
+    <string name="capture_tile">Idea</string>
+    <string name="shortcut_idea">New idea</string>
+    <string name="shortcut_task">New task</string>
+    <string name="shortcut_ideas">Ideas</string>
 </resources>
