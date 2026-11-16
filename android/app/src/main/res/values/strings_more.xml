@@ -478,4 +478,16 @@
     <string name="now_card_free">Nothing to do right now. Breathe.</string>
     <string name="now_card_done">Done, what\'s next?</string>
     <string name="now_card_until">until %1$s</string>
+    <string name="idea_jot_tags">Jot an idea… (#tag to sort it)</string>
+    <string name="ideas_search">Search ideas</string>
+    <string name="ideas_no_match">Nothing matches. Try fewer words.</string>
+    <string name="idea_caught">Caught.</string>
+    <string name="idea_to_task_today">Make it a task for today</string>
+    <string name="idea_to_task">Make it a task</string>
+    <string name="idea_to_note">Make it a note</string>
+    <string name="idea_now_task_today">Now a task for today.</string>
+    <string name="idea_now_task">Now a task.</string>
+    <string name="idea_now_note">Now a note.</string>
+    <string name="idea_deleted">Idea deleted.</string>
+    <string name="idea_edit">Edit idea</string>
 </resources>

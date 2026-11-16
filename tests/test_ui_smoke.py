@@ -1109,6 +1109,7 @@ def test_closing_hides_to_the_tray_and_quit_really_quits(services, app, monkeypa
     class FakeTray(QObject):
         show_requested = Signal()
         quit_requested = Signal()
+        idea_requested = Signal()
 
         def __init__(self):
             super().__init__()

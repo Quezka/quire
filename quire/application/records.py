@@ -140,6 +140,7 @@ class IdeaRecord:
     text: str
     created: datetime
     done: bool
+    tags: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)

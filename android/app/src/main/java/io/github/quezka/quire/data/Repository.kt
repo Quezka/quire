@@ -143,6 +143,35 @@ class Repository(
         records.delete("idea", uid)
         changed()
     }
+    fun editIdea(uid: String, text: String) {
+        val idea = ideas().firstOrNull { it.uid == uid } ?: return
+        if (!Ideas.valid(text.trim())) return
+        records.save("idea", uid, Codec.ideaData(idea.copy(text = text.trim()), records.get("idea", uid)?.data))
+        changed()
+    }
+    /** Undo a delete: same text and time, a new record. */
+    fun restoreIdea(idea: Idea) {
+        records.save("idea", Codec.newUid(), Codec.ideaData(idea.copy(uid = ""), null))
+        changed()
+    }
+    /** The idea becomes a task (first line = title, rest = details); the idea is then done. */
+    fun ideaToTask(uid: String, due: LocalDate?): Task? {
+        val idea = ideas().firstOrNull { it.uid == uid } ?: return null
+        val rest = idea.text.trim().split("\n", limit = 2).getOrNull(1)?.trim().orEmpty()
+        val task = saveTask(Task(Codec.newUid(), Ideas.firstLine(idea.text).ifEmpty { idea.text.take(120) }, due = due,
+            details = rest))
+        setIdeaDone(uid, true)
+        return task
+    }
+    /** The idea becomes a note (first line as its heading); the idea is then done. */
+    fun ideaToNote(uid: String): Note? {
+        val idea = ideas().firstOrNull { it.uid == uid } ?: return null
+        val lines = idea.text.trim().split("\n", limit = 2)
+        val body = "# " + lines[0].trim() + (lines.getOrNull(1)?.let { "\n\n" + it.trim() } ?: "")
+        val note = saveNote(Note(Codec.newUid(), body))
+        setIdeaDone(uid, true)
+        return note
+    }
     fun routines(): List<Routine> = records.live("routine").map(Codec::routine)
     fun routine(uid: String): Routine? = records.get("routine", uid)?.let(Codec::routine)
     fun tasks(): List<Task> = distinctImports(records.live("task")).first.map(Codec::task)

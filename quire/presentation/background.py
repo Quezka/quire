@@ -75,6 +75,7 @@ class Tray(QObject):
 
     show_requested = Signal()
     quit_requested = Signal()
+    idea_requested = Signal()
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -83,9 +84,12 @@ class Tray(QObject):
         menu = QMenu()
         open_action = QAction(_("Open Quire"), menu)
         open_action.triggered.connect(self.show_requested)
+        idea_action = QAction(_("New idea…"), menu)
+        idea_action.triggered.connect(self.idea_requested)
         quit_action = QAction(_("Quit Quire"), menu)
         quit_action.triggered.connect(self.quit_requested)
         menu.addAction(open_action)
+        menu.addAction(idea_action)
         menu.addSeparator()
         menu.addAction(quit_action)
         self._menu = menu

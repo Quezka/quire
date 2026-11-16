@@ -63,13 +63,13 @@ def build_services(db_path: str | Path, clock: Clock | None = None,
     planner = PlannerService(courses, events, tasks, journal, clock, bus, jobs, shifts,
                               SqliteRoutineRepository(db))
     tasks_service = TaskService(tasks, courses, clock, bus)
-    ideas = IdeaService(SqliteIdeaRepository(db), clock, bus)
+    notes_service = NoteService(notes, courses, clock, bus, images, diagrams or LigatureApp(), notebooks)
+    ideas = IdeaService(SqliteIdeaRepository(db), clock, bus, tasks_service, notes_service, settings)
     services = Services(
         timetable=TimetableService(courses, bus),
         planner=planner,
         tasks=tasks_service,
-        notes=NoteService(notes, courses, clock, bus, images, diagrams or LigatureApp(),
-                          notebooks),
+        notes=notes_service,
         school=SchoolRecordsService(courses, tasks, records, clock, register.name.lower()),
         school_sync=SchoolSyncService(register, credentials or KeyringCredentialStore(),
                                       courses, tasks, records, settings, clock, bus),

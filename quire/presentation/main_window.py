@@ -100,6 +100,7 @@ class MainWindow(QMainWindow):
         self._quitting = False
         if tray is not None:
             tray.show_requested.connect(self.bring_back)
+            tray.idea_requested.connect(self.new_idea)
             tray.quit_requested.connect(self.quit_app)
         self.setWindowTitle(_("Quire"))
         clamp_window(self, 1240, 800, 980, 620)
@@ -178,6 +179,12 @@ class MainWindow(QMainWindow):
         from .notify import notify
         notify(digest.title(d), "\n".join(digest.lines(d)))
 
+    def new_idea(self):
+        """Ctrl+I or the tray: straight to the Ideas box, ready to type."""
+        self.bring_back()
+        self.show_page(self.stack.indexOf(self.ideas))
+        self.ideas.focus_entry()
+
     def show_page(self, index: int):
         if self.stack.currentWidget() is self.notes and index != 3:
             self.notes.flush()
@@ -210,6 +217,7 @@ class MainWindow(QMainWindow):
         for i in range(min(9, len(self.PAGES))):
             self._shortcut(f"Ctrl+{i + 1}", lambda _checked=False, i=i: self.show_page(i))
         self._shortcut("Ctrl+N", self.new_note)
+        self._shortcut("Ctrl+I", self.new_idea)
         self._shortcut("Ctrl+Q", self.quit_app)
         self._shortcut("Ctrl+T", self.new_task)
         self._shortcut("Ctrl+Shift+E", self.new_event)
