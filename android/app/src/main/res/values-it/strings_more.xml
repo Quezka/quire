@@ -495,4 +495,23 @@
     <string name="shortcut_idea">Nuova idea</string>
     <string name="shortcut_task">Nuova attività</string>
     <string name="shortcut_ideas">Idee</string>
+    <string name="leave_now">È ora di partire</string>
+    <string name="bring">Porta: %1$s</string>
+    <string name="snooze_5">Rimanda 5 min</string>
+    <string name="got_it">Ok</string>
+    <plurals name="leave_in">
+        <item quantity="one">Parti tra %d minuto</item>
+        <item quantity="other">Parti tra %d minuti</item>
+    </plurals>
+    <string name="done">Fatto</string>
+    <string name="nudge_tiny">Aprila e fai %1$d minuti. Basta per iniziare.</string>
+    <string name="plan_title">Domani</string>
+    <string name="plan_pick">La tua cosa principale</string>
+    <string name="plan_other">Altro…</string>
+    <string name="plan_tomorrow">Pianifica domani</string>
+    <string name="digest_main">★ Cosa principale: %1$s</string>
+    <string name="digest_idea_back">Ricordi quest\'idea? %1$s</string>
+    <string name="assistant_morning_at">Mattina</string>
+    <string name="assistant_evening_at">Sera</string>
+    <string name="assistant_nudge_at">Spinta</string>
 </resources>

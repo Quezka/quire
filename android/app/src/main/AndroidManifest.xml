@@ -56,6 +56,12 @@
                 <data android:mimeType="text/plain" />
             </intent-filter>
         </activity>
+        <activity
+            android:name=".capture.PlanTomorrowActivity"
+            android:exported="false"
+            android:excludeFromRecents="true"
+            android:taskAffinity=""
+            android:theme="@style/Theme.Quire.Capture" />
         <service
             android:name=".capture.IdeaTileService"
             android:exported="true"

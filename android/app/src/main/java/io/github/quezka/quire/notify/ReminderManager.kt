@@ -25,12 +25,32 @@ class ReminderManager(
 
     private fun sent(): Set<String> = settings.get("reminders.sent")?.split("\n")?.filter { it.isNotEmpty() }?.toSet() ?: emptySet()
 
+    /** key -> when to show it again (the notification's Snooze). */
+    private fun snoozed(): Map<String, LocalDateTime> = settings.get("reminders.snoozed").orEmpty().lines()
+        .mapNotNull { line -> line.split("=", limit = 2).takeIf { it.size == 2 }
+            ?.let { (k, v) -> runCatching { k to LocalDateTime.parse(v) }.getOrNull() } }.toMap()
+
+    private fun saveSnoozed(map: Map<String, LocalDateTime>) =
+        settings.set("reminders.snoozed", map.entries.joinToString("\n") { "${it.key}=${it.value}" })
+
+    /** Snooze a reminder [minutes] (it comes back, unless the thing has started by then). */
+    fun snooze(key: String, minutes: Long = 5) {
+        saveSnoozed(snoozed() + (key to now().plusMinutes(minutes)))
+        plan()
+    }
+
     /** Show what's due now (a minute early is fine: alarms can come a little early). */
     fun fire() {
         val time = now()
         val sent = sent()
-        val due = upcoming(time.minusMinutes(2)).filter { it.at <= time.plusMinutes(1) && it.key !in sent }
+        val coming = upcoming(time.minusMinutes(2))
+        val due = coming.filter { it.at <= time.plusMinutes(1) && it.key !in sent }
         for (r in due) notifier.reminder(r, time)
+        // snoozed ones whose time came: once more
+        val snoozed = snoozed()
+        val again = snoozed.filterValues { it <= time.plusMinutes(1) }.keys
+        for (r in coming.filter { it.key in again }) notifier.reminder(r, time)
+        saveSnoozed(snoozed.filterKeys { it !in again && coming.any { r -> r.key == it } })
         // Keep only keys of things that haven't started yet.
         val keep = (sent + due.map { it.key }).filter { key ->
             runCatching { LocalDateTime.parse(key.substringAfterLast('|')) > time.minusHours(1) }.getOrDefault(false)
@@ -41,7 +61,8 @@ class ReminderManager(
     /** Set the alarm for the next reminder not shown yet. */
     fun plan() {
         val sent = sent()
-        val next = upcoming(now()).firstOrNull { it.key !in sent }
-        notifier.wakeAt(Notifier.ACTION_REMIND, next?.at)
+        val next = upcoming(now()).firstOrNull { it.key !in sent }?.at
+        val snooze = snoozed().values.minOrNull()
+        notifier.wakeAt(Notifier.ACTION_REMIND, listOfNotNull(next, snooze).minOrNull())
     }
 }

@@ -311,6 +311,12 @@ private fun AssistantPanel(container: Container) {
             row(R.string.assistant_glance, R.string.assistant_glance_hint, assistant.isOn("glance")) { assistant.set("glance", it) }
             row(R.string.assistant_digest, R.string.assistant_digest_hint, assistant.isOn("digest")) { assistant.set("digest", it) }
             row(R.string.assistant_nudges, R.string.assistant_nudges_hint, assistant.isOn("nudges")) { assistant.set("nudges", it) }
+            // your own times (were fixed at 7:30 / 21:30 / 15:00)
+            Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                TimeButton(stringResource(R.string.assistant_morning_at), assistant.morningAt, { assistant.setTime("morning_at", it); shown++ })
+                TimeButton(stringResource(R.string.assistant_evening_at), assistant.eveningAt, { assistant.setTime("evening_at", it); shown++ })
+                TimeButton(stringResource(R.string.assistant_nudge_at), assistant.nudgeAt, { assistant.setTime("nudge_at", it); shown++ })
+            }
             row(R.string.hub, R.string.hub_hint, hub.enabled) { hub.enabled = it; assistant.plan() }
             if (hub.enabled) {
                 if (!access) OutlinedButton(onClick = {

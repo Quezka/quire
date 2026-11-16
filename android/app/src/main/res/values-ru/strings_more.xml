@@ -513,4 +513,25 @@
     <string name="shortcut_idea">Новая идея</string>
     <string name="shortcut_task">Новая задача</string>
     <string name="shortcut_ideas">Идеи</string>
+    <string name="leave_now">Пора выходить</string>
+    <string name="bring">Взять: %1$s</string>
+    <string name="snooze_5">Отложить на 5 мин</string>
+    <string name="got_it">Понятно</string>
+    <plurals name="leave_in">
+        <item quantity="one">Выходи через %d минуту</item>
+        <item quantity="few">Выходи через %d минуты</item>
+        <item quantity="many">Выходи через %d минут</item>
+        <item quantity="other">Выходи через %d минуты</item>
+    </plurals>
+    <string name="done">Готово</string>
+    <string name="nudge_tiny">Просто открой и сделай %1$d минут. Этого хватит, чтобы начать.</string>
+    <string name="plan_title">Завтра</string>
+    <string name="plan_pick">Твоё главное дело</string>
+    <string name="plan_other">Что-то другое…</string>
+    <string name="plan_tomorrow">Спланировать завтра</string>
+    <string name="digest_main">★ Главное: %1$s</string>
+    <string name="digest_idea_back">Помнишь эту идею? %1$s</string>
+    <string name="assistant_morning_at">Утро</string>
+    <string name="assistant_evening_at">Вечер</string>
+    <string name="assistant_nudge_at">Толчок</string>
 </resources>

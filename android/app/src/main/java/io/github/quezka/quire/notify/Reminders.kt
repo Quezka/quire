@@ -60,10 +60,25 @@ object ReminderPlan {
                 if (item.continues || item.isAllDay || !settings.wants(item.kind)) continue
                 val starts = day.atStartOfDay().plusMinutes(item.start.toLong())
                 if (starts <= now || starts > horizon) continue
-                result += Reminder(maxOf(starts.minusMinutes(before.toLong()), now), starts, item)
+                val lead = before + Prep.travelMinutes(item.details)
+                result += Reminder(maxOf(starts.minusMinutes(lead.toLong()), now), starts, item)
             }
             day = day.plusDays(1)
         }
         return result.sortedBy { it.at }
     }
+}
+
+
+/** What to get ready before something starts, read from its notes (no new fields, so it syncs as it is):
+ *  `travel: 20` (also viaggio / дорога) = minutes to get there, the reminder comes that much earlier;
+ *  lines starting with `-` = things to bring. */
+object Prep {
+    private val TRAVEL = Regex("(?i)\\b(travel|viaggio|дорога)\\s*:?\\s*(\\d{1,3})")
+
+    fun travelMinutes(details: String): Int = TRAVEL.find(details)?.groupValues?.get(2)?.toIntOrNull() ?: 0
+
+    fun bring(details: String, max: Int = 5): List<String> = details.lineSequence().map { it.trim() }
+        .filter { it.startsWith("-") || it.startsWith("•") }.map { it.trimStart('-', '•', ' ') }
+        .filter { it.isNotEmpty() }.take(max).toList()
 }

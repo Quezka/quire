@@ -20,12 +20,25 @@ object Assistant {
         items.flatMap { listOf(it.start, it.end) }.filter { it > minute }.minOrNull()
 
     /** The one task to do next: overdue first (oldest due), then due today, then the soonest; never more than one. */
-    fun nextStep(tasks: List<Task>, today: LocalDate): Task? {
+    fun nextStep(tasks: List<Task>, today: LocalDate, main: String? = null): Task? {
         val open = tasks.filter { !it.done }
+        // the main thing picked the evening before comes first while it's open
+        open.firstOrNull { it.uid == main }?.let { return it }
         return open.filter { it.due != null && it.due < today }.minByOrNull { it.due!! }
             ?: open.filter { it.due == today }.minByOrNull { it.title.lowercase() }
             ?: open.filter { it.due != null }.minByOrNull { it.due!! }
     }
+
+    /** Tomorrow's candidates for "the main thing": due tomorrow, then overdue, then the soonest dated; at most [max]. */
+    fun planCandidates(tasks: List<Task>, today: LocalDate, max: Int = 6): List<Task> {
+        val open = tasks.filter { !it.done && it.due != null }
+        val tomorrow = today.plusDays(1)
+        return (open.filter { it.due == tomorrow } + open.filter { it.due!! <= today }.sortedBy { it.due } +
+            open.filter { it.due!! > tomorrow }.sortedBy { it.due }).distinctBy { it.uid }.take(max)
+    }
+
+    /** A first step small enough to start (ADHD: starting is the hard part). */
+    const val TINY_STEP_MINUTES = 5
 
     fun overdue(tasks: List<Task>, today: LocalDate) = tasks.count { !it.done && it.due != null && it.due < today }
     fun dueOn(tasks: List<Task>, day: LocalDate) = tasks.filter { !it.done && it.due == day }

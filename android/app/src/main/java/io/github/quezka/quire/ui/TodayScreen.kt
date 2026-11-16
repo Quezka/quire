@@ -291,7 +291,7 @@ private fun DayPage(container: Container, version: Int, day: LocalDate, today: L
 private fun NowCard(container: Container, version: Int, items: List<AgendaItem>, minute: Int) {
     val repo = container.repository
     val (now, next) = io.github.quezka.quire.domain.Assistant.nowNext(items, minute)
-    val step = remember(version) { io.github.quezka.quire.domain.Assistant.nextStep(repo.tasks(), repo.today()) }
+    val step = remember(version) { container.assistant.step() }
     val colors = MaterialTheme.colorScheme
     androidx.compose.material3.Card(Modifier.fillMaxWidth(), shape = androidx.compose.foundation.shape.RoundedCornerShape(28.dp),
         colors = androidx.compose.material3.CardDefaults.cardColors(containerColor = colors.primaryContainer,
