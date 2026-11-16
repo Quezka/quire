@@ -73,6 +73,10 @@ object Agenda {
     ): List<AgendaItem> {
         val items = mutableListOf<AgendaItem>()
         for (r in routines.filter { it.occursOn(day) }) {
+            if (r.minutes > 0) {
+                items += AgendaItem(ItemKind.ROUTINE, r.uid, day, r.minute, minOf(MINUTES_PER_DAY, r.minute + r.minutes), r.title, r.color)
+                continue
+            }
             val start = minOf(r.minute, MINUTES_PER_DAY - MILESTONE_MINUTES)
             items += AgendaItem(ItemKind.ROUTINE, r.uid, day, start, start + MILESTONE_MINUTES, r.title, r.color)
         }

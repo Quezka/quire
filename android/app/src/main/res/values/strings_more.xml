@@ -538,4 +538,11 @@
     <string name="ideas_one_note">Put them all in one note</string>
     <string name="ideas_none_to_export">No ideas to export.</string>
     <string name="ideas_in_one_note">Now in one note, under Notes.</string>
+    <string name="routine_lasts">Lasts</string>
+    <string name="routine_moment">A moment</string>
+    <string name="plan_my_day">Plan my day</string>
+    <string name="plan_intro">Time for your tasks, between what\'s already on. Untick what you don\'t want.</string>
+    <string name="plan_nothing">Nothing to plan: no open tasks for this day, or no free time left.</string>
+    <string name="plan_add">Add to my day</string>
+    <string name="plan_added">Added to your day.</string>
 </resources>

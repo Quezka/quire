@@ -55,6 +55,7 @@ data class Routine(
     val minute: Int,
     val weekdays: Set<Int> = (0..6).toSet(),
     val color: String = "#f5a524",
+    val minutes: Int = 0, // how long; 0 = a moment (= desktop `Routine.minutes`)
 ) {
     fun occursOn(day: LocalDate) = day.weekdayIndex() in weekdays
 }

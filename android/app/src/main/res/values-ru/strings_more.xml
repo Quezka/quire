@@ -558,4 +558,11 @@
     <string name="ideas_one_note">Собрать все в одну заметку</string>
     <string name="ideas_none_to_export">Нет идей для экспорта.</string>
     <string name="ideas_in_one_note">Теперь в одной заметке, в «Заметках».</string>
+    <string name="routine_lasts">Длится</string>
+    <string name="routine_moment">Мгновение</string>
+    <string name="plan_my_day">Спланировать день</string>
+    <string name="plan_intro">Время для задач между уже запланированным. Снимите галочку с ненужного.</string>
+    <string name="plan_nothing">Нечего планировать: на этот день нет открытых задач или нет свободного времени.</string>
+    <string name="plan_add">Добавить в день</string>
+    <string name="plan_added">Добавлено в день.</string>
 </resources>

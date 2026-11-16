@@ -277,14 +277,20 @@ fun RoutineEditor(repo: Repository, uid: String?, close: () -> Unit) {
     var minute by remember { mutableStateOf(existing?.minute ?: 6 * 60) }
     var days by remember { mutableStateOf(existing?.weekdays ?: (0..6).toSet()) }
     var color by remember { mutableStateOf(existing?.color ?: "#f5a524") }
+    var length by remember { mutableStateOf(existing?.minutes ?: 0) }
     EditorSheet(stringResource(if (existing == null) R.string.new_routine else R.string.edit_routine), close,
         canSave = title.isNotBlank() && days.isNotEmpty(),
-        onSave = { repo.saveRoutine(Routine(existing?.uid ?: Codec.newUid(), title, minute, days, color)); close() },
+        onSave = { repo.saveRoutine(Routine(existing?.uid ?: Codec.newUid(), title, minute, days, color, length)); close() },
         onDelete = existing?.let { { repo.deleteRoutine(it.uid); close() } }) {
         OutlinedTextField(title, { title = it }, Modifier.fillMaxWidth(),
             placeholder = { Text(stringResource(R.string.routine_title_hint)) },
             textStyle = MaterialTheme.typography.titleMedium)
         TimeButton(stringResource(R.string.at_time), minute, { minute = it })
+        Text(stringResource(R.string.routine_lasts), style = MaterialTheme.typography.labelLarge)
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            for (m in listOf(0, 10, 15, 20, 30, 45, 60, 90)) FilterChip(selected = length == m, onClick = { length = m },
+                label = { Text(if (m == 0) stringResource(R.string.routine_moment) else hoursText(m)) })
+        }
         Text(stringResource(R.string.repeats_on), style = MaterialTheme.typography.labelLarge)
         FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             for (d in 0..6) FilterChip(selected = d in days, onClick = { days = if (d in days) days - d else days + d },

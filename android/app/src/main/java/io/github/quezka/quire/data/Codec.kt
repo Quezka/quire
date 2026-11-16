@@ -185,12 +185,12 @@ object Codec {
         val days = (d["weekdays"] as? kotlinx.serialization.json.JsonArray)
             ?.mapNotNull { (it as? JsonPrimitive)?.content?.toIntOrNull() }?.toSet()
             ?.takeIf { it.isNotEmpty() } ?: (0..6).toSet()
-        return Routine(r.uid, d.str("title"), d.int("start"), days, d.str("color", "#f5a524"))
+        return Routine(r.uid, d.str("title"), d.int("start"), days, d.str("color", "#f5a524"), d.int("minutes"))
     }
 
     fun routineData(r: Routine, previous: JsonObject?) = merged(previous, mapOf(
         "title" to JsonPrimitive(r.title), "start" to JsonPrimitive(r.minute),
-        "color" to JsonPrimitive(r.color),
+        "color" to JsonPrimitive(r.color), "minutes" to JsonPrimitive(r.minutes),
         "weekdays" to kotlinx.serialization.json.JsonArray(r.weekdays.sorted().map { JsonPrimitive(it) }),
     ))
 

@@ -143,6 +143,7 @@ fun TodayScreen(container: Container, version: Int, openTask: (String) -> Unit, 
     var adding by remember { mutableStateOf<ItemKind?>(null) }
     var addingMilestone by remember { mutableStateOf(false) }
     var menu by remember { mutableStateOf(false) }
+    var planning by remember { mutableStateOf(false) }
 
     Box(Modifier.fillMaxSize()) {
         GlassScreen(bar = {
@@ -200,6 +201,9 @@ TopAppBar(
             val turn by animateFloatAsState(if (menu) 45f else 0f, Motion.bouncy(), label = "fab")
             Icon(Icons.Filled.Add, stringResource(R.string.add), Modifier.graphicsLayer { rotationZ = turn })
             DropdownMenu(menu, onDismissRequest = { menu = false }) {
+                DropdownMenuItem(text = { Text(stringResource(R.string.plan_my_day)) },
+                    leadingIcon = { Icon(Icons.Filled.Event, null) },
+                    onClick = { menu = false; planning = true })
                 DropdownMenuItem(text = { Text(stringResource(R.string.shortcut_idea)) },
                     leadingIcon = { Icon(androidx.compose.ui.res.painterResource(R.drawable.ic_widget_idea), null) },
                     onClick = { menu = false; context.startActivity(android.content.Intent(context,
@@ -224,6 +228,10 @@ TopAppBar(
     }
 
     AgendaEditors(repo, editing, adding, day, milestone = addingMilestone) { editing = null; adding = null }
+    if (planning) PlanDayDialog(repo, day, done = { n ->
+        planning = false
+        if (n > 0) scope.launch { snackbar.showSnackbar(context.getString(R.string.plan_added)) }
+    }, dismiss = { planning = false })
 }
 
 /** One day: schedule, tasks, quick add and the day note. */

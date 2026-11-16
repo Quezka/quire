@@ -538,4 +538,11 @@
     <string name="ideas_one_note">Mettile tutte in una nota</string>
     <string name="ideas_none_to_export">Nessuna idea da esportare.</string>
     <string name="ideas_in_one_note">Ora sono in una nota, in Note.</string>
+    <string name="routine_lasts">Dura</string>
+    <string name="routine_moment">Un istante</string>
+    <string name="plan_my_day">Pianifica la giornata</string>
+    <string name="plan_intro">Tempo per le tue attività, tra gli impegni che hai già. Togli la spunta a quello che non vuoi.</string>
+    <string name="plan_nothing">Niente da pianificare: nessuna attività aperta per questo giorno, o niente tempo libero.</string>
+    <string name="plan_add">Aggiungi alla giornata</string>
+    <string name="plan_added">Aggiunto alla giornata.</string>
 </resources>
