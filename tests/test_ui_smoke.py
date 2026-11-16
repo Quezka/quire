@@ -1062,20 +1062,40 @@ def test_fmt_mark():
     assert [fmt_mark(v) for v in (6, 6.25, 6.5, 6.75, 10)] == ["6", "6+", "6½", "7-", "10"]
 
 
-def test_day_note_from_another_computer_shows_up_but_never_replaces_typing(window, services):
+def test_inbox_shows_open_ideas_and_turns_one_into_a_task_or_clears_it(app, window, services):
     from .conftest import TODAY
-
     window.show_page(0)
     today = window.today
     today.set_day(TODAY)
-    services.planner.save_journal(TODAY, "Written on the laptop")  # as a sync would
-    assert today.journal.toPlainText() == "Written on the laptop"
+    first = services.ideas.add("Call the gym")
+    services.ideas.add("Buy a lamp")
+    app.processEvents()
+    inbox = today.inbox
+    assert inbox.count.text() == "2" and not inbox.empty.isVisible()
+    services.ideas.to_task(first, TODAY)
+    app.processEvents()
+    assert inbox.count.text() == "1"
+    assert any(t.task.title == "Call the gym" for t in services.planner.day_agenda(TODAY).tasks)
+    second = services.ideas.ideas(include_done=False)[0]
+    inbox._done(second)
+    app.processEvents()
+    assert inbox.empty.isVisible() and inbox.undo_btn.isVisibleTo(inbox)
+    inbox._undo()
+    app.processEvents()
+    assert inbox.count.text() == "1"
 
-    today.journal.setPlainText("Typing here…")  # unsaved edit
-    services.planner.save_journal(TODAY, "Changed on the laptop again")
-    assert today.journal.toPlainText() == "Typing here…"
-    today.flush_journal()
-    assert services.planner.journal(TODAY) == "Typing here…"  # the newer edit wins
+
+def test_today_shows_one_column_at_a_time_in_split_screen(app, window):
+    window.show_page(0)
+    today = window.today
+    window.resize(640, 700)
+    app.processEvents()
+    today._size_class("compact")
+    assert today.view_switch.isVisibleTo(today) and not today._side.isVisibleTo(today)
+    today._show_column("todo")
+    assert today._side.isVisibleTo(today) and not today._timeline.isVisibleTo(today)
+    today._size_class("expanded")
+    assert today._timeline.isVisibleTo(today) and today._side.isVisibleTo(today)
 
 
 def test_open_note_follows_changes_from_elsewhere(window, services):

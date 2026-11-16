@@ -1,4 +1,4 @@
-"""Day planner: timeline of classes and events, tasks due, and a day journal."""
+"""Day planner: timeline of classes and events, tasks due, and the inbox (ideas to decide on)."""
 from __future__ import annotations
 
 from datetime import date, datetime, timedelta
@@ -7,7 +7,7 @@ from PySide6.QtCore import Qt, QTimer, Signal
 from PySide6.QtGui import QColor
 from PySide6.QtWidgets import (
     QCalendarWidget, QFrame, QHBoxLayout, QLabel, QLineEdit, QListWidget, QListWidgetItem, QMenu,
-    QPlainTextEdit, QScrollArea, QToolButton, QVBoxLayout, QWidget, QWidgetAction,
+    QScrollArea, QToolButton, QVBoxLayout, QWidget, QWidgetAction,
 )
 
 from ...application.bus import Topic
@@ -31,6 +31,9 @@ from .common import (
 from ..i18n import _
 from .quick_log import QuickLog
 from .now_card import NowCard
+from .inbox import InboxCard
+from quezka_ui import fit
+from quezka_ui.widgets import Segmented
 
 
 class TodayView(Page):
@@ -78,7 +81,8 @@ class TodayView(Page):
         self.scroll.setWidget(self.grid)
         self.zoom = TimelineZoom(self.grid, self.scroll, "today", self)
         self.slider = Slider(self.scroll.viewport())
-        self.header.insertWidget(self.header.count() - 3, zoom_controls(self, self.zoom))
+        self._zoom_box = zoom_controls(self, self.zoom)
+        self.header.insertWidget(self.header.count() - 3, self._zoom_box)
         self.all_day = AllDayStrip()
         self.all_day.activated.connect(lambda item: self._block_activated(item, None))
         timeline = Card(padding=6)
@@ -104,22 +108,15 @@ class TodayView(Page):
         due.add(self.tasks, 1)
         due.add(self.quick)
 
-        # ---- journal ----
-        notes = Card(_("Day notes"))
-        self.journal = QPlainTextEdit(placeholderText=_("Anything to remember about this day…"))
-        self.journal.setObjectName("bare")
-        notes.add(self.journal, 1)
-        self._journal_timer = QTimer(self, singleShot=True, interval=600,
-                                     timeout=self.flush_journal)
-        self.journal.textChanged.connect(self._journal_edited)
-        self._journal_day: date | None = None
-        self._journal_dirty = False
+        # ---- inbox (replaced day notes, 0.52) ----
+        self.inbox = InboxCard(services, lambda: self.day)
+        self.openIdeas = self.inbox.openIdeas
 
         self.quick_log = QuickLog(services)
         self.now_card = NowCard(services, relay)
         # side column scrolls when short (1366x768 laptop) <- else Due squeezed to 0 rows
         due.setMinimumHeight(230)
-        notes.setMinimumHeight(130)
+        self.inbox.setMinimumHeight(130)
         side_box = QWidget()
         side = QVBoxLayout(side_box)
         side.setContentsMargins(0, 0, 0, 0)
@@ -127,7 +124,7 @@ class TodayView(Page):
         side.addWidget(self.now_card)
         side.addWidget(self.quick_log)
         side.addWidget(due, 3)
-        side.addWidget(notes, 1)
+        side.addWidget(self.inbox, 1)
         side_scroll = QScrollArea(widgetResizable=True, frameShape=QFrame.NoFrame)
         side_scroll.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         side_scroll.setWidget(side_box)
@@ -137,7 +134,16 @@ class TodayView(Page):
         body.setSpacing(16)
         body.addWidget(timeline, 5)
         body.addWidget(side_scroll, 3)
+        # compact (split screen): one column at a time, switch on top
+        self.view_switch = Segmented([("day", _("Day")), ("todo", _("To do"))])
+        self.view_switch.set_value("day")
+        self.view_switch.changed.connect(self._show_column)
+        self.view_switch.hide()
+        self._timeline, self._side = timeline, side_scroll
+        self._digest_btn = brief
+        self.root.addWidget(self.view_switch, 0, Qt.AlignLeft)
         self.root.addLayout(body, 1)
+        fit.on_size_class(self, self._size_class)
 
         relay.changed.connect(self._changed)
         theme.manager().changed.connect(self._theme_changed)
@@ -146,6 +152,24 @@ class TodayView(Page):
         QTimer(self, interval=60_000, timeout=self._check_midnight).start()
         self.set_day(self.day)
 
+    # ---- layout ---------------------------------------------------------
+
+    def _size_class(self, size: str):
+        compact = size == fit.COMPACT
+        self.view_switch.setVisible(compact)
+        if compact:
+            self._show_column(self.view_switch.value())
+        else:
+            self._timeline.show()
+            self._side.show()
+        for w in (self._zoom_box, self._digest_btn):
+            if w is not None:
+                w.setVisible(not compact)
+
+    def _show_column(self, which):
+        self._timeline.setVisible(which == "day")
+        self._side.setVisible(which != "day")
+
     # ---- navigation -----------------------------------------------------
 
     def _show_digest(self):
@@ -153,14 +177,9 @@ class TodayView(Page):
         DigestDialog(self.services.digest.current(), self).exec()
 
     def set_day(self, day: date):
-        self.flush_journal()
         self.day = day
         self.calendar.setSelectedDate(to_qdate(day))
-        agenda = self.refresh()
-        self.journal.blockSignals(True)
-        self.journal.setPlainText(agenda.journal)
-        self.journal.blockSignals(False)
-        self._journal_day = day
+        self.refresh()
         QTimer.singleShot(0, self._scroll_to_focus)
 
     def go_to(self, day: date):
@@ -194,41 +213,15 @@ class TodayView(Page):
         if not self.zoom.fit:  # when fitted, the whole day is already in view
             self.scroll.verticalScrollBar().setValue(int(self.grid.y_for(target)) - TimeGrid.PAD)
 
-    # ---- journal --------------------------------------------------------
-
-    def _journal_edited(self):
-        self._journal_dirty = True
-        self._journal_timer.start()
-
-    def flush_journal(self):
-        self._journal_timer.stop()
-        if self._journal_dirty and self._journal_day is not None:
-            self.planner.save_journal(self._journal_day, self.journal.toPlainText())
-        self._journal_dirty = False
-
     # ---- rendering ------------------------------------------------------
 
     def _changed(self, topic: Topic):
         if topic in (Topic.COURSES, Topic.EVENTS, Topic.TASKS, Topic.WORK):
             self.refresh()
-        elif topic is Topic.JOURNAL:
-            self._reload_journal()
+        if topic in (Topic.IDEAS, Topic.TASKS):
+            self.inbox.refresh()
         if topic in (Topic.WATER, Topic.SLEEP, Topic.MEDICINE):
             self.quick_log.refresh()
-
-    def _reload_journal(self):
-        """Show the day note as stored (e.g. after a sync), unless it's being edited."""
-        if self._journal_dirty or self._journal_day is None:
-            return
-        stored = self.planner.journal(self._journal_day)
-        if stored != self.journal.toPlainText():
-            position = self.journal.textCursor().position()
-            self.journal.blockSignals(True)
-            self.journal.setPlainText(stored)
-            self.journal.blockSignals(False)
-            cursor = self.journal.textCursor()
-            cursor.setPosition(min(position, len(stored)))
-            self.journal.setTextCursor(cursor)
 
     def _theme_changed(self, _theme):
         self.refresh()

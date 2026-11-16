@@ -48,9 +48,9 @@ def test_milestones_routines_and_sleep_render(window, app, services):
     from PySide6.QtCore import QCoreApplication, QEvent
     QCoreApplication.sendPostedEvents(None, QEvent.DeferredDelete)
 
-    sleep = next(w for w in (window.stack.widget(i) for i in range(window.stack.count()))
-                 if isinstance(w, SleepView))
-    window.show_page(window.stack.indexOf(sleep))
+    sleep = window.health.pages["sleep"]
+    assert isinstance(sleep, SleepView)
+    window.show_view(sleep)
     app.processEvents()
     assert sleep.bars.overview.nights and "night" in sleep.summary.text()
     assert not sleep.grab().isNull()
@@ -88,7 +88,7 @@ def test_water_page_shows_the_goal_and_logs_a_glass(window, app, services):
     from quire.application.inputs import WaterProfileInput
 
     water = window.water
-    window.show_page(window.stack.indexOf(water))
+    window.show_view(water)
     app.processEvents()
     assert "height" in water.subtitle.text().lower()  # no goal until height and weight are set
     services.water.save_profile(WaterProfileInput(175, 70, 250))
@@ -214,7 +214,7 @@ def test_medicine_page_ticks_a_dose_and_edits_a_medicine(window, app, services):
         parse_times("25:00")
     services.medicine.save(None, MedicineInput("Vitamin D", "1 tablet", (480,)))
     view = window.medicine
-    window.show_page(window.stack.indexOf(view))
+    window.show_view(view)
     app.processEvents()
     assert view.doses.count() == 1 and "Vitamin D" in view.doses.item(0).text()
     view.doses.item(0).setCheckState(Qt.Checked)

@@ -4,6 +4,7 @@ import sys
 
 from datetime import date
 
+from quezka_ui.pages import PageStack
 from PySide6.QtCore import QSettings, QSize, Qt, QTimer, QUrl
 from PySide6.QtGui import QAction, QDesktopServices, QIcon, QKeySequence
 from PySide6.QtWidgets import (
@@ -32,6 +33,7 @@ from .views.sleep import SleepView
 from ..application.bus import Topic
 from .views.medicine import MedicineView
 from .views.ideas import IdeasView
+from .views.health import HealthView
 from .views.water import WaterView
 from .views.work import WorkView
 from .i18n import N_, _
@@ -90,8 +92,7 @@ class Sidebar(QFrame):
 class MainWindow(QMainWindow):
     PAGES = [("today", N_("Today")), ("week", N_("Week")), ("coursework", N_("Coursework")),
              ("notes", N_("Notes")), ("school", N_("School")), ("briefcase", N_("Work")),
-             ("timer", N_("Focus")), ("moon", N_("Sleep")), ("drop", N_("Water")),
-             ("pill", N_("Medicines")), ("star", N_("Ideas"))]
+             ("timer", N_("Focus")), ("pill", N_("Health")), ("star", N_("Ideas"))]
 
     def __init__(self, services: Services, tray=None):
         super().__init__()
@@ -118,11 +119,12 @@ class MainWindow(QMainWindow):
         self.medicine = MedicineView(services, relay)
         self.ideas = IdeasView(services, relay)
 
+        self.health = HealthView(self.sleep, self.water, self.medicine)
         self.sidebar = Sidebar()
-        self.stack = QStackedWidget()
+        self.stack = PageStack()  # split screen: page scrolls, window stays narrow
         for i, (page, (icon_name, label)) in enumerate(zip(
                 [self.today, self.week, self.coursework, self.notes, self.school, self.work,
-                 self.focus, self.sleep, self.water, self.medicine, self.ideas],
+                 self.focus, self.health, self.ideas],
                 self.PAGES)):
             self.stack.addWidget(page)
             self.sidebar.add_page(icon_name, _(label), f"Ctrl+{i + 1}" if i < 9 else "")
@@ -130,6 +132,7 @@ class MainWindow(QMainWindow):
         self.school.newsChanged.connect(self._school_news)
         self.focus.statusChanged.connect(self._focus_status)
         self.today.now_card.focusRequested.connect(lambda: self.show_page(self.PAGES.index(("timer", "Focus"))))
+        self.today.openIdeas.connect(lambda: self.show_page(self.stack.indexOf(self.ideas)))
         self.reminders = Reminders(services.reminders, self)
         # morning / evening digest: checked every minute, each shown once a day
         self._digest_timer = QTimer(self, interval=60_000, timeout=self._digest)
@@ -184,6 +187,14 @@ class MainWindow(QMainWindow):
         self.bring_back()
         self.show_page(self.stack.indexOf(self.ideas))
         self.ideas.focus_entry()
+
+    def show_view(self, view):
+        """Show a page, also one inside Health (sleep / water / medicine)."""
+        for part, page in self.health.pages.items():
+            if page is view:
+                self.health.show_part(part)
+                view = self.health
+        self.show_page(self.stack.indexOf(view))
 
     def show_page(self, index: int):
         if self.stack.currentWidget() is self.notes and index != 3:
@@ -300,7 +311,6 @@ class MainWindow(QMainWindow):
 
     def _flush(self):
         self.notes.flush()
-        self.today.flush_journal()
 
     def backup(self):
         self._flush()

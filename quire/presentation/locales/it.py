@@ -1035,4 +1035,11 @@ MESSAGES = {
     'Now a task.': "Ora è un'attività.",
     'Search ideas': 'Cerca idee',
     'Remember this idea? {idea}': "Ricordi quest'idea? {idea}",
+    'Inbox': 'In arrivo',
+    'Inbox empty. Ideas you catch (Ctrl+I) land here.': 'Niente in arrivo. Le idee che annoti (Ctrl+I) finiscono qui.',
+    '{n} more in Ideas': 'Altre {n} in Idee',
+    'Done: clear it from the inbox': 'Fatto: toglila da qui',
+    'Cleared.': 'Tolta.',
+    'To do': 'Da fare',
+    'Health': 'Salute',
 }

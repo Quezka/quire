@@ -1037,4 +1037,11 @@ MESSAGES = {
     'Now a task.': 'Теперь это задача.',
     'Search ideas': 'Поиск идей',
     'Remember this idea? {idea}': 'Помнишь эту идею? {idea}',
+    'Inbox': 'Входящие',
+    'Inbox empty. Ideas you catch (Ctrl+I) land here.': 'Входящих нет. Идеи, которые вы записываете (Ctrl+I), появляются здесь.',
+    '{n} more in Ideas': 'Ещё {n} в «Идеях»',
+    'Done: clear it from the inbox': 'Готово: убрать из входящих',
+    'Cleared.': 'Убрано.',
+    'To do': 'Сделать',
+    'Health': 'Здоровье',
 }
