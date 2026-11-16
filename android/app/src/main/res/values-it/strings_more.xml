@@ -525,4 +525,5 @@
     <string name="inbox_to_task">In attività</string>
     <string name="inbox_done">Fatto</string>
     <string name="inbox_more_ideas">Altre %1$d in Idee</string>
+    <string name="average_over_time">Media nel tempo</string>
 </resources>

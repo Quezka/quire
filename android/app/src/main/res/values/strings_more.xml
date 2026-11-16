@@ -525,4 +525,5 @@
     <string name="inbox_to_task">To task</string>
     <string name="inbox_done">Done</string>
     <string name="inbox_more_ideas">%1$d more in Ideas</string>
+    <string name="average_over_time">Average over time</string>
 </resources>

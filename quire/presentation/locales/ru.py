@@ -1044,4 +1044,5 @@ MESSAGES = {
     'Cleared.': 'Убрано.',
     'To do': 'Сделать',
     'Health': 'Здоровье',
+    'Average over time': 'Средний балл со временем',
 }

@@ -22,7 +22,7 @@ from ..notify import notify
 from ..task_view import TaskView
 from ..widgets import SubjectDelegate, TwoLineDelegate, mark_color
 from .common import Card, Page, StatTile, button, icon_button, label, primary_button
-from .school_panels import AbsencesPanel, BooksPanel, NoticesPanel, SubjectDialog
+from .school_panels import AbsencesPanel, BooksPanel, NoticesPanel, SubjectDialog, TrendChart
 from ..i18n import _
 from quezka_ui.fit import exec_menu
 
@@ -266,9 +266,16 @@ class SchoolView(Page):
         self.news.setHorizontalScrollBarPolicy(Qt.ScrollBarAlwaysOff)
         self.news_card.add(self.news, 1)
 
+        # overall average over time (user ask 0.52)
+        self.trend_card = Card(_("Average over time"))
+        self.trend = TrendChart()
+        self.trend.setMinimumHeight(150)
+        self.trend_card.add(self.trend, 1)
+
         main = QVBoxLayout()
         main.setSpacing(16)
         main.addWidget(subjects, 3)
+        main.addWidget(self.trend_card, 2)
         main.addWidget(self.news_card, 1)
 
         side = QVBoxLayout()
@@ -377,6 +384,10 @@ class SchoolView(Page):
         t = theme.current()
         today = self.services.planner.today()
         o = self.school.overview(self._period)
+        marks = sorted((g.day, g.value) for sub in self.school.grades_by_subject(self._period)
+                       for g in sub.grades if g.counts)
+        self.trend.set_data(marks, self.school.trend(None, self._period))
+        self.trend_card.setVisible(len(marks) >= 2)
         self.tile_average.show(f"{o.average:.2f}" if o.average is not None else "–",
                                plural(o.grade_count, "grade"),
                                mark_color(o.average, t) if o.average is not None else None)

@@ -1042,4 +1042,5 @@ MESSAGES = {
     'Cleared.': 'Tolta.',
     'To do': 'Da fare',
     'Health': 'Salute',
+    'Average over time': 'Media nel tempo',
 }

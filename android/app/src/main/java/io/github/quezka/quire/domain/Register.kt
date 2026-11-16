@@ -33,6 +33,18 @@ fun average(grades: List<Grade>): Double? {
     return if (values.isEmpty()) null else round2(values.average())
 }
 
+/** (day, average of every mark up to that day), one point per day, oldest first (= desktop `running_average`). */
+fun runningAverage(grades: List<Grade>): List<Pair<LocalDate, Double>> {
+    val result = mutableListOf<Pair<LocalDate, Double>>()
+    var total = 0.0
+    grades.filter { it.counts }.sortedBy { it.day }.forEachIndexed { i, g ->
+        total += g.value!!
+        val entry = g.day to round2(total / (i + 1))
+        if (result.isNotEmpty() && result.last().first == g.day) result[result.size - 1] = entry else result.add(entry)
+    }
+    return result
+}
+
 /** The mark needed on each of the next [tests] tests for the average to reach [target],
  *  rounded up to a quarter (marks go 6+, 6½, 7-…). */
 fun neededGrade(values: List<Double>, target: Double, tests: Int = 1): Double {

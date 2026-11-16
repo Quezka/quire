@@ -194,6 +194,12 @@ private fun Overview(container: Container, data: io.github.quezka.quire.domain.R
                     if (below > 0) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.tertiary)
             }
         }
+        if (data.grades.count { it.counts } >= 2) item(key = "trend") {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Text(stringResource(R.string.average_over_time), style = MaterialTheme.typography.titleSmall)
+                AverageChart(data.grades, PASS_MARK)
+            }
+        }
         data.lastSync?.let { item(key = "last") { Hint(context.getString(R.string.last_synced, it.replace('T', ' ').take(16))) } }
         if (bySubject.isEmpty()) item(key = "none") { Hint(stringResource(R.string.no_grades)) }
         items(bySubject, key = { it.first }) { (subject, grades, avg) ->
