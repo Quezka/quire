@@ -549,4 +549,8 @@
     <string name="digest_all_day">Весь день: %1$s</string>
     <string name="digest_more">…и ещё %1$d</string>
     <string name="digest_routines">Рутины: %1$s</string>
+    <string name="notes_widget_name">Заметки Quire</string>
+    <string name="notes_widget_description">Закреплённые и последние заметки; нажмите, чтобы открыть</string>
+    <string name="notes_widget_title">Заметки</string>
+    <string name="notes_widget_empty">Заметок пока нет. Нажмите, чтобы написать.</string>
 </resources>

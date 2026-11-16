@@ -104,6 +104,15 @@
             <meta-data android:name="android.appwidget.provider"
                 android:resource="@xml/agenda_widget_info" />
         </receiver>
+        <!-- the home-screen notes widget (0.52) -->
+        <receiver android:name=".widget.NotesWidgetReceiver" android:exported="true"
+            android:label="@string/notes_widget_name">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider"
+                android:resource="@xml/notes_widget_info" />
+        </receiver>
         <receiver android:name=".update.InstallReceiver" android:exported="false" />
 
         <!-- the notification hub: other apps' notifications held for the digest (needs notification access) -->

@@ -529,4 +529,8 @@
     <string name="digest_all_day">All day: %1$s</string>
     <string name="digest_more">…and %1$d more</string>
     <string name="digest_routines">Routines: %1$s</string>
+    <string name="notes_widget_name">Quire notes</string>
+    <string name="notes_widget_description">Pinned and latest notes; tap one to open it</string>
+    <string name="notes_widget_title">Notes</string>
+    <string name="notes_widget_empty">No notes yet. Tap to write one.</string>
 </resources>

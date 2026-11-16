@@ -70,7 +70,7 @@ class Container(
         io.github.quezka.quire.ui.currencyCode = settings.get("currency") ?: "EUR"
         sync.start()
         SchoolWorker.schedule(context)
-        repository.onChanged = { reminders.plan(); quiet.update(); assistant.updateNow(); AgendaWidget.refresh(context) }
+        repository.onChanged = { reminders.plan(); quiet.update(); assistant.updateNow(); AgendaWidget.refresh(context); io.github.quezka.quire.widget.NotesWidget.refresh(context) }
         reminders.plan()
         quiet.update()
         water.plan()

@@ -78,12 +78,14 @@ class MainActivity : ComponentActivity() {
 
     private var requested by mutableStateOf<Int?>(null)
     private var addTask by mutableStateOf(false) // from the widget's + button
+    private var noteRequested by mutableStateOf<String?>(null) // from the notes widget
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         requested = intent?.let(::tabExtra)
         addTask = intent?.let(::newTaskExtra) == true
+        noteRequested = intent?.getStringExtra("note")
         val container = container
         setContent {
             QuireTheme {
@@ -103,6 +105,10 @@ class MainActivity : ComponentActivity() {
                         else -> { tab = 4; page = Page.entries[r - 10] }
                     }
                     requested = null
+                }
+                LaunchedEffect(noteRequested) {
+                    noteRequested?.let { tab = 3; page = null; openNote = it.ifEmpty { null } }
+                    noteRequested = null
                 }
                 LaunchedEffect(addTask) {
                     if (addTask) { newTaskDue = null; newTask = true; addTask = false }
@@ -174,6 +180,7 @@ class MainActivity : ComponentActivity() {
         super.onNewIntent(intent)
         requested = tabExtra(intent)
         addTask = newTaskExtra(intent)
+        noteRequested = intent.getStringExtra("note")
     }
 
     override fun onResume() {
