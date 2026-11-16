@@ -70,6 +70,16 @@ class RoutineRecord:
     minute: int
     weekdays: tuple[int, ...]
     color: str
+    minutes: int = 0
+
+
+@dataclass(frozen=True)
+class PlanSlot:
+    """A suggested block of time for a task (plan my day)."""
+    start: int
+    end: int
+    title: str
+    task_id: int | None = None
 
 
 @dataclass(frozen=True)
@@ -454,7 +464,7 @@ def sleep_record(s: SleepLog) -> SleepRecord:
 
 
 def routine_record(r: Routine) -> RoutineRecord:
-    return RoutineRecord(r.id, r.title, r.minute, tuple(r.weekdays), r.color)
+    return RoutineRecord(r.id, r.title, r.minute, tuple(r.weekdays), r.color, r.minutes)
 
 
 def task_record(t: Task) -> TaskRecord:

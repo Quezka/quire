@@ -127,7 +127,7 @@ class SqliteRoutineRepository(_Repo):
     @staticmethod
     def _routine(r) -> Routine:
         days = tuple(sorted({int(d) for d in r["weekdays"].split(",") if d.strip().isdigit()}))
-        return Routine(r["title"], r["start_min"], days, r["color"], r["id"])
+        return Routine(r["title"], r["start_min"], days, r["color"], r["id"], r["minutes"] or 0)
 
     def list(self) -> list[Routine]:
         return [self._routine(r) for r in
@@ -139,13 +139,13 @@ class SqliteRoutineRepository(_Repo):
 
     def add(self, routine: Routine) -> int:
         return self._write(
-            "INSERT INTO routines (title, start_min, weekdays, color) VALUES (?, ?, ?, ?)",
-            routine.title, routine.minute, ",".join(map(str, routine.weekdays)), routine.color)
+            "INSERT INTO routines (title, start_min, weekdays, color, minutes) VALUES (?, ?, ?, ?, ?)",
+            routine.title, routine.minute, ",".join(map(str, routine.weekdays)), routine.color, routine.minutes)
 
     def update(self, routine: Routine):
-        self._write("UPDATE routines SET title = ?, start_min = ?, weekdays = ?, color = ?"
+        self._write("UPDATE routines SET title = ?, start_min = ?, weekdays = ?, color = ?, minutes = ?"
                     " WHERE id = ?", routine.title, routine.minute,
-                    ",".join(map(str, routine.weekdays)), routine.color, routine.id)
+                    ",".join(map(str, routine.weekdays)), routine.color, routine.minutes, routine.id)
 
     def delete(self, routine_id):
         self._write("DELETE FROM routines WHERE id = ?", routine_id)

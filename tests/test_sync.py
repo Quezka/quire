@@ -703,3 +703,15 @@ def test_every_device_pulls_everything_once_after_an_update(pair):
     assert a.sync.prepare().cursor is not None
     a.sync._set("full_pull", None)  # as on a device updated from before the full pull
     assert a.sync.prepare().cursor is None
+
+
+def test_a_routine_length_reaches_the_other_device(pair):
+    from quire.application.inputs import RoutineInput
+    a, b = pair
+    a.planner.save_routine(None, RoutineInput("Shower", 7 * 60, minutes=20))
+    a.sync.sync()
+    b.sync.sync()
+    (shower,) = b.planner.routines()
+    assert shower.minutes == 20
+    item = next(i for i in b.planner.day_agenda(TODAY).items if i.title == "Shower")
+    assert (item.time.start, item.time.end) == (7 * 60, 7 * 60 + 20)

@@ -1056,4 +1056,12 @@ MESSAGES = {
     'Text': 'Testo',
     'Saved.': 'Salvate.',
     'Now in one note, under Notes.': 'Ora sono in una nota, in Note.',
+    'A moment': 'Un istante',
+    'Lasts': 'Dura',
+    'A routine lasts at most 12 hours.': 'Una routine dura al massimo 12 ore.',
+    'Plan my day': 'Pianifica la giornata',
+    'Plan my day…': 'Pianifica la giornata…',
+    "Time for your tasks, between what's already on. Untick what you don't want.": 'Tempo per le tue attività, tra gli impegni che hai già. Togli la spunta a quello che non vuoi.',
+    'Nothing to plan: no open tasks for this day, or no free time left.': 'Niente da pianificare: nessuna attività aperta per questo giorno, o niente tempo libero.',
+    'Add to my day': 'Aggiungi alla giornata',
 }

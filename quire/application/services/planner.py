@@ -9,7 +9,7 @@ from ..bus import ChangeBus, Topic
 from ..dto import AgendaItem, DayAgenda, ItemKind, TaskItem, WeekAgenda
 from ..inputs import EventInput, RoutineInput
 from ..records import (
-    EventRecord, RoutineRecord, course_record, event_record, routine_record, span, task_record,
+    PlanSlot, EventRecord, RoutineRecord, course_record, event_record, routine_record, span, task_record,
 )
 from ..ports import (
     Clock, CourseRepository, EventRepository, JobRepository, JournalRepository, RoutineRepository,
@@ -40,7 +40,7 @@ def _event_item(e: Event) -> AgendaItem:
 
 
 def _routine_items(routines: list[Routine], day: date) -> list[AgendaItem]:
-    return [AgendaItem(ItemKind.ROUTINE, r.id, day, span(milestone_time(r.minute)), r.title,
+    return [AgendaItem(ItemKind.ROUTINE, r.id, day, span(r.time()), r.title,
                        r.color, details="")
             for r in routines if r.occurs_on(day)]
 
@@ -111,6 +111,33 @@ class PlannerService:
         return DayAgenda(day, day == today, tuple(items), task_items,
                          self._journal.get(day), bool(courses))
 
+    # ---- plan my day (0.52) ----
+
+    def suggest_day(self, day: date) -> list[PlanSlot]:
+        """Blocks of time for the open tasks of the day (overdue first), in the free time between
+        classes, events, shifts and routines that last. Nothing is saved until `accept_plan`."""
+        from ...domain.day_plan import DAY_END, DAY_START, plan, round_up
+        agenda = self.day_agenda(day)
+        busy = [(i.time.start, i.time.end) for i in agenda.items
+                if not (i.kind is ItemKind.ROUTINE and i.time.end - i.time.start <= 1)
+                and i.time.end - i.time.start < 24 * 60]
+        start = DAY_START
+        if day == self._clock.today():
+            now = self._clock.now()
+            start = max(start, round_up(now.hour * 60 + now.minute))
+        todo = [(t.task.id, t.task.title) for t in agenda.tasks
+                if not t.task.done and t.task.due is not None and t.task.due <= day]
+        if not todo:  # nothing due by then: the next few days' work
+            todo = [(t.task.id, t.task.title) for t in agenda.tasks if not t.task.done]
+        return [PlanSlot(s.start, s.end, s.title, s.ref) for s in plan(todo, busy, start, DAY_END)]
+
+    def accept_plan(self, day: date, slots: list[PlanSlot]) -> int:
+        """The chosen blocks become events on that day; how many."""
+        for slot in slots:
+            self.save_event(None, EventInput(day, slot.start, slot.end, slot.title,
+                                             color="#5b5bd6"))
+        return len(slots)
+
     def week_agenda(self, any_day: date) -> WeekAgenda:
         monday = monday_of(any_day)
         sunday = monday + timedelta(days=6)
@@ -172,7 +199,7 @@ class PlannerService:
 
     def save_routine(self, routine_id: int | None, data: RoutineInput) -> int:
         routine = Routine(data.title.strip(), data.minute, tuple(sorted(set(data.weekdays))),
-                          data.color, routine_id)
+                          data.color, routine_id, max(0, data.minutes))
         routine.validate()
         if routine_id is None:
             routine.id = self._routines.add(routine)

@@ -190,7 +190,7 @@ class SqliteSyncStore:
             return {"day": r["day"], "start": r["start_min"], "end": r["end_min"],
                     "title": r["title"], "details": r["details"], "color": r["color"]}
         if kind == "routine":
-            return {"title": r["title"], "start": r["start_min"], "color": r["color"],
+            return {"title": r["title"], "start": r["start_min"], "color": r["color"], "minutes": r["minutes"] or 0,
                     "weekdays": [int(d) for d in r["weekdays"].split(",") if d.strip().isdigit()]}
         if kind == "task":
             return {"title": r["title"], "kind": r["kind"],
@@ -304,7 +304,7 @@ class SqliteSyncStore:
                       "title": d["title"], "details": d.get("details", ""),
                       "color": d.get("color", "#8a8f98")}
         elif s.kind == "routine":
-            values = {"title": d["title"], "start_min": d["start"],
+            values = {"title": d["title"], "start_min": d["start"], "minutes": int(d.get("minutes") or 0),
                       "weekdays": ",".join(str(x) for x in d.get("weekdays", range(7))),
                       "color": d.get("color", "#f5a524")}
         elif s.kind == "task":

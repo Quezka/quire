@@ -76,6 +76,7 @@ class RoutineInput:
     minute: int
     weekdays: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
     color: str = "#f5a524"
+    minutes: int = 0  # 0 = a moment
 
 
 @dataclass(frozen=True)

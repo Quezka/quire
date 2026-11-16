@@ -1058,4 +1058,12 @@ MESSAGES = {
     'Text': 'Текст',
     'Saved.': 'Сохранено.',
     'Now in one note, under Notes.': 'Теперь в одной заметке, в «Заметках».',
+    'A moment': 'Мгновение',
+    'Lasts': 'Длится',
+    'A routine lasts at most 12 hours.': 'Рутина длится не больше 12 часов.',
+    'Plan my day': 'Спланировать день',
+    'Plan my day…': 'Спланировать день…',
+    "Time for your tasks, between what's already on. Untick what you don't want.": 'Время для задач между уже запланированным. Снимите галочку с ненужного.',
+    'Nothing to plan: no open tasks for this day, or no free time left.': 'Нечего планировать: на этот день нет открытых задач или нет свободного времени.',
+    'Add to my day': 'Добавить в день',
 }

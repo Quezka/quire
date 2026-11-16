@@ -435,6 +435,10 @@ class RoutineDialog(QDialog):
 
         self.title = QLineEdit(placeholderText=_("e.g. Wake up"))
         self.time = _time_edit(6 * 60)
+        from PySide6.QtWidgets import QSpinBox
+        # 0 = a moment (wake up); > 0 = takes room in the day (shower 20 min) -> plan my day works around it
+        self.length = QSpinBox(minimum=0, maximum=12 * 60, singleStep=5, suffix=" " + _("min"))
+        self.length.setSpecialValueText(_("A moment"))
         self.color = ColorButton("#f5a524")
         self.days = []
         days = QHBoxLayout()
@@ -453,6 +457,7 @@ class RoutineDialog(QDialog):
         form = QFormLayout()
         form.addRow(_("Title"), self.title)
         form.addRow(_("Time"), self.time)
+        form.addRow(_("Lasts"), self.length)
         form.addRow(_("Repeats"), days)
         form.addRow("", week)
         form.addRow(_("Colour"), self.color)
@@ -465,6 +470,7 @@ class RoutineDialog(QDialog):
             r = self.planner.routine(routine_id)
             self.title.setText(r.title)
             self.time.setTime(min_to_qtime(r.minute))
+            self.length.setValue(r.minutes)
             self.color.setColor(r.color)
             self._pick(r.weekdays)
 
@@ -476,7 +482,7 @@ class RoutineDialog(QDialog):
         def save():
             data = RoutineInput(self.title.text().strip(), qtime_to_min(self.time.time()),
                                 tuple(d for d, box in enumerate(self.days) if box.isChecked()),
-                                self.color.color())
+                                self.color.color(), self.length.value())
             self.planner.save_routine(self.routine_id, data)
 
         if attempt(self, save):
@@ -1260,9 +1266,45 @@ def weekly_shift_menu(parent, services: Services, job_id: int, origin: tuple[dat
         JobDialog(services, job_id, parent).exec()
 
 
+class PlanDayDialog(QDialog):
+    """Plan my day: suggested blocks for the day's tasks in the free time; tick the ones to keep."""
+
+    def __init__(self, services: Services, day, parent=None):
+        super().__init__(parent)
+        from .formatting import fmt_min
+        self.services, self.day = services, day
+        self.setWindowTitle(_("Plan my day"))
+        self.slots = services.planner.suggest_day(day)
+        layout = QVBoxLayout(self)
+        intro = QLabel(_("Time for your tasks, between what's already on. Untick what you don't want.")
+                       if self.slots else
+                       _("Nothing to plan: no open tasks for this day, or no free time left."))
+        intro.setWordWrap(True)
+        layout.addWidget(intro)
+        self.boxes = []
+        for slot in self.slots:
+            box = QCheckBox(f"{fmt_min(slot.start)}–{fmt_min(slot.end)}  {slot.title}")
+            box.setChecked(True)
+            self.boxes.append(box)
+            layout.addWidget(box)
+        buttons = QDialogButtonBox(QDialogButtonBox.Cancel)
+        if self.slots:
+            buttons.addButton(_("Add to my day"), QDialogButtonBox.AcceptRole)
+        buttons.accepted.connect(self._accept)
+        buttons.rejected.connect(self.reject)
+        layout.addWidget(buttons)
+
+    def _accept(self):
+        chosen = [s for s, box in zip(self.slots, self.boxes) if box.isChecked()]
+        self.services.planner.accept_plan(self.day, chosen)
+        self.accept()
+
+
 def add_menu(parent, services: Services, day_provider) -> QMenu:
-    """The "+ Add" button's menu: an event or a work shift on the shown day."""
+    """The "+ Add" button's menu: plan my day, an event or a work shift on the shown day."""
     menu = QMenu(parent)
+    menu.addAction(_("Plan my day…"), lambda: PlanDayDialog(services, day_provider(), parent).exec())
+    menu.addSeparator()
     menu.addAction(_("Event…"), lambda: EventDialog(services, day=day_provider(),
                                                  parent=parent).exec())
     menu.addAction(_("Milestone…"), lambda: EventDialog(services, day=day_provider(),

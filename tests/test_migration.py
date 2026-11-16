@@ -180,3 +180,21 @@ def test_v14_databases_gain_routines_and_sleep_logs(tmp_path):
     row = db.conn.execute("SELECT uid, dirty FROM sleep_logs").fetchone()
     assert (row["uid"], row["dirty"]) == ("day:2026-09-23", 1)
     db.close()
+
+
+def test_v20_databases_gain_routine_lengths_and_the_shared_bedtime(tmp_path):
+    path = tmp_path / "v20.db"
+    SqliteDatabase(path).close()
+    with sqlite3.connect(path) as conn:
+        conn.executescript("""
+            INSERT INTO routines (title, start_min) VALUES ('Wake up', 360);
+            ALTER TABLE routines DROP COLUMN minutes;
+            DROP TABLE sleep_state;
+            PRAGMA user_version = 20;
+        """)
+    db = SqliteDatabase(path)
+    assert db.conn.execute("PRAGMA user_version").fetchone()[0] == SCHEMA_VERSION
+    assert db.conn.execute("SELECT minutes FROM routines").fetchone()[0] == 0  # old ones = moments
+    db.conn.execute("INSERT INTO sleep_state (id, since) VALUES (1, '2026-09-22T23:10')")
+    assert db.conn.execute("SELECT uid FROM sleep_state").fetchone()[0] == "pending"
+    db.close()

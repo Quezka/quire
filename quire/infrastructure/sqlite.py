@@ -37,7 +37,8 @@ CREATE TABLE IF NOT EXISTS routines (
     title     TEXT NOT NULL,
     start_min INTEGER NOT NULL,
     weekdays  TEXT NOT NULL DEFAULT '0,1,2,3,4,5,6',
-    color     TEXT NOT NULL DEFAULT '#f5a524'
+    color     TEXT NOT NULL DEFAULT '#f5a524',
+    minutes   INTEGER NOT NULL DEFAULT 0
 );
 CREATE TABLE IF NOT EXISTS tasks (
     id        INTEGER PRIMARY KEY,
@@ -256,6 +257,8 @@ class SqliteDatabase:
         self.conn.execute("CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_external"
                           " ON tasks(external_id) WHERE external_id IS NOT NULL")
         # v20: ideas (table made by SCHEMA); money no longer used (its table stays).
+        # v21: routines last a while (0 = a moment); sleep_state (table made by SCHEMA).
+        self._add_column("routines", "minutes", "INTEGER NOT NULL DEFAULT 0")
         # v9: change tracking for sync between devices (ids, timestamps, tombstones).
         from .sync_store import install
         install(self.conn)

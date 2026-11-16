@@ -1272,3 +1272,20 @@ def test_the_now_card_offers_one_step_and_starts_focus(window, services):
         card.focus_btn.click()
         assert services.focus.state().running
         services.focus.reset()
+
+
+def test_plan_my_day_dialog_adds_only_ticked_blocks(app, window, services):
+    from datetime import timedelta
+    from quire.application.inputs import TaskInput
+    from quire.presentation.dialogs import PlanDayDialog
+    from .conftest import TODAY
+    day = TODAY + timedelta(days=2)
+    services.tasks.save(None, TaskInput("Read chapter 3", due=day))
+    services.tasks.save(None, TaskInput("Lab report", due=day))
+    dialog = PlanDayDialog(services, day, window)
+    assert len(dialog.boxes) == 2
+    kept, dropped = dialog.slots[0].title, dialog.slots[1].title
+    dialog.boxes[1].setChecked(False)
+    dialog._accept()
+    titles = [i.title for i in services.planner.day_agenda(day).items]
+    assert kept in titles and dropped not in titles

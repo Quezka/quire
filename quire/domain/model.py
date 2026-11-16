@@ -118,13 +118,19 @@ def milestone_time(minute: int) -> TimeRange:
 
 @dataclass
 class Routine:
-    """A milestone that repeats on chosen weekdays, such as "Wake up" at 06:00."""
+    """Something that repeats on chosen weekdays: "Wake up" at 06:00 (a moment), or "Shower" 07:00 for 20 min."""
 
     title: str
     minute: int
     weekdays: tuple[int, ...] = (0, 1, 2, 3, 4, 5, 6)
     color: str = "#f5a524"
     id: int | None = None
+    minutes: int = 0  # how long; 0 = a moment (milestone)
+
+    def time(self) -> "TimeRange":
+        if self.minutes <= 0:
+            return milestone_time(self.minute)
+        return TimeRange(self.minute, min(MINUTES_PER_DAY, self.minute + self.minutes))
 
     def validate(self):
         if not self.title.strip():
@@ -133,6 +139,8 @@ class Routine:
             raise ValidationError("The time must fall within a single day.")
         if not self.weekdays or any(not 0 <= d <= 6 for d in self.weekdays):
             raise ValidationError("Pick at least one day of the week.")
+        if not 0 <= self.minutes <= 12 * 60:
+            raise ValidationError("A routine lasts at most 12 hours.")
 
     def occurs_on(self, day: date) -> bool:
         return day.weekday() in self.weekdays
