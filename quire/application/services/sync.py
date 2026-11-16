@@ -16,7 +16,7 @@ from ..ports import (
 )
 
 TOPICS = {"course": Topic.COURSES, "event": Topic.EVENTS, "routine": Topic.EVENTS, "task": Topic.TASKS,
-          "note": Topic.NOTES, "image": Topic.NOTES, "notebook": Topic.NOTES, "journal": Topic.JOURNAL, "idea": Topic.IDEAS, "sleep": Topic.SLEEP, "water": Topic.WATER, "medicine": Topic.MEDICINE, "dose": Topic.MEDICINE, "job": Topic.WORK, "shift": Topic.WORK,
+          "note": Topic.NOTES, "image": Topic.NOTES, "notebook": Topic.NOTES, "journal": Topic.JOURNAL, "idea": Topic.IDEAS, "sleep": Topic.SLEEP, "sleep_state": Topic.SLEEP, "water": Topic.WATER, "medicine": Topic.MEDICINE, "dose": Topic.MEDICINE, "job": Topic.WORK, "shift": Topic.WORK,
           "focus": Topic.FOCUS}
 FULL_PULL = "v20-ideas"  # change -> every device pull all records once more
 _EMAIL = re.compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")

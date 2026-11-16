@@ -47,17 +47,24 @@ class SleepService:
     # ---- one-tap logging: "going to sleep" now, "awake" later ----
 
     def asleep_since(self) -> datetime | None:
-        value = self._settings.get(self.PREFIX + "pending")
-        try:
-            return datetime.fromisoformat(value) if value else None
-        except ValueError:
-            return None
+        since = self._logs.pending()
+        if since is None:  # before 0.52 = per device setting -> move into the shared row once
+            value = self._settings.get(self.PREFIX + "pending")
+            try:
+                since = datetime.fromisoformat(value) if value else None
+            except ValueError:
+                since = None
+            if since is not None:
+                self._logs.set_pending(since)
+                self._settings.set(self.PREFIX + "pending", None)
+        return since
 
     def go_to_sleep(self) -> None:
-        self._settings.set(self.PREFIX + "pending", self._clock.now().isoformat(timespec="minutes"))
+        self._logs.set_pending(self._clock.now().replace(second=0, microsecond=0))
         self._bus.publish(Topic.SLEEP)
 
     def cancel_going_to_sleep(self) -> None:
+        self._logs.set_pending(None)
         self._settings.set(self.PREFIX + "pending", None)
         self._bus.publish(Topic.SLEEP)
 
@@ -72,6 +79,7 @@ class SleepService:
         log = SleepLog(now.date(), since.hour * 60 + since.minute, now.hour * 60 + now.minute)
         log.validate()
         self._logs.put(log)
+        self._logs.set_pending(None)
         self._settings.set(self.PREFIX + "pending", None)
         self._bus.publish(Topic.SLEEP)
         return sleep_record(log)

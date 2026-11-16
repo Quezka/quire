@@ -53,6 +53,13 @@ class CompatibilityTest {
         assertEquals("woke once", night.note)
     }
 
+    @Test fun goingToBedOnTheDesktopIsSeenOnThePhone() {
+        val repo = repository()
+        assertEquals(java.time.LocalDateTime.of(2026, 9, 22, 23, 10), repo.sleepPending())
+        repo.setSleepPending(null)
+        assertEquals(null, repo.sleepPending())
+    }
+
     @Test fun waterFromTheDesktopIsRead() {
         val glass = repository().waterLogs().single()
         assertEquals(300, glass.ml)

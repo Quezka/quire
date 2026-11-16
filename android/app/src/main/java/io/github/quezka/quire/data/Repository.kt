@@ -80,6 +80,16 @@ class Repository(
         records.save("sleep", uid, Codec.sleepData(log.copy(note = log.note.trim()), records.get("sleep", uid)?.data))
         changed()
     }
+    /** "Going to bed" time shared by every device (kind `sleep_state`, uid `pending`, 0.52). */
+    fun sleepPending(): java.time.LocalDateTime? = records.get("sleep_state", "pending")?.data
+        ?.let { (it["since"] as? kotlinx.serialization.json.JsonPrimitive)?.contentOrNullSafe() }
+        ?.let { runCatching { java.time.LocalDateTime.parse(it) }.getOrNull() }
+    fun setSleepPending(since: java.time.LocalDateTime?) {
+        records.save("sleep_state", "pending", kotlinx.serialization.json.JsonObject(mapOf(
+            "since" to (since?.let { kotlinx.serialization.json.JsonPrimitive(it.withSecond(0).withNano(0).toString()) }
+                ?: kotlinx.serialization.json.JsonNull))))
+        changed()
+    }
     fun deleteSleep(day: LocalDate) {
         records.delete("sleep", Codec.sleepUid(day))
         changed()
@@ -405,3 +415,6 @@ class Repository(
 
     fun pending() = records.pending()
 }
+
+private fun kotlinx.serialization.json.JsonPrimitive.contentOrNullSafe(): String? =
+    if (this is kotlinx.serialization.json.JsonNull) null else content

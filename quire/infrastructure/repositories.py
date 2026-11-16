@@ -351,6 +351,18 @@ class SqliteSleepRepository(_Repo):
     def delete(self, day):
         self._write("DELETE FROM sleep_logs WHERE day = ?", day.isoformat())
 
+    def pending(self):
+        r = self._one("SELECT since FROM sleep_state WHERE id = 1")
+        try:
+            return datetime.fromisoformat(r["since"]) if r and r["since"] else None
+        except ValueError:
+            return None
+
+    def set_pending(self, since):
+        value = since.isoformat(timespec="minutes") if since else None
+        self._write("INSERT INTO sleep_state (id, since) VALUES (1, ?)"
+                    " ON CONFLICT(id) DO UPDATE SET since = excluded.since", value)
+
 
 class SqliteIdeaRepository(_Repo):
     @staticmethod

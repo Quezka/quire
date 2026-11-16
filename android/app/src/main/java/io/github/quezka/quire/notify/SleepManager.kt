@@ -22,10 +22,17 @@ class SleepManager(
     fun remindEnabled() = settings.get("sleep.remind") != "0"
     fun setRemind(on: Boolean) { settings.set("sleep.remind", if (on) "1" else "0"); plan() }
 
-    fun asleepSince(): LocalDateTime? = settings.get("sleep.pending")?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() }
+    /** Shared with the desktop (bed on one device, wake on the other); old per-device setting moved once. */
+    fun asleepSince(): LocalDateTime? {
+        repo.sleepPending()?.let { return it }
+        val old = settings.get("sleep.pending")?.let { runCatching { LocalDateTime.parse(it) }.getOrNull() } ?: return null
+        repo.setSleepPending(old)
+        settings.set("sleep.pending", null)
+        return old
+    }
 
-    fun goToSleep() { settings.set("sleep.pending", now().withSecond(0).withNano(0).toString()); plan() }
-    fun cancel() { settings.set("sleep.pending", null) }
+    fun goToSleep() { repo.setSleepPending(now()); plan() }
+    fun cancel() { repo.setSleepPending(null); settings.set("sleep.pending", null) }
 
     /** Close the night started with [goToSleep], waking now; null if nothing was started or it was
      *  more than 18 hours ago or less than 30 minutes ago. */
@@ -36,6 +43,7 @@ class SleepManager(
         if (minutes < 30 || minutes > 18 * 60) return null
         val log = SleepLog(time.toLocalDate(), since.hour * 60 + since.minute, time.hour * 60 + time.minute)
         repo.saveSleep(log)
+        repo.setSleepPending(null)
         settings.set("sleep.pending", null)
         return log
     }

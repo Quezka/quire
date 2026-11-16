@@ -420,6 +420,32 @@ def test_sleep_logs_reach_the_other_device_one_per_day(pair):
     assert a.sleep.night(TODAY) is None
 
 
+def test_going_to_bed_on_one_device_and_waking_on_the_other_logs_the_night(pair):
+    from datetime import datetime, timedelta
+    a, b = pair
+    a.sleep.go_to_sleep()
+    since = a.sleep.asleep_since()
+    a.sync.sync()
+    b.sync.sync()
+    assert b.sleep.asleep_since() == since
+    b.sleep._clock.now = lambda: since + timedelta(hours=8)  # morning on the phone
+    tick()
+    night = b.sleep.wake_up()
+    b.sync.sync()
+    a.sync.sync()
+    assert a.sleep.asleep_since() is None
+    assert a.sleep.night(night.day) is not None
+
+
+def test_old_per_device_bedtime_moves_into_the_shared_row(pair):
+    a, b = pair
+    a.sleep._settings.set("sleep.pending", "2026-03-02T23:10")
+    assert a.sleep.asleep_since().hour == 23 and a.sleep._settings.get("sleep.pending") is None
+    a.sync.sync()
+    b.sync.sync()
+    assert b.sleep.asleep_since() is not None
+
+
 def test_notebooks_and_the_notes_in_them_reach_the_other_device(pair):
     a, b = pair
     ideas = a.notes.create_notebook(NotebookInput("Ideas", "#f76b15")).id

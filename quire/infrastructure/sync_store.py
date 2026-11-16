@@ -49,6 +49,8 @@ SYNCED = (
     Synced("journal", "journal", "'day:' || NEW.day"),
     Synced("water", "water_logs", RANDOM_UID),  # one record per glass
     Synced("sleep", "sleep_logs", "'day:' || NEW.day"),  # one night per day, like the journal
+    # "going to bed" on one device, "woke up" on the other (0.52, schema v21): one shared row
+    Synced("sleep_state", "sleep_state", "'pending'"),
     Synced("shift", "shifts", RANDOM_UID),
     Synced("focus", "focus_sessions", RANDOM_UID),
     Synced("medicine", "medicines", RANDOM_UID),
@@ -217,6 +219,8 @@ class SqliteSyncStore:
                     "taken": bool(r["taken"]), "at": r["at_min"]}
         if kind == "idea":
             return {"text": r["text"], "created": r["created"], "done": bool(r["done"])}
+        if kind == "sleep_state":
+            return {"since": r["since"]}
         if kind == "sleep":
             return {"day": r["day"], "asleep": r["asleep"], "woke": r["woke"],
                     "quality": r["quality"], "note": r["note"]}
@@ -336,6 +340,8 @@ class SqliteSyncStore:
                       "taken": int(d.get("taken", True)), "at_min": d.get("at", 0)}
         elif s.kind == "idea":
             values = {"text": d["text"], "created": d["created"], "done": int(bool(d.get("done", False)))}
+        elif s.kind == "sleep_state":
+            values = {"id": 1, "since": d.get("since")}
         elif s.kind == "sleep":
             values = {"day": d["day"], "asleep": d["asleep"], "woke": d["woke"],
                       "quality": d.get("quality"), "note": d.get("note", "")}
@@ -387,6 +393,8 @@ class SqliteSyncStore:
     def _same_thing(self, s: Synced, values: dict):
         """A local row that is the same thing under another uid: the same day's journal, or
         the same register item imported before this device had synced."""
+        if s.kind == "sleep_state":
+            return self._conn.execute("SELECT rowid FROM sleep_state WHERE id = 1").fetchone()
         if s.kind in ("journal", "sleep"):
             return self._conn.execute(f"SELECT rowid FROM {s.table} WHERE day = ?",
                                       (values["day"],)).fetchone()
